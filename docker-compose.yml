@@ -1,0 +1,44 @@
+# Local Elasticsearch for dev only. Security is disabled here for convenience;
+# when you move to a hosted cluster, set ELASTICSEARCH_URL / _USERNAME / _PASSWORD
+# in .env.local instead of touching this file.
+services:
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.15.2
+    container_name: rag-saas-es
+    environment:
+      - discovery.type=single-node
+      - xpack.security.enabled=false
+      - xpack.security.http.ssl.enabled=false
+      - "ES_JAVA_OPTS=-Xms1g -Xmx1g"
+      - bootstrap.memory_lock=true
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+    ports:
+      # Host port 9201 (not 9200) — this machine already runs another
+      # Elasticsearch container on 9200 for a different project.
+      - "9201:9200"
+    volumes:
+      - esdata:/usr/share/elasticsearch/data
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:9200/_cluster/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  # Optional: Kibana for browsing the index during dev. Comment out if not needed.
+  kibana:
+    image: docker.elastic.co/kibana/kibana:8.15.2
+    container_name: rag-saas-kibana
+    environment:
+      - ELASTICSEARCH_HOSTS=http://elasticsearch:9200
+    ports:
+      - "5601:5601"
+    depends_on:
+      elasticsearch:
+        condition: service_healthy
+
+volumes:
+  esdata:
+    driver: local
