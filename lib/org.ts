@@ -9,7 +9,7 @@ export interface CurrentOrg {
 /**
  * Returns the current user's first organization, or null if they don't
  * belong to one yet. The MVP assumes one org per user (schema supports
- * many — multi-org switching is a later iteration).
+ * many; multi-org switching is a later iteration).
  */
 export async function getCurrentOrg(): Promise<CurrentOrg | null> {
   const supabase = createClient();

@@ -18,7 +18,7 @@ const { ensureChunksIndex, getEsClient, hybridSearch, CHUNKS_INDEX } = await imp
 );
 
 const sampleDoc = `
-Script de vente — objection prix.
+Script de vente : objection prix.
 
 Quand un client dit que le prix est trop élevé, ne baisse jamais le prix immédiatement.
 Reformule d'abord la valeur perçue : demande-lui ce qui compte le plus pour lui dans sa décision.

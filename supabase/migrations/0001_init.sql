@@ -1,5 +1,5 @@
 -- ============================================================================
--- RAG SaaS — initial multi-tenant schema
+-- RAG SaaS: initial multi-tenant schema
 -- ============================================================================
 -- Tenancy model: one "organization" = one client. Users belong to
 -- organizations via users_organizations (many-to-many, with a role).
@@ -19,7 +19,7 @@ create table if not exists organizations (
 );
 
 -- ----------------------------------------------------------------------------
--- users_organizations — links auth.users to organizations with a role.
+-- users_organizations: links auth.users to organizations with a role.
 -- No separate "users" table: Supabase Auth's auth.users is the source of
 -- truth for identity; this table only adds the tenancy + role relationship.
 -- ----------------------------------------------------------------------------
@@ -34,7 +34,7 @@ create table if not exists users_organizations (
 create index if not exists users_organizations_org_idx on users_organizations (organization_id);
 
 -- ----------------------------------------------------------------------------
--- chatbots — an organization can run several bots (e.g. one per use case).
+-- chatbots: an organization can run several bots (e.g. one per use case).
 -- ----------------------------------------------------------------------------
 create table if not exists chatbots (
   id uuid primary key default gen_random_uuid(),
@@ -47,7 +47,7 @@ create table if not exists chatbots (
 create index if not exists chatbots_org_idx on chatbots (organization_id);
 
 -- ----------------------------------------------------------------------------
--- documents — one row per uploaded file; indexing status tracked here while
+-- documents: one row per uploaded file; indexing status tracked here while
 -- the actual chunks/embeddings live in Elasticsearch.
 -- ----------------------------------------------------------------------------
 create table if not exists documents (

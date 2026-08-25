@@ -4,6 +4,10 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { createClient } from '@/lib/supabase/client';
+import { Button } from '@/components/ui/Button';
+import { Card } from '@/components/ui/Card';
+import { Input, Label } from '@/components/ui/Card';
+import { Logo } from '@/components/ui/Logo';
 
 export default function LoginPage() {
   const router = useRouter();
@@ -31,49 +35,54 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center">
-      <form onSubmit={handleSubmit} className="w-full max-w-sm space-y-4 rounded-lg border bg-white p-6 shadow-sm">
-        <h1 className="text-xl font-semibold">Connexion</h1>
-
-        <div className="space-y-1">
-          <label className="text-sm font-medium">Email</label>
-          <input
-            type="email"
-            required
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            className="w-full rounded border px-3 py-2 text-sm"
-          />
+    <div className="flex min-h-screen items-center justify-center bg-slate-50 px-4">
+      <div className="w-full max-w-sm">
+        <div className="mb-8 flex justify-center">
+          <Link href="/">
+            <Logo />
+          </Link>
         </div>
 
-        <div className="space-y-1">
-          <label className="text-sm font-medium">Mot de passe</label>
-          <input
-            type="password"
-            required
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            className="w-full rounded border px-3 py-2 text-sm"
-          />
-        </div>
+        <Card className="p-8">
+          <h1 className="text-lg font-semibold text-slate-900">Connexion</h1>
+          <p className="mt-1 text-sm text-slate-500">Accédez à votre espace Corpus.ai.</p>
 
-        {error && <p className="text-sm text-red-600">{error}</p>}
+          <form onSubmit={handleSubmit} className="mt-6 space-y-4">
+            <div className="space-y-1.5">
+              <Label>Email</Label>
+              <Input
+                type="email"
+                required
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+              />
+            </div>
 
-        <button
-          type="submit"
-          disabled={loading}
-          className="w-full rounded bg-gray-900 py-2 text-sm font-medium text-white disabled:opacity-50"
-        >
-          {loading ? 'Connexion...' : 'Se connecter'}
-        </button>
+            <div className="space-y-1.5">
+              <Label>Mot de passe</Label>
+              <Input
+                type="password"
+                required
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+              />
+            </div>
 
-        <p className="text-center text-sm text-gray-600">
+            {error && <p className="text-sm text-red-600">{error}</p>}
+
+            <Button type="submit" disabled={loading} className="w-full">
+              {loading ? 'Connexion...' : 'Se connecter'}
+            </Button>
+          </form>
+        </Card>
+
+        <p className="mt-6 text-center text-sm text-slate-500">
           Pas encore de compte ?{' '}
-          <Link href="/signup" className="font-medium text-gray-900 underline">
+          <Link href="/signup" className="font-medium text-brand-700 hover:text-brand-800">
             Créer un compte
           </Link>
         </p>
-      </form>
+      </div>
     </div>
   );
 }

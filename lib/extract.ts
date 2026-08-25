@@ -6,18 +6,21 @@ const MIN_CHARS_PER_PAGE = 20;
 
 export class UnsupportedDocumentError extends Error {}
 
-export type SupportedFileType = 'pdf' | 'docx' | 'txt';
+export type SupportedFileType = 'pdf' | 'docx' | 'txt' | 'md';
 
 export function detectFileType(filename: string): SupportedFileType | null {
   const ext = filename.toLowerCase().split('.').pop();
   if (ext === 'pdf') return 'pdf';
   if (ext === 'docx') return 'docx';
   if (ext === 'txt') return 'txt';
+  if (ext === 'md') return 'md';
   return null;
 }
 
 export async function extractText(buffer: Buffer, fileType: SupportedFileType): Promise<string> {
-  if (fileType === 'txt') {
+  // Markdown is plain text for chunking/embedding purposes — the raw syntax
+  // (#, **, ```) adds a little noise but doesn't hurt retrieval quality.
+  if (fileType === 'txt' || fileType === 'md') {
     return buffer.toString('utf-8');
   }
 
@@ -39,7 +42,7 @@ export async function extractText(buffer: Buffer, fileType: SupportedFileType): 
 
     if (avgCharsPerPage < MIN_CHARS_PER_PAGE) {
       throw new UnsupportedDocumentError(
-        "Ce PDF semble être un scan/image sans texte extractible. L'OCR n'est pas encore supporté — merci d'uploader un PDF avec du texte natif."
+        "Ce PDF semble être un scan/image sans texte extractible. L'OCR n'est pas encore supporté, merci d'uploader un PDF avec du texte natif."
       );
     }
 

@@ -4,6 +4,9 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { createClient } from '@/lib/supabase/client';
+import { Button } from '@/components/ui/Button';
+import { Card, Input, Label } from '@/components/ui/Card';
+import { Logo } from '@/components/ui/Logo';
 
 export default function SignupPage() {
   const router = useRouter();
@@ -35,7 +38,7 @@ export default function SignupPage() {
     // If email confirmation is disabled in the Supabase project (recommended
     // for the pilot), signUp() returns an active session immediately and we
     // can create the organization right away. Otherwise the user must
-    // confirm their email first — org creation happens after they log in
+    // confirm their email first; org creation happens after they log in
     // for the first time (see dashboard page's onboarding check).
     if (data.session) {
       const { error: orgError } = await supabase.rpc('create_organization', {
@@ -57,74 +60,83 @@ export default function SignupPage() {
 
   if (pendingConfirmation) {
     return (
-      <div className="flex min-h-screen items-center justify-center">
-        <div className="max-w-sm space-y-2 rounded-lg border bg-white p-6 text-center shadow-sm">
-          <h1 className="text-lg font-semibold">Vérifie ta boîte mail</h1>
-          <p className="text-sm text-gray-600">
-            Un email de confirmation a été envoyé à {email}. Clique sur le lien pour activer ton
-            compte, puis connecte-toi.
-          </p>
+      <div className="flex min-h-screen items-center justify-center bg-slate-50 px-4">
+        <div className="w-full max-w-sm">
+          <div className="mb-8 flex justify-center">
+            <Logo />
+          </div>
+          <Card className="p-8 text-center">
+            <h1 className="text-lg font-semibold text-slate-900">Vérifiez votre boîte mail</h1>
+            <p className="mt-2 text-sm text-slate-500">
+              Un email de confirmation a été envoyé à <span className="font-medium">{email}</span>.
+              Cliquez sur le lien pour activer votre compte, puis connectez-vous.
+            </p>
+          </Card>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center">
-      <form onSubmit={handleSubmit} className="w-full max-w-sm space-y-4 rounded-lg border bg-white p-6 shadow-sm">
-        <h1 className="text-xl font-semibold">Créer un compte</h1>
-
-        <div className="space-y-1">
-          <label className="text-sm font-medium">Nom de l'entreprise</label>
-          <input
-            type="text"
-            required
-            value={orgName}
-            onChange={(e) => setOrgName(e.target.value)}
-            className="w-full rounded border px-3 py-2 text-sm"
-          />
+    <div className="flex min-h-screen items-center justify-center bg-slate-50 px-4">
+      <div className="w-full max-w-sm">
+        <div className="mb-8 flex justify-center">
+          <Link href="/">
+            <Logo />
+          </Link>
         </div>
 
-        <div className="space-y-1">
-          <label className="text-sm font-medium">Email</label>
-          <input
-            type="email"
-            required
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            className="w-full rounded border px-3 py-2 text-sm"
-          />
-        </div>
+        <Card className="p-8">
+          <h1 className="text-lg font-semibold text-slate-900">Créer un compte</h1>
+          <p className="mt-1 text-sm text-slate-500">Démarrez votre pilote gratuit.</p>
 
-        <div className="space-y-1">
-          <label className="text-sm font-medium">Mot de passe</label>
-          <input
-            type="password"
-            required
-            minLength={6}
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            className="w-full rounded border px-3 py-2 text-sm"
-          />
-        </div>
+          <form onSubmit={handleSubmit} className="mt-6 space-y-4">
+            <div className="space-y-1.5">
+              <Label>Nom de l'entreprise</Label>
+              <Input
+                type="text"
+                required
+                value={orgName}
+                onChange={(e) => setOrgName(e.target.value)}
+              />
+            </div>
 
-        {error && <p className="text-sm text-red-600">{error}</p>}
+            <div className="space-y-1.5">
+              <Label>Email</Label>
+              <Input
+                type="email"
+                required
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+              />
+            </div>
 
-        <button
-          type="submit"
-          disabled={loading}
-          className="w-full rounded bg-gray-900 py-2 text-sm font-medium text-white disabled:opacity-50"
-        >
-          {loading ? 'Création...' : 'Créer le compte'}
-        </button>
+            <div className="space-y-1.5">
+              <Label>Mot de passe</Label>
+              <Input
+                type="password"
+                required
+                minLength={6}
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+              />
+            </div>
 
-        <p className="text-center text-sm text-gray-600">
+            {error && <p className="text-sm text-red-600">{error}</p>}
+
+            <Button type="submit" disabled={loading} className="w-full">
+              {loading ? 'Création...' : 'Créer le compte'}
+            </Button>
+          </form>
+        </Card>
+
+        <p className="mt-6 text-center text-sm text-slate-500">
           Déjà un compte ?{' '}
-          <Link href="/login" className="font-medium text-gray-900 underline">
+          <Link href="/login" className="font-medium text-brand-700 hover:text-brand-800">
             Se connecter
           </Link>
         </p>
-      </form>
+      </div>
     </div>
   );
 }

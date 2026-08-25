@@ -43,7 +43,7 @@ export interface ChunkDoc {
 
 /**
  * Creates the chunks index with its mapping if it doesn't exist yet.
- * Safe to call on every server start — it's a no-op if the index is present.
+ * Safe to call on every server start: it's a no-op if the index is present.
  */
 export async function ensureChunksIndex(): Promise<void> {
   const es = getEsClient();
@@ -94,12 +94,12 @@ const RRF_RANK_CONSTANT = 60;
 /**
  * Hybrid retrieval: full-text (BM25) on `content` fused with kNN on
  * `embedding`, filtered to one chatbot's organization scope. Always filter
- * by both organization_id and chatbot_id — this is the multi-tenant
+ * by both organization_id and chatbot_id: this is the multi-tenant
  * boundary.
  *
  * Fusion is Reciprocal Rank Fusion computed in application code (two
  * separate searches, combined by rank) rather than Elasticsearch's native
- * `retriever.rrf`, which requires a Platinum license — not something we
+ * `retriever.rrf`, which requires a Platinum license and isn't something we
  * want to depend on for a self-hosted Basic-license cluster. Same formula
  * ES uses natively: score(doc) = sum over retrievers of 1 / (k + rank),
  * with k = 60 (ES's own default).

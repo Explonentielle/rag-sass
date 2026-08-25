@@ -4,7 +4,7 @@ import type { Database } from '@/types/database';
 
 /**
  * Server-side Supabase client bound to the request's auth cookies.
- * Respects RLS as the calling user — use this for all normal reads/writes
+ * Respects RLS as the calling user; use this for all normal reads/writes
  * from Route Handlers and Server Components.
  */
 export function createClient() {
@@ -24,7 +24,7 @@ export function createClient() {
               cookieStore.set(name, value, options)
             );
           } catch {
-            // Called from a Server Component with no response to write to —
+            // Called from a Server Component with no response to write to;
             // safe to ignore as long as middleware also refreshes the session.
           }
         },

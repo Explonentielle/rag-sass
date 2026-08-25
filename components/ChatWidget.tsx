@@ -1,6 +1,8 @@
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
+import { Button } from '@/components/ui/Button';
+import { Input } from '@/components/ui/Card';
 
 interface Message {
   role: 'user' | 'assistant';
@@ -22,7 +24,17 @@ function parseSseChunk(chunk: string): { event: string; data: any }[] {
     });
 }
 
-export default function ChatWidget({ chatbotId }: { chatbotId: string }) {
+export default function ChatWidget({
+  chatbotId,
+  apiEndpoint = '/api/chat',
+  placeholder = 'Posez une question sur les documents de ce chatbot.',
+  className = 'rounded-xl border border-slate-200 shadow-card',
+}: {
+  chatbotId: string;
+  apiEndpoint?: string;
+  placeholder?: string;
+  className?: string;
+}) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
@@ -44,7 +56,7 @@ export default function ChatWidget({ chatbotId }: { chatbotId: string }) {
     setLoading(true);
 
     try {
-      const res = await fetch('/api/chat', {
+      const res = await fetch(apiEndpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ chatbotId, question, history }),
@@ -105,25 +117,27 @@ export default function ChatWidget({ chatbotId }: { chatbotId: string }) {
   }
 
   return (
-    <div className="flex flex-1 flex-col overflow-hidden rounded-lg border bg-white">
-      <div className="flex-1 space-y-4 overflow-y-auto p-4">
+    <div className={`flex flex-1 flex-col overflow-hidden bg-white ${className}`}>
+      <div className="flex-1 space-y-4 overflow-y-auto p-6">
         {messages.length === 0 && (
-          <p className="text-sm text-gray-400">Pose une question sur les documents de ce chatbot.</p>
+          <div className="flex h-full items-center justify-center">
+            <p className="text-sm text-slate-400">{placeholder}</p>
+          </div>
         )}
 
         {messages.map((m, i) => (
           <div key={i} className={m.role === 'user' ? 'flex justify-end' : 'flex justify-start'}>
             <div
-              className={`max-w-[80%] rounded-lg px-3 py-2 text-sm ${
-                m.role === 'user' ? 'bg-gray-900 text-white' : 'bg-gray-100 text-gray-900'
+              className={`max-w-[80%] rounded-lg px-4 py-2.5 text-sm leading-relaxed ${
+                m.role === 'user' ? 'bg-brand-800 text-white' : 'bg-slate-100 text-slate-900'
               }`}
             >
-              <p className="whitespace-pre-wrap">{m.content || (loading && i === messages.length - 1 ? '...' : '')}</p>
+              <p className="whitespace-pre-wrap">{m.content || (loading && i === messages.length - 1 ? '···' : '')}</p>
 
               {m.error && <p className="mt-1 text-xs text-red-600">{m.error}</p>}
 
               {m.sources && m.sources.length > 0 && (
-                <div className="mt-2 border-t border-gray-300/50 pt-1 text-xs text-gray-500">
+                <div className="mt-2 border-t border-slate-300/60 pt-1.5 text-xs text-slate-500">
                   Sources : {m.sources.join(', ')}
                 </div>
               )}
@@ -133,22 +147,17 @@ export default function ChatWidget({ chatbotId }: { chatbotId: string }) {
         <div ref={bottomRef} />
       </div>
 
-      <form onSubmit={handleSubmit} className="flex gap-2 border-t p-3">
-        <input
+      <form onSubmit={handleSubmit} className="flex gap-2 border-t border-slate-200 p-4">
+        <Input
           type="text"
           value={input}
           onChange={(e) => setInput(e.target.value)}
-          placeholder="Pose ta question..."
+          placeholder="Posez votre question..."
           disabled={loading}
-          className="flex-1 rounded border px-3 py-2 text-sm"
         />
-        <button
-          type="submit"
-          disabled={loading || !input.trim()}
-          className="rounded bg-gray-900 px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
-        >
+        <Button type="submit" disabled={loading || !input.trim()}>
           Envoyer
-        </button>
+        </Button>
       </form>
     </div>
   );

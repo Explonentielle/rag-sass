@@ -15,9 +15,12 @@ export default async function ChatPage({ params }: { params: { id: string } }) {
   if (!chatbot) notFound();
 
   return (
-    <div className="flex h-[calc(100vh-8rem)] flex-col">
+    <div className="flex h-[calc(100vh-9rem)] flex-col">
       <div className="mb-4">
-        <Link href={`/dashboard/chatbots/${chatbot.id}`} className="text-sm text-gray-500 hover:underline">
+        <Link
+          href={`/dashboard/chatbots/${chatbot.id}`}
+          className="text-sm text-slate-500 hover:text-slate-700"
+        >
           ← {chatbot.name}
         </Link>
       </div>

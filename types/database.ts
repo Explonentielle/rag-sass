@@ -56,6 +56,29 @@ export interface Database {
           created_at?: string;
         };
       };
+      custom_templates: {
+        Row: {
+          id: string;
+          organization_id: string;
+          label: string;
+          template: string;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          organization_id: string;
+          label: string;
+          template: string;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          organization_id?: string;
+          label?: string;
+          template?: string;
+          created_at?: string;
+        };
+      };
       documents: {
         Row: {
           id: string;

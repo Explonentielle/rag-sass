@@ -18,7 +18,7 @@ export interface ChatTurn {
 
 /**
  * Streams a RAG answer from Claude. `history` should NOT include the
- * current question — that's passed separately as `question` and appended
+ * current question: that's passed separately as `question` and appended
  * as the final user turn.
  */
 export async function* streamAnswer(params: {

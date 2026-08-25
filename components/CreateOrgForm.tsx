@@ -3,6 +3,9 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
+import { Button } from '@/components/ui/Button';
+import { Card, Input } from '@/components/ui/Card';
+import { Logo } from '@/components/ui/Logo';
 
 export default function CreateOrgForm() {
   const router = useRouter();
@@ -28,27 +31,29 @@ export default function CreateOrgForm() {
   }
 
   return (
-    <div className="mx-auto max-w-sm rounded-lg border bg-white p-6 shadow-sm">
-      <h1 className="mb-1 text-lg font-semibold">Bienvenue</h1>
-      <p className="mb-4 text-sm text-gray-600">Donne un nom à ton organisation pour commencer.</p>
-      <form onSubmit={handleSubmit} className="space-y-3">
-        <input
-          type="text"
-          required
-          placeholder="Nom de l'entreprise"
-          value={orgName}
-          onChange={(e) => setOrgName(e.target.value)}
-          className="w-full rounded border px-3 py-2 text-sm"
-        />
-        {error && <p className="text-sm text-red-600">{error}</p>}
-        <button
-          type="submit"
-          disabled={loading}
-          className="w-full rounded bg-gray-900 py-2 text-sm font-medium text-white disabled:opacity-50"
-        >
-          {loading ? 'Création...' : 'Créer mon organisation'}
-        </button>
-      </form>
+    <div className="mx-auto max-w-sm py-12">
+      <div className="mb-6 flex justify-center">
+        <Logo />
+      </div>
+      <Card className="p-8">
+        <h1 className="text-lg font-semibold text-slate-900">Bienvenue</h1>
+        <p className="mt-1 text-sm text-slate-500">
+          Donnez un nom à votre organisation pour commencer.
+        </p>
+        <form onSubmit={handleSubmit} className="mt-6 space-y-4">
+          <Input
+            type="text"
+            required
+            placeholder="Nom de l'entreprise"
+            value={orgName}
+            onChange={(e) => setOrgName(e.target.value)}
+          />
+          {error && <p className="text-sm text-red-600">{error}</p>}
+          <Button type="submit" disabled={loading} className="w-full">
+            {loading ? 'Création...' : 'Créer mon organisation'}
+          </Button>
+        </form>
+      </Card>
     </div>
   );
 }

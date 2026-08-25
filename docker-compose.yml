@@ -16,7 +16,7 @@ services:
         soft: -1
         hard: -1
     ports:
-      # Host port 9201 (not 9200) — this machine already runs another
+      # Host port 9201 (not 9200): this machine already runs another
       # Elasticsearch container on 9200 for a different project.
       - "9201:9200"
     volumes:

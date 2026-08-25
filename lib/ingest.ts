@@ -20,7 +20,7 @@ export interface ProcessDocumentParams {
  * Runs the full ingestion pipeline for one document, synchronously, updating
  * its status in Postgres at each step: pending -> processing -> indexed|error.
  *
- * Run inline in the upload request for this MVP (no job queue yet) — fine
+ * Run inline in the upload request for this MVP (no job queue yet); fine
  * for the pilot's document sizes; move to a background worker if uploads
  * start timing out.
  */
@@ -30,9 +30,9 @@ export async function processDocument(
 ): Promise<{ status: 'indexed' | 'error'; errorMessage?: string; chunkCount?: number }> {
   const { documentId, chatbotId, organizationId, storagePath, fileType, filename } = params;
 
-  await supabase.from('documents').update({ status: 'processing' }).eq('id', documentId);
-
   try {
+    await supabase.from('documents').update({ status: 'processing' }).eq('id', documentId);
+
     const { data: fileBlob, error: downloadError } = await supabase.storage
       .from('documents')
       .download(storagePath);

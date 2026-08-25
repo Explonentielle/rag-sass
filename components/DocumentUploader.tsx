@@ -2,6 +2,7 @@
 
 import { useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { Button } from '@/components/ui/Button';
 
 export default function DocumentUploader({ chatbotId }: { chatbotId: string }) {
   const router = useRouter();
@@ -40,18 +41,24 @@ export default function DocumentUploader({ chatbotId }: { chatbotId: string }) {
   }
 
   return (
-    <div className="space-y-1">
-      <label className="inline-block cursor-pointer rounded border border-dashed px-4 py-2 text-sm hover:bg-gray-50">
-        {uploading ? 'Traitement en cours...' : '+ Ajouter un document (.pdf, .docx, .txt)'}
-        <input
-          ref={inputRef}
-          type="file"
-          accept=".pdf,.docx,.txt"
-          onChange={handleFileChange}
-          disabled={uploading}
-          className="hidden"
-        />
-      </label>
+    <div className="flex flex-col items-end gap-1">
+      <Button
+        variant="secondary"
+        size="sm"
+        onClick={() => inputRef.current?.click()}
+        disabled={uploading}
+      >
+        {uploading ? 'Traitement en cours...' : '+ Ajouter un document'}
+      </Button>
+      <input
+        ref={inputRef}
+        type="file"
+        accept=".pdf,.docx,.txt,.md"
+        onChange={handleFileChange}
+        disabled={uploading}
+        className="hidden"
+      />
+      <p className="text-xs text-slate-400">.pdf, .docx, .txt, .md</p>
       {error && <p className="text-sm text-red-600">{error}</p>}
     </div>
   );

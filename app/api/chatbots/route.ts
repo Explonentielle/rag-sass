@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
-import { getPromptTemplate, PROMPT_TEMPLATES } from '@/lib/prompts';
+import { PROMPT_TEMPLATES } from '@/lib/prompts';
 
 export async function POST(request: Request) {
   const supabase = createClient();
@@ -14,22 +14,22 @@ export async function POST(request: Request) {
   const body = await request.json().catch(() => null);
   const organizationId: string | undefined = body?.organizationId;
   const name: string | undefined = body?.name?.trim();
-  const templateId: string | undefined = body?.templateId;
+  // Full prompt text, resolved client-side from either a default or a
+  // custom (org-owned) template — the server doesn't need to distinguish.
+  const systemPromptTemplate: string | undefined = body?.systemPromptTemplate?.trim();
 
   if (!organizationId || !name) {
     return NextResponse.json({ error: 'organizationId et name sont requis.' }, { status: 400 });
   }
 
-  const template = getPromptTemplate(templateId ?? '') ?? PROMPT_TEMPLATES[0];
-
   // RLS (chatbots_insert policy: is_org_member) enforces that the user
-  // actually belongs to this organization — no extra check needed here.
+  // actually belongs to this organization; no extra check needed here.
   const { data, error } = await supabase
     .from('chatbots')
     .insert({
       organization_id: organizationId,
       name,
-      system_prompt_template: template.template,
+      system_prompt_template: systemPromptTemplate || PROMPT_TEMPLATES[0].template,
     })
     .select('id')
     .single();
