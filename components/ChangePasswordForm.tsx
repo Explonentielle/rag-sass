@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/Button';
 import { Input, Label } from '@/components/ui/Card';
 
 export default function ChangePasswordForm() {
+  const [open, setOpen] = useState(false);
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -35,6 +36,18 @@ export default function ChangePasswordForm() {
     setPassword('');
     setConfirmPassword('');
     setSuccess(true);
+    setOpen(false);
+  }
+
+  if (!open) {
+    return (
+      <div className="space-y-2">
+        <Button size="sm" onClick={() => setOpen(true)}>
+          Changer le mot de passe
+        </Button>
+        {success && <p className="text-sm text-emerald-600">Mot de passe mis à jour.</p>}
+      </div>
+    );
   }
 
   return (
@@ -60,10 +73,24 @@ export default function ChangePasswordForm() {
         />
       </div>
       {error && <p className="text-sm text-red-600">{error}</p>}
-      {success && <p className="text-sm text-emerald-600">Mot de passe mis à jour.</p>}
-      <Button type="submit" size="sm" disabled={loading}>
-        {loading ? 'Mise à jour...' : 'Mettre à jour le mot de passe'}
-      </Button>
+      <div className="flex gap-2">
+        <Button type="submit" size="sm" disabled={loading}>
+          {loading ? 'Mise à jour...' : 'Mettre à jour'}
+        </Button>
+        <Button
+          type="button"
+          variant="secondary"
+          size="sm"
+          onClick={() => {
+            setOpen(false);
+            setError(null);
+            setPassword('');
+            setConfirmPassword('');
+          }}
+        >
+          Annuler
+        </Button>
+      </div>
     </form>
   );
 }

@@ -72,14 +72,16 @@ export default function TeamMembers({ organizationId }: { organizationId: string
       ))}
 
       <form onSubmit={handleInvite} className="flex flex-col gap-2 px-6 py-4 sm:flex-row sm:items-center">
-        <Input
-          type="email"
-          required
-          placeholder="email@exemple.com"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-        />
-        <Button type="submit" size="sm" disabled={inviting}>
+        <div className="flex-1">
+          <Input
+            type="email"
+            required
+            placeholder="email@exemple.com"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+          />
+        </div>
+        <Button type="submit" size="sm" disabled={inviting} className="flex-shrink-0 whitespace-nowrap">
           {inviting ? 'Ajout...' : '+ Ajouter'}
         </Button>
       </form>
