@@ -5,6 +5,7 @@ import { usePathname } from 'next/navigation';
 import { Icon, ICONS } from '@/components/icons';
 import { Logo } from '@/components/ui/Logo';
 import SignOutButton from '@/components/SignOutButton';
+import OrgSwitcher from '@/components/OrgSwitcher';
 
 const NAV_ITEMS = [
   { href: '/dashboard', label: "Vue d'ensemble", icon: ICONS.grid },
@@ -16,10 +17,12 @@ const NAV_ITEMS = [
 ];
 
 export default function Sidebar({
-  orgName,
+  orgs,
+  currentOrgId,
   userEmail,
 }: {
-  orgName: string;
+  orgs: { id: string; name: string }[];
+  currentOrgId: string;
   userEmail: string | undefined;
 }) {
   const pathname = usePathname();
@@ -32,10 +35,8 @@ export default function Sidebar({
         </Link>
       </div>
 
-      <div className="border-b border-white/10 px-6 py-4">
-        <p className="truncate text-sm font-medium text-white">{orgName}</p>
-        <p className="truncate text-xs text-brand-300">{userEmail}</p>
-      </div>
+      <OrgSwitcher orgs={orgs} currentOrgId={currentOrgId} />
+      <p className="truncate px-6 py-2 text-xs text-brand-300">{userEmail}</p>
 
       <nav className="flex-1 space-y-1 px-3 py-4">
         {NAV_ITEMS.map((item) => {
