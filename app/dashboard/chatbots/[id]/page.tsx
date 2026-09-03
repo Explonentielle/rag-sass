@@ -6,6 +6,7 @@ import DocumentUploader from '@/components/DocumentUploader';
 import { ButtonLink } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { DocumentStatusBadge } from '@/components/DocumentStatusBadge';
+import DeleteDocumentButton from '@/components/DeleteDocumentButton';
 import { Icon, IconBadge, ICONS } from '@/components/icons';
 
 export default async function ChatbotPage({ params }: { params: { id: string } }) {
@@ -86,7 +87,10 @@ export default async function ChatbotPage({ params }: { params: { id: string } }
                   <p className="mt-0.5 text-xs text-slate-400">{doc.chunk_count} segments indexés</p>
                 )}
               </div>
-              <DocumentStatusBadge status={doc.status} />
+              <div className="flex items-center gap-3">
+                <DocumentStatusBadge status={doc.status} />
+                <DeleteDocumentButton documentId={doc.id} />
+              </div>
             </div>
           ))}
           {(documents ?? []).length === 0 && (

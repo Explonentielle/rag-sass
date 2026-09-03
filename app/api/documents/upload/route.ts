@@ -1,8 +1,10 @@
 import { NextResponse } from 'next/server';
+import { File } from 'node:buffer';
 import { v4 as uuidv4 } from 'uuid';
 import { createClient } from '@/lib/supabase/server';
 import { detectFileType } from '@/lib/extract';
 import { processDocument } from '@/lib/ingest';
+import { logWarn, logError } from '@/lib/logger';
 
 export const maxDuration = 300; // ingestion can take a while for larger files
 
@@ -21,6 +23,7 @@ export async function POST(request: Request) {
     const file = formData.get('file');
 
     if (typeof chatbotId !== 'string' || !(file instanceof File)) {
+      logWarn('upload.bad_request', { userId: user.id, chatbotId });
       return NextResponse.json({ error: 'chatbotId et file sont requis.' }, { status: 400 });
     }
 
@@ -33,12 +36,14 @@ export async function POST(request: Request) {
       .single();
 
     if (chatbotError || !chatbot) {
+      logWarn('upload.chatbot_not_found', { userId: user.id, chatbotId, error: chatbotError?.message });
       return NextResponse.json({ error: 'Chatbot introuvable.' }, { status: 404 });
     }
 
     const fileType = detectFileType(file.name);
     if (!fileType) {
       const ext = file.name.split('.').pop()?.toLowerCase() ?? '';
+      logWarn('upload.unsupported_format', { userId: user.id, chatbotId, filename: file.name, ext });
       return NextResponse.json(
         {
           error: `Le format .${ext} n'est pas encore supporté (seuls .pdf, .docx, .txt et .md le sont pour l'instant).`,
@@ -55,6 +60,12 @@ export async function POST(request: Request) {
       .upload(storagePath, buffer, { contentType: file.type });
 
     if (uploadError) {
+      logError('upload.storage_failed', {
+        userId: user.id,
+        chatbotId,
+        filename: file.name,
+        error: uploadError.message,
+      });
       return NextResponse.json(
         { error: `Upload échoué: ${uploadError.message}` },
         { status: 500 }
@@ -74,6 +85,12 @@ export async function POST(request: Request) {
       .single();
 
     if (insertError || !document) {
+      logError('upload.insert_failed', {
+        userId: user.id,
+        chatbotId,
+        filename: file.name,
+        error: insertError?.message,
+      });
       return NextResponse.json(
         { error: `Enregistrement échoué: ${insertError?.message}` },
         { status: 500 }
@@ -97,6 +114,10 @@ export async function POST(request: Request) {
     // clean JSON error instead of a raw 500 with no body (which the client
     // can't parse, so it falls back to a generic, unhelpful message).
     const message = err instanceof Error ? err.message : 'Erreur inconnue.';
+    logError('upload.uncaught_exception', {
+      error: message,
+      stack: err instanceof Error ? err.stack : undefined,
+    });
     return NextResponse.json({ error: `Erreur serveur: ${message}` }, { status: 500 });
   }
 }

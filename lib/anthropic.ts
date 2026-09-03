@@ -1,3 +1,6 @@
+// Currently unused: chat generation runs on OpenAI (lib/openai.ts) to keep
+// billing on a single provider. Kept in place in case that decision flips
+// back — nothing in the app imports from this file right now.
 import Anthropic from '@anthropic-ai/sdk';
 
 let client: Anthropic | null = null;

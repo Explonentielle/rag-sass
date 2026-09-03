@@ -3,6 +3,7 @@ import { notFound } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
 import { getCurrentOrg } from '@/lib/org';
 import { DocumentStatusBadge } from '@/components/DocumentStatusBadge';
+import DeleteDocumentButton from '@/components/DeleteDocumentButton';
 import { Card } from '@/components/ui/Card';
 import type { DocumentStatus } from '@/types/database';
 
@@ -49,7 +50,10 @@ export default async function DocumentsPage() {
                   <p className="mt-0.5 text-xs text-red-600">{doc.error_message}</p>
                 )}
               </div>
-              <DocumentStatusBadge status={doc.status as DocumentStatus} />
+              <div className="flex flex-shrink-0 items-center gap-3">
+                <DocumentStatusBadge status={doc.status as DocumentStatus} />
+                <DeleteDocumentButton documentId={doc.id} />
+              </div>
             </Link>
           );
         })}

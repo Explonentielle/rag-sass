@@ -1,8 +1,45 @@
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
+import ReactMarkdown from 'react-markdown';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Card';
+
+// Chat responses come back as Markdown (the LLM formats naturally with
+// **bold**, lists, headers) — render it instead of showing raw syntax.
+// Only used for assistant bubbles; user messages render as plain text.
+const MARKDOWN_COMPONENTS = {
+  p: ({ children }: { children?: React.ReactNode }) => (
+    <p className="mb-2 last:mb-0">{children}</p>
+  ),
+  strong: ({ children }: { children?: React.ReactNode }) => (
+    <strong className="font-semibold">{children}</strong>
+  ),
+  ul: ({ children }: { children?: React.ReactNode }) => (
+    <ul className="mb-2 list-disc space-y-1 pl-5 last:mb-0">{children}</ul>
+  ),
+  ol: ({ children }: { children?: React.ReactNode }) => (
+    <ol className="mb-2 list-decimal space-y-1 pl-5 last:mb-0">{children}</ol>
+  ),
+  li: ({ children }: { children?: React.ReactNode }) => <li>{children}</li>,
+  h1: ({ children }: { children?: React.ReactNode }) => (
+    <h1 className="mb-1 mt-2 font-semibold first:mt-0">{children}</h1>
+  ),
+  h2: ({ children }: { children?: React.ReactNode }) => (
+    <h2 className="mb-1 mt-2 font-semibold first:mt-0">{children}</h2>
+  ),
+  h3: ({ children }: { children?: React.ReactNode }) => (
+    <h3 className="mb-1 mt-2 font-semibold first:mt-0">{children}</h3>
+  ),
+  a: ({ href, children }: { href?: string; children?: React.ReactNode }) => (
+    <a href={href} target="_blank" rel="noreferrer" className="text-brand-700 underline">
+      {children}
+    </a>
+  ),
+  code: ({ children }: { children?: React.ReactNode }) => (
+    <code className="rounded bg-slate-200 px-1 py-0.5 font-mono text-xs">{children}</code>
+  ),
+};
 
 interface Message {
   role: 'user' | 'assistant';
@@ -40,9 +77,14 @@ export default function ChatWidget({
   const [loading, setLoading] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
 
+  // Scroll only when a new message is *added* (user question + empty
+  // assistant placeholder), not on every streamed token — otherwise the
+  // view stays pinned to the bottom while a long answer streams in, and
+  // you land on the end of it instead of the start once it's done.
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [messages.length]);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -132,7 +174,15 @@ export default function ChatWidget({
                 m.role === 'user' ? 'bg-brand-800 text-white' : 'bg-slate-100 text-slate-900'
               }`}
             >
-              <p className="whitespace-pre-wrap">{m.content || (loading && i === messages.length - 1 ? '···' : '')}</p>
+              {m.role === 'assistant' ? (
+                m.content ? (
+                  <ReactMarkdown components={MARKDOWN_COMPONENTS}>{m.content}</ReactMarkdown>
+                ) : (
+                  loading && i === messages.length - 1 && <p>···</p>
+                )
+              ) : (
+                <p className="whitespace-pre-wrap">{m.content}</p>
+              )}
 
               {m.error && <p className="mt-1 text-xs text-red-600">{m.error}</p>}
 

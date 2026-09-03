@@ -97,7 +97,7 @@ export default function DocsPage() {
             </li>
             <li>
               <strong>Pas de rate limiting</strong> : un ID de chatbot exposé publiquement peut en
-              théorie être spammé, avec un coût réel (appels OpenAI + Anthropic).
+              théorie être spammé, avec un coût réel (appels OpenAI, embeddings + chat).
             </li>
             <li>
               <strong>Pas de contrôle "ce chatbot est-il embeddable"</strong> : tous les chatbots

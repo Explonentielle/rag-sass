@@ -6,6 +6,7 @@ import { IconBadge, ICONS } from '@/components/icons';
 import { PROMPT_TEMPLATES } from '@/lib/prompts';
 import CreateTemplateForm from '@/components/CreateTemplateForm';
 import DeleteTemplateButton from '@/components/DeleteTemplateButton';
+import EditTemplateButton from '@/components/EditTemplateButton';
 
 export default async function TemplatesPage() {
   const org = await getCurrentOrg();
@@ -52,7 +53,14 @@ export default async function TemplatesPage() {
                     </IconBadge>
                     <h3 className="font-semibold text-slate-900">{t.label}</h3>
                   </div>
-                  <DeleteTemplateButton templateId={t.id} />
+                  <div className="flex items-center gap-2">
+                    <EditTemplateButton
+                      templateId={t.id}
+                      initialLabel={t.label}
+                      initialTemplate={t.template}
+                    />
+                    <DeleteTemplateButton templateId={t.id} />
+                  </div>
                 </div>
                 <pre className="mt-3 whitespace-pre-wrap rounded-md bg-slate-50 p-4 font-mono text-xs leading-relaxed text-slate-600">
                   {t.template}

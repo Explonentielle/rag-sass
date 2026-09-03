@@ -262,7 +262,7 @@ function Features() {
     {
       icon: ICONS.bolt,
       title: 'Réponses en streaming',
-      body: "Génération rapide, mot par mot, propulsée par Claude d'Anthropic.",
+      body: "Génération rapide, mot par mot, propulsée par OpenAI.",
     },
   ];
 

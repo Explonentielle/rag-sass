@@ -1,8 +1,8 @@
 import { createClient } from '@/lib/supabase/server';
-import { embedText } from '@/lib/openai';
+import { embedText, streamAnswer, type ChatTurn } from '@/lib/openai';
 import { hybridSearch } from '@/lib/elasticsearch';
 import { buildSystemPrompt } from '@/lib/prompts';
-import { streamAnswer, type ChatTurn } from '@/lib/anthropic';
+import { logInfo, logWarn, logError } from '@/lib/logger';
 
 export const maxDuration = 60;
 
@@ -36,8 +36,12 @@ export async function POST(request: Request) {
     .single();
 
   if (chatbotError || !chatbot) {
+    logWarn('chat.chatbot_not_found', { userId: user.id, chatbotId, error: chatbotError?.message });
     return new Response('Chatbot introuvable.', { status: 404 });
   }
+
+  const logCtx = { chatbotId: chatbot.id, organizationId: chatbot.organization_id, userId: user.id };
+  logInfo('chat.request', { ...logCtx, question });
 
   const encoder = new TextEncoder();
 
@@ -69,8 +73,10 @@ export async function POST(request: Request) {
         }
 
         controller.enqueue(encoder.encode(sseEvent('done', {})));
+        logInfo('chat.success', { ...logCtx, chunkCount: chunks.length, sourceCount: sources.length });
       } catch (err) {
         const message = err instanceof Error ? err.message : 'Erreur inconnue.';
+        logError('chat.failed', { ...logCtx, error: message, stack: err instanceof Error ? err.stack : undefined });
         controller.enqueue(encoder.encode(sseEvent('error', { message })));
       } finally {
         controller.close();

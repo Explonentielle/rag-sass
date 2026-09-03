@@ -21,7 +21,7 @@ export default function DeleteTemplateButton({ templateId }: { templateId: strin
     <button
       onClick={handleDelete}
       disabled={loading}
-      className="text-xs font-medium text-slate-400 hover:text-red-600 disabled:opacity-50"
+      className="rounded-full bg-red-50 px-2.5 py-1 text-xs font-medium text-red-600 transition-colors hover:bg-red-100 hover:text-red-700 disabled:opacity-50"
     >
       Supprimer
     </button>

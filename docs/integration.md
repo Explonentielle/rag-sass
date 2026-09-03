@@ -46,7 +46,7 @@ Utilisé par le widget flottant et par `/embed/[chatbotId]`.
   chatbot peut l'interroger via `/api/public-chat`, depuis n'importe quel
   site. Pas de whitelist d'origines autorisées pour l'instant.
 - **Pas de rate limiting** : un ID de chatbot exposé publiquement peut en
-  théorie être spammé, avec un coût réel (appels OpenAI + Anthropic).
+  théorie être spammé, avec un coût réel (appels OpenAI, embeddings + chat).
 - **Pas de contrôle "ce chatbot est-il embeddable"** : tous les chatbots sont
   accessibles via `/api/public-chat` et `/embed/*` dès qu'on connaît leur ID
   — il n'y a pas de case à cocher "autoriser l'embed" par chatbot.

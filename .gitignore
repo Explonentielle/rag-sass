@@ -21,6 +21,9 @@ npm-debug.log*
 # elasticsearch data volume (bind mount, if used)
 /esdata
 
+# local debug logs (lib/logger.ts) — can contain user questions, stays local
+/logs
+
 # typescript
 *.tsbuildinfo
 next-env.d.ts

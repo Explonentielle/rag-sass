@@ -1,14 +1,13 @@
 # RAG SaaS : MVP
 
-Chatbot RAG multi-tenant : upload de documents internes, indexation (Elasticsearch, hybrid search), chat (Claude) avec citation des sources.
+Chatbot RAG multi-tenant : upload de documents internes, indexation (Elasticsearch, hybrid search), chat (OpenAI) avec citation des sources.
 
 ## Stack
 
 - **Next.js 14** (App Router, TypeScript) : frontend + backend (API routes)
 - **Supabase** : Postgres (multi-tenant + RLS), Auth, Storage
 - **Elasticsearch** : recherche hybride (full-text + dense_vector, fusion RRF calculée côté application, voir note plus bas)
-- **OpenAI** (`text-embedding-3-small`) : embeddings
-- **Anthropic** (`claude-haiku-4-5-20251001` par défaut, `claude-sonnet-5` possible) : génération
+- **OpenAI** : embeddings (`text-embedding-3-small`) **et** génération de chat (`gpt-5.6-luna` par défaut) — un seul fournisseur, un seul abonnement à gérer. `lib/anthropic.ts` reste dans le repo si ce choix change un jour, mais rien ne l'utilise actuellement.
 
 ## Ce que vous devez faire vous-même avant de lancer le projet
 
@@ -18,9 +17,8 @@ Ces étapes ne peuvent pas être automatisées depuis ce repo :
    - Dans **SQL Editor**, exécute dans l'ordre le contenu de `supabase/migrations/0001_init.sql` puis `supabase/migrations/0002_storage.sql`.
    - Dans **Authentication > Providers > Email**, pour le pilote je recommande de **désactiver "Confirm email"** (Settings > Auth) pour éviter la friction de confirmation par email pendant les tests. Sinon prévois de recevoir/valider l'email de confirmation avant la 1ère connexion.
    - Récupère `Project URL`, `anon public key` et `service_role key` dans **Settings > API**.
-2. **Créer une clé API OpenAI** sur [platform.openai.com](https://platform.openai.com/api-keys).
-3. **Créer une clé API Anthropic** sur [console.anthropic.com](https://console.anthropic.com/settings/keys).
-4. **Avoir Docker installé** (Docker Desktop sur Windows) pour lancer Elasticsearch en local.
+2. **Créer une clé API OpenAI** sur [platform.openai.com](https://platform.openai.com/api-keys), avec de la facturation active (embeddings + chat en dépendent tous les deux désormais).
+3. **Avoir Docker installé** (Docker Desktop sur Windows) pour lancer Elasticsearch en local.
 
 ## Setup
 
@@ -36,7 +34,7 @@ docker compose up -d
 # 3. Variables d'environnement
 cp .env.example .env.local
 # remplir NEXT_PUBLIC_SUPABASE_URL, NEXT_PUBLIC_SUPABASE_ANON_KEY, SUPABASE_SERVICE_ROLE_KEY,
-# OPENAI_API_KEY, ANTHROPIC_API_KEY (ELASTICSEARCH_URL par défaut convient pour le local)
+# OPENAI_API_KEY (ELASTICSEARCH_URL par défaut convient pour le local)
 
 # 4. Lancer le projet
 npm run dev
@@ -76,7 +74,8 @@ lib/
   extract.ts                        : extraction texte PDF/DOCX/TXT + détection scan
   chunking.ts                       : découpage en chunks avec overlap
   ingest.ts                         : orchestration extraction, chunk, embed, index
-  openai.ts, anthropic.ts           : clients LLM
+  openai.ts                         : client OpenAI (embeddings + chat)
+  anthropic.ts                      : client Claude, gardé mais inutilisé
   prompts.ts                        : templates de system prompt
 components/ui/                      : primitives de design partagées (Button, Card, Input...)
 supabase/migrations/                : schéma SQL + RLS (à exécuter manuellement)
