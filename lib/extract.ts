@@ -25,7 +25,16 @@ export async function extractText(buffer: Buffer, fileType: SupportedFileType): 
   }
 
   if (fileType === 'docx') {
-    const { value } = await mammoth.extractRawText({ buffer });
+    // Markdown instead of raw text: Word "Heading" styles come through as
+    // #/##/### lines, which lib/chunking.ts uses to chunk by section
+    // instead of blind sentence-packing. convertToMarkdown exists at
+    // runtime but isn't in mammoth's shipped .d.ts, hence the cast.
+    const convertToMarkdown = (
+      mammoth as unknown as {
+        convertToMarkdown: (input: { buffer: Buffer }) => Promise<{ value: string }>;
+      }
+    ).convertToMarkdown;
+    const { value } = await convertToMarkdown({ buffer });
     if (!value.trim()) {
       throw new UnsupportedDocumentError('Ce fichier .docx ne contient aucun texte extractible.');
     }

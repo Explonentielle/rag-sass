@@ -91,6 +91,15 @@ export interface RetrievedChunk {
 
 const RRF_RANK_CONSTANT = 60;
 
+// Retrieval sizing: instead of always returning a fixed number of chunks
+// (previously a hard-coded topK: 5), we fetch a generous candidate pool,
+// fuse it via RRF, then keep however many chunks stay competitive with the
+// best match — a narrow question with one clearly-best chunk returns few
+// results, a broad question with several similarly-strong matches returns
+// more, up to MAX_CHUNKS. See docs/roadmap.md item 1.
+const CANDIDATE_POOL_SIZE = 15; // also doubles as the hard cap on returned chunks
+const MIN_SCORE_RATIO = 0.6; // keep chunks scoring >= 60% of the top chunk's fused score
+
 /**
  * Hybrid retrieval: full-text (BM25) on `content` fused with kNN on
  * `embedding`, filtered to one chatbot's organization scope. Always filter
@@ -109,9 +118,17 @@ export async function hybridSearch(params: {
   chatbotId: string;
   queryText: string;
   queryEmbedding: number[];
-  topK?: number;
+  maxChunks?: number;
+  minScoreRatio?: number;
 }): Promise<RetrievedChunk[]> {
-  const { organizationId, chatbotId, queryText, queryEmbedding, topK = 5 } = params;
+  const {
+    organizationId,
+    chatbotId,
+    queryText,
+    queryEmbedding,
+    maxChunks = CANDIDATE_POOL_SIZE,
+    minScoreRatio = MIN_SCORE_RATIO,
+  } = params;
   const es = getEsClient();
 
   const filter = [
@@ -119,7 +136,7 @@ export async function hybridSearch(params: {
     { term: { chatbot_id: chatbotId } },
   ];
 
-  const rankWindowSize = Math.max(20, topK * 4);
+  const rankWindowSize = Math.max(CANDIDATE_POOL_SIZE, maxChunks);
 
   const [textResult, knnResult] = await Promise.all([
     es.search({
@@ -165,9 +182,13 @@ export async function hybridSearch(params: {
   addRankedHits(textResult.hits.hits);
   addRankedHits(knnResult.hits.hits);
 
-  return Array.from(fused.values())
-    .sort((a, b) => b.score - a.score)
-    .slice(0, topK)
+  const ranked = Array.from(fused.values()).sort((a, b) => b.score - a.score);
+  const topScore = ranked[0]?.score ?? 0;
+  const scoreFloor = topScore * minScoreRatio;
+
+  return ranked
+    .filter((r) => r.score >= scoreFloor)
+    .slice(0, maxChunks)
     .map(({ source, score }) => ({
       content: source.content,
       document_id: source.document_id,

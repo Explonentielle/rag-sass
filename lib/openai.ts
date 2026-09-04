@@ -1,4 +1,5 @@
 import OpenAI from 'openai';
+import { logWarn } from '@/lib/logger';
 
 let client: OpenAI | null = null;
 
@@ -70,5 +71,78 @@ export async function* streamAnswer(params: {
   for await (const chunk of stream) {
     const text = chunk.choices[0]?.delta?.content;
     if (text) yield text;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Query rewriting (docs/roadmap.md item 2). One extra LLM call before
+// retrieval that turns the raw user question into a query better suited to
+// semantic (kNN) search and one better suited to keyword (BM25) search —
+// e.g. a vague or multi-part question gets cleaned up / focused. Never
+// blocks the pipeline: any failure falls back to the raw question for both.
+// ---------------------------------------------------------------------------
+
+export interface RewrittenQuery {
+  semanticQuery: string;
+  keywordQuery: string;
+}
+
+const QUERY_REWRITE_SYSTEM_PROMPT = `Tu reformules la question d'un utilisateur en deux versions optimisées pour la recherche documentaire dans une base de connaissances. Tu ne réponds jamais à la question, tu la reformules seulement.
+
+- semanticQuery : une reformulation claire et complète de l'intention de la question, adaptée à une recherche par similarité sémantique. Si la question a plusieurs volets, résume l'ensemble en une phrase cohérente.
+- keywordQuery : les termes clés et mots importants de la question (noms, termes techniques, références précises), adaptés à une recherche par mots-clés. Plus court que semanticQuery, pas une phrase complète.
+
+Si la question est déjà claire et simple, renvoie une version très proche de l'originale.`;
+
+/**
+ * Rewrites a raw question into a semantic-search query and a keyword-search
+ * query. Falls back to returning the original question for both if the
+ * rewrite call fails or returns something unusable.
+ */
+export async function rewriteQuery(question: string): Promise<RewrittenQuery> {
+  const fallback: RewrittenQuery = { semanticQuery: question, keywordQuery: question };
+
+  try {
+    const openai = getOpenAiClient();
+    const response = await openai.chat.completions.create({
+      model: DEFAULT_CHAT_MODEL,
+      max_completion_tokens: 300,
+      response_format: {
+        type: 'json_schema',
+        json_schema: {
+          name: 'query_rewrite',
+          strict: true,
+          schema: {
+            type: 'object',
+            properties: {
+              semanticQuery: { type: 'string' },
+              keywordQuery: { type: 'string' },
+            },
+            required: ['semanticQuery', 'keywordQuery'],
+            additionalProperties: false,
+          },
+        },
+      },
+      messages: [
+        { role: 'system', content: QUERY_REWRITE_SYSTEM_PROMPT },
+        { role: 'user', content: question },
+      ],
+    });
+
+    const raw = response.choices[0]?.message?.content;
+    if (!raw) throw new Error('Réponse vide');
+
+    const parsed = JSON.parse(raw);
+    if (!parsed.semanticQuery || !parsed.keywordQuery) {
+      throw new Error('Champs manquants dans la sortie structurée');
+    }
+
+    return { semanticQuery: parsed.semanticQuery, keywordQuery: parsed.keywordQuery };
+  } catch (err) {
+    logWarn('query_rewrite.failed', {
+      question,
+      error: err instanceof Error ? err.message : String(err),
+    });
+    return fallback;
   }
 }

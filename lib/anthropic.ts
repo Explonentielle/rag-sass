@@ -1,7 +1,10 @@
 // Currently unused: chat generation runs on OpenAI (lib/openai.ts) to keep
-// billing on a single provider. Kept in place in case that decision flips
-// back — nothing in the app imports from this file right now.
+// billing on a single provider. Kept in place — and kept in sync feature-
+// for-feature with lib/openai.ts — in case that decision flips back.
 import Anthropic from '@anthropic-ai/sdk';
+import { z } from 'zod';
+import { zodOutputFormat } from '@anthropic-ai/sdk/helpers/zod';
+import { logWarn } from '@/lib/logger';
 
 let client: Anthropic | null = null;
 
@@ -12,7 +15,12 @@ function getAnthropicClient(): Anthropic {
   return client;
 }
 
-export const DEFAULT_MODEL = process.env.ANTHROPIC_MODEL || 'claude-haiku-4-5-20251001';
+// No date suffix: current model IDs are used as-is (see docs/roadmap.md /
+// claude-api skill). Haiku 4.5, not Opus, because this is the explicit
+// default this project was originally specced with (fast + cheap for
+// short, tightly-grounded RAG answers); switch to claude-sonnet-5 via
+// ANTHROPIC_MODEL for higher quality if this is ever re-enabled.
+export const DEFAULT_MODEL = process.env.ANTHROPIC_MODEL || 'claude-haiku-4-5';
 
 export interface ChatTurn {
   role: 'user' | 'assistant';
@@ -44,5 +52,58 @@ export async function* streamAnswer(params: {
     if (event.type === 'content_block_delta' && event.delta.type === 'text_delta') {
       yield event.delta.text;
     }
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Query rewriting (docs/roadmap.md item 2) — Claude equivalent of
+// lib/openai.ts's rewriteQuery(). Same contract: never blocks the pipeline,
+// falls back to the raw question for both fields on any failure.
+// ---------------------------------------------------------------------------
+
+export interface RewrittenQuery {
+  semanticQuery: string;
+  keywordQuery: string;
+}
+
+const QueryRewriteSchema = z.object({
+  semanticQuery: z.string(),
+  keywordQuery: z.string(),
+});
+
+const QUERY_REWRITE_SYSTEM_PROMPT = `Tu reformules la question d'un utilisateur en deux versions optimisées pour la recherche documentaire dans une base de connaissances. Tu ne réponds jamais à la question, tu la reformules seulement.
+
+- semanticQuery : une reformulation claire et complète de l'intention de la question, adaptée à une recherche par similarité sémantique. Si la question a plusieurs volets, résume l'ensemble en une phrase cohérente.
+- keywordQuery : les termes clés et mots importants de la question (noms, termes techniques, références précises), adaptés à une recherche par mots-clés. Plus court que semanticQuery, pas une phrase complète.
+
+Si la question est déjà claire et simple, renvoie une version très proche de l'originale.`;
+
+export async function rewriteQuery(question: string): Promise<RewrittenQuery> {
+  const fallback: RewrittenQuery = { semanticQuery: question, keywordQuery: question };
+
+  try {
+    const anthropic = getAnthropicClient();
+    const response = await anthropic.messages.parse({
+      model: DEFAULT_MODEL,
+      max_tokens: 300,
+      system: QUERY_REWRITE_SYSTEM_PROMPT,
+      messages: [{ role: 'user', content: question }],
+      output_config: {
+        format: zodOutputFormat(QueryRewriteSchema),
+      },
+    });
+
+    if (!response.parsed_output) {
+      throw new Error('Sortie structurée vide ou invalide');
+    }
+
+    return response.parsed_output;
+  } catch (err) {
+    logWarn('query_rewrite.failed', {
+      question,
+      provider: 'anthropic',
+      error: err instanceof Error ? err.message : String(err),
+    });
+    return fallback;
   }
 }

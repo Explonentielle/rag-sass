@@ -1,5 +1,5 @@
 import { createClient } from '@/lib/supabase/server';
-import { embedText, streamAnswer, type ChatTurn } from '@/lib/openai';
+import { embedText, streamAnswer, rewriteQuery, type ChatTurn } from '@/lib/openai';
 import { hybridSearch } from '@/lib/elasticsearch';
 import { buildSystemPrompt } from '@/lib/prompts';
 import { logInfo, logWarn, logError } from '@/lib/logger';
@@ -48,14 +48,14 @@ export async function POST(request: Request) {
   const stream = new ReadableStream({
     async start(controller) {
       try {
-        const queryEmbedding = await embedText(question);
+        const { semanticQuery, keywordQuery } = await rewriteQuery(question);
+        const queryEmbedding = await embedText(semanticQuery);
 
         const chunks = await hybridSearch({
           organizationId: chatbot.organization_id,
           chatbotId: chatbot.id,
-          queryText: question,
+          queryText: keywordQuery,
           queryEmbedding,
-          topK: 5,
         });
 
         const sources = Array.from(
@@ -73,7 +73,13 @@ export async function POST(request: Request) {
         }
 
         controller.enqueue(encoder.encode(sseEvent('done', {})));
-        logInfo('chat.success', { ...logCtx, chunkCount: chunks.length, sourceCount: sources.length });
+        logInfo('chat.success', {
+          ...logCtx,
+          chunkCount: chunks.length,
+          sourceCount: sources.length,
+          semanticQuery,
+          keywordQuery,
+        });
       } catch (err) {
         const message = err instanceof Error ? err.message : 'Erreur inconnue.';
         logError('chat.failed', { ...logCtx, error: message, stack: err instanceof Error ? err.stack : undefined });

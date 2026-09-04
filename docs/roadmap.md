@@ -7,11 +7,11 @@ fixe — sert de mémoire centralisée plutôt que de planning strict.
 
 | # | Domaine | Item | Effort | Dépend de |
 |---|---|---|---|---|
-| 1 | RAG | Seuil de score dynamique (remplace `topK` fixe) | Faible | — |
-| 2 | RAG | Reformulation de requête (query rewriting) | Moyen | — |
+| 1 | RAG | Seuil de score dynamique (remplace `topK` fixe) | Faible | ✅ Fait |
+| 2 | RAG | Reformulation de requête (query rewriting) | Moyen | ✅ Fait |
 | 3 | RAG | Agent unique topK + reformulation | Moyen | 1, 2 (fallback si insuffisants) |
-| 4 | RAG | Reranking post-récupération | Moyen | — |
-| 5 | RAG | Chunking sémantique (par section) | Moyen | — |
+| 4 | RAG | Reranking post-récupération | Moyen | Piste : à regrouper avec 18 en offre premium |
+| 5 | RAG | Chunking sémantique (par section) | Moyen | ✅ Fait |
 | 6 | Ingestion | Traitement asynchrone (queue) | Élevé | — |
 | 7 | Ingestion | OCR pour PDF scannés | Élevé | — |
 | 8 | Ingestion | Formats CSV / Excel | Moyen | — |
@@ -126,37 +126,59 @@ Ordre de priorité recommandé : **1 → 2 → 4/5 → 3 en dernier recours**, p
 rester sur des changements sans latence ajoutée le plus longtemps possible
 avant d'introduire un appel LLM supplémentaire dans le chemin critique.
 
-### 1. Seuil de score dynamique (remplace `topK` fixe)
+### 1. Seuil de score dynamique (remplace `topK` fixe) — ✅ fait
 
-**Problème** : `hybridSearch()` (`lib/elasticsearch.ts`) retourne toujours
-exactement `topK: 5` chunks (codé en dur dans `app/api/chat/route.ts` et
-`app/api/public-chat/route.ts`), peu importe la question. Une question large
-qui toucherait légitimement 10 documents n'en récupère que 5 ; une question
-très ciblée en récupère 5 même si 2 suffiraient.
+**Ce qui a été fait** : `hybridSearch()` (`lib/elasticsearch.ts`) ne prend
+plus un `topK` fixe. Elle récupère un pool de candidats (jusqu'à
+`CANDIDATE_POOL_SIZE = 15`), fusionne via RRF comme avant, puis garde tous
+les chunks dont le score fusionné est au moins `MIN_SCORE_RATIO = 0.6`
+(60%) du score du meilleur résultat — plafonné à 15. Les deux constantes
+sont ajustables en tête de fichier. Les deux routes de chat
+(`app/api/chat/route.ts`, `app/api/public-chat/route.ts`) n'imposent plus de
+`topK`, elles utilisent les valeurs par défaut.
 
-**Proposition** : remplacer le nombre fixe par un seuil sur le score de
-fusion RRF (déjà calculé) : prendre tous les chunks au-dessus d'un seuil
-X, avec un plafond (ex. 15) pour éviter un contexte démesuré.
+**Validé en réel** : testé sur le chatbot support (`/api/public-chat`) —
+question ciblée → 3 chunks retournés (au lieu des 5 fixes d'avant).
+Pas encore possible de valider "question large = plus de chunks" faute de
+base documentaire assez fournie pour ce chatbot de test (seulement 4 chunks
+au total indexés) — à revalider une fois un chatbot avec plus de contenu
+varié disponible.
 
-**Effort / compromis** : faible — aucun appel LLM supplémentaire, juste un
-changement de logique sur des scores déjà calculés. À faire en premier :
-gratuit en latence, capture déjà une bonne partie du bénéfice recherché.
+**Note sur le choix de 0.6** : la courbe de score RRF est volontairement
+plate (différence faible entre rang 1 et rang 15), donc `MIN_SCORE_RATIO`
+est un réglage empirique, pas une valeur dérivée mathématiquement — à
+ajuster si le nombre de chunks retournés semble trop généreux ou trop
+restrictif en usage réel.
 
-### 2. Reformulation de requête (query rewriting)
+### 2. Reformulation de requête (query rewriting) — ✅ fait
 
-**Problème** : la question brute de l'utilisateur est envoyée telle quelle
-à la fois à la recherche kNN (sémantique) et BM25 (mots-clés). Une question
-mal formulée ou à plusieurs volets ("compare X et Y et explique Z") n'est
-pas optimale pour l'un ou l'autre.
+**Ce qui a été fait** : `rewriteQuery()` (`lib/openai.ts`) — un appel
+`gpt-5.6-luna` avec sortie structurée (JSON Schema, `strict: true`) qui
+transforme la question brute en `semanticQuery` (phrase complète pour le
+kNN) et `keywordQuery` (termes clés pour BM25). Branché dans
+`app/api/chat/route.ts` et `app/api/public-chat/route.ts`, avant l'appel à
+`embedText()`/`hybridSearch()`. En cas d'échec (erreur API, JSON invalide,
+champs manquants), repli automatique sur la question brute pour les deux —
+la reformulation ne peut jamais bloquer le pipeline.
 
-**Proposition** : un appel LLM (rapide/léger) qui reformule la question en
-une requête optimisée pour le sémantique, une pour les mots-clés, et
-éventuellement décompose une question à plusieurs volets en sous-requêtes.
+**Pas fait** : la décomposition d'une question à plusieurs volets en
+plusieurs sous-requêtes séparées (actuellement, une question à plusieurs
+volets donne un seul `keywordQuery` combiné, pas plusieurs recherches). À
+ajouter si ça s'avère insuffisant en usage réel.
 
-**Effort / compromis** : moyen — ajoute un appel LLM avant la recherche
-(latence + coût), mais reste une technique établie avec un gain de
-pertinence documenté. Prioritaire sur l'agent topK (item 3) car la valeur
-est mieux démontrée dans la littérature RAG.
+**Validé en réel** sur le chatbot support : question à deux volets ("ajouter
+des gens dans mon équipe" + "changer le nom de mon organisation") →
+`semanticQuery`: "Comment ajouter des membres à mon équipe et modifier le
+nom de mon organisation ?", `keywordQuery`: "ajouter membres équipe;
+modifier nom organisation". Sortie structurée fiable, pipeline complet
+réussi (3 chunks, 1 source).
+
+**Compromis à surveiller** : ajoute un appel LLM séquentiel avant chaque
+recherche (latence + coût supplémentaires sur chaque message). Pas encore
+mesuré précisément en usage réel — à observer via les logs
+(`chat.success`/`public-chat.success` incluent maintenant `semanticQuery`
+et `keywordQuery`) si le gain de pertinence justifie le coût sur des
+questions simples qui n'en ont probablement pas besoin.
 
 ### 3. Agent unique topK + reformulation (fallback)
 
@@ -183,17 +205,38 @@ avant de les envoyer au LLM, pour affiner au-delà de ce que la fusion RRF
 reranking est généralement plus rapide qu'un appel LLM complet), amélioration
 de précision surtout utile si le volume de documents par chatbot grossit.
 
-### 5. Chunking sémantique
+**Piste produit (2026-09-04)** : plutôt que de l'inclure gratuitement pour
+tout le monde, envisager de le regrouper avec l'item 18 (indexation assistée
+par IA) dans une offre premium payante — les deux ajoutent un coût réel par
+usage (LLM ou reranker), donc la même logique de facturation à l'usage
+s'applique aux deux.
 
-**Problème** : `lib/chunking.ts` découpe par taille cible en caractères
-(découpage par phrases), sans tenir compte de la structure du document.
+### 5. Chunking sémantique — ✅ fait
 
-**Proposition** : découper en respectant titres/sections/paragraphes plutôt
-qu'une taille fixe.
+**Ce qui a été fait** : `lib/chunking.ts` détecte les titres Markdown
+(`#`/`##`/...) dans le texte extrait. S'il y en a, il découpe par section
+(`chunkByStructure`) : les sections courtes et liées sont regroupées jusqu'à
+la taille cible, une section trop grosse à elle seule est sous-découpée
+avec l'ancienne méthode par phrases (`chunkBySentences`, gardée comme
+fallback ET comme sous-découpeur). Sans titre détecté, tout le texte passe
+directement par `chunkBySentences` comme avant.
 
-**Effort / compromis** : moyen — demande de détecter la structure du
-document (variable selon le format), gain surtout sur des documents très
-structurés (procédures, documentation).
+**Complément côté extraction** : `lib/extract.ts` convertit maintenant les
+`.docx` en Markdown (`mammoth.convertToMarkdown`) au lieu de texte brut —
+les styles "Titre" de Word deviennent des `#`/`##`, donc les `.docx`
+structurés bénéficient aussi du chunking par section, pas seulement les
+`.md`. `convertToMarkdown` existe à l'exécution mais n'est pas dans les
+types TS officiels de `mammoth` (juste `extractToRawText`/`convertToHtml`),
+d'où un cast dans le code.
+
+**Non concerné** : les PDF (`pdf-parse` ne renvoie que du texte brut, aucun
+marqueur de titre fiable à exploiter) continuent sur le chunking par
+phrases classique — pas de changement pour ce format.
+
+**Validé** : testé en local avec un document synthétique (une grosse
+section + plusieurs mini-sections FAQ) — la grosse section sous-découpée
+sur 3 chunks sans jamais couper une question/réponse, les mini-FAQ toutes
+regroupées dans un seul chunk plutôt qu'éclatées une par une.
 
 ---
 
