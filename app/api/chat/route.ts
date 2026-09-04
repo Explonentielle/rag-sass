@@ -3,6 +3,7 @@ import { embedText, streamAnswer, rewriteQuery, type ChatTurn } from '@/lib/open
 import { hybridSearch } from '@/lib/elasticsearch';
 import { buildSystemPrompt } from '@/lib/prompts';
 import { logInfo, logWarn, logError } from '@/lib/logger';
+import { checkRateLimit } from '@/lib/rateLimit';
 
 export const maxDuration = 60;
 
@@ -26,6 +27,20 @@ export async function POST(request: Request) {
 
   if (!chatbotId || !question) {
     return new Response('chatbotId et question sont requis.', { status: 400 });
+  }
+
+  // Defense in depth — the public endpoint is the real abuse vector (see
+  // app/api/public-chat/route.ts), but a sane per-user cap here costs
+  // nothing and guards against a runaway client loop.
+  const rateLimit = checkRateLimit(`chat:${user.id}`);
+  if (!rateLimit.allowed) {
+    logWarn('chat.rate_limited', { userId: user.id, chatbotId });
+    return new Response('Trop de requêtes, réessayez dans un instant.', {
+      status: 429,
+      headers: rateLimit.retryAfterSeconds
+        ? { 'Retry-After': String(rateLimit.retryAfterSeconds) }
+        : undefined,
+    });
   }
 
   // RLS scopes this to chatbots the caller's org owns.

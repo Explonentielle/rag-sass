@@ -3,14 +3,16 @@ import { embedText, streamAnswer, rewriteQuery, type ChatTurn } from '@/lib/open
 import { hybridSearch } from '@/lib/elasticsearch';
 import { buildSystemPrompt } from '@/lib/prompts';
 import { logInfo, logWarn, logError } from '@/lib/logger';
+import { checkPublicChatRateLimit, getClientIp } from '@/lib/rateLimit';
 
 export const maxDuration = 60;
 
 // Public, unauthenticated chat endpoint for the floating widget and iframe
 // embeds. No login required by design (that's the point of an embeddable
-// widget) — the only access control is knowing the chatbotId. There is
-// currently no per-chatbot allowlist of embedding domains and no rate
-// limiting; see docs/integration.md for the current limitations.
+// widget) — the only access control is knowing the chatbotId. Rate-limited
+// per chatbot+visitor, with auto-blacklist of IPs that exhaust the window
+// twice in a row (see lib/rateLimit.ts); there is still no per-chatbot
+// allowlist of embedding domains — see docs/integration.md.
 
 function sseEvent(event: string, data: unknown) {
   return `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`;
@@ -24,6 +26,22 @@ export async function POST(request: Request) {
 
   if (!chatbotId || !question) {
     return new Response('chatbotId et question sont requis.', { status: 400 });
+  }
+
+  const ip = getClientIp(request);
+  const rateLimit = checkPublicChatRateLimit(chatbotId, ip);
+  if (!rateLimit.allowed) {
+    if (rateLimit.blacklisted) {
+      logWarn('public-chat.blacklisted_ip_blocked', { chatbotId, ip });
+      return new Response('Accès bloqué.', { status: 403 });
+    }
+    logWarn('public-chat.rate_limited', { chatbotId, ip });
+    return new Response('Trop de requêtes, réessayez dans un instant.', {
+      status: 429,
+      headers: rateLimit.retryAfterSeconds
+        ? { 'Retry-After': String(rateLimit.retryAfterSeconds) }
+        : undefined,
+    });
   }
 
   const admin = getAdminClient();

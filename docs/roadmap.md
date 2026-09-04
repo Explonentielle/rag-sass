@@ -16,7 +16,7 @@ fixe — sert de mémoire centralisée plutôt que de planning strict.
 | 7 | Ingestion | OCR pour PDF scannés | Élevé | — |
 | 8 | Ingestion | Formats CSV / Excel | Moyen | — |
 | 9 | Chat | Historique de conversation persistant | Moyen | — |
-| 10 | Chat | Rate limiting (surtout `/api/public-chat`) | Faible | — |
+| 10 | Chat | Rate limiting (surtout `/api/public-chat`) | Faible | ✅ Fait |
 | 11 | LLM | Bascule génération vers OpenAI | Faible | ✅ Fait |
 | 12 | Compte | Changement d'email | Faible (code) | SMTP externe |
 | 13 | Compte | Invitation par email (nouveaux comptes) | Faible (code) | SMTP externe |
@@ -285,14 +285,47 @@ state React du navigateur, perdu au rechargement. Pas de table
 **Effort / compromis** : moyen — nouvelle table + RLS, à faire si le besoin
 de retrouver une conversation passée se confirme avec les pilotes.
 
-### 10. Rate limiting
+### 10. Rate limiting — ✅ Fait
 
 **Problème** : aucune limite de débit sur les endpoints de chat, en
 particulier `/api/public-chat` qui est public par design (voir
-`docs/integration.md`).
+`docs/integration.md`) — n'importe qui connaissant un `chatbotId` pouvait
+spammer l'endpoint sans limite (coût OpenAI/ES illimité, DoS trivial).
 
-**Effort / compromis** : faible à moyen selon la solution (in-memory simple
-vs. solution distribuée si plusieurs instances serveur).
+**Solution implémentée** : limiteur in-memory (`lib/rateLimit.ts`), fenêtre
+glissante de 60s, 20 requêtes max par fenêtre. Clé `public-chat:{chatbotId}:{ip}`
+sur l'endpoint public (par visiteur, par chatbot) ; clé `chat:{userId}` en
+défense en profondeur sur l'endpoint authentifié. Réponse `429` +
+header `Retry-After`. Testé en direct : 22 requêtes envoyées, les 20
+premières passent (404 attendu, chatbot de test inexistant), la 21e et la
+22e sont bloquées en 429 — comportement conforme.
+
+La fenêtre se réinitialise en continu (pas un total à vie) : ~1 message/3s en
+rythme soutenu, largement au-dessus du débit d'une conversation humaine
+normale, y compris via le widget iframe embarqué.
+
+**Blacklist automatique (2026-09-04)** : un bot malveillant qui tourne en
+continu à 20 req/min coûtait quand même en continu (OpenAI + Elasticsearch à
+chaque requête acceptée). Ajout d'un blacklist IP : si une même IP épuise la
+fenêtre de 20 requêtes deux fois d'affilée (~2 minutes de spam soutenu,
+signal quasi impossible à atteindre pour un humain — voir plus haut),
+l'IP est bloquée 24h, rejetée en `403` avant toute requête DB/ES/OpenAI.
+Événement loggé en `error` (`rateLimit.ip_blacklisted`) pour repérage
+immédiat dans le journal local. Testé en direct : 2 fenêtres consécutives
+exhaustées → blacklist déclenché, requêtes suivantes bloquées en 403.
+Blacklist global par IP (pas par chatbot) pour couvrir la rotation entre
+plusieurs `chatbotId` connus. `ip === 'unknown'` (pas de header proxy, ex.
+dev local) est explicitement exclu du blacklist pour ne pas bloquer tout le
+monde derrière un même proxy qui ne forward pas l'IP.
+
+**Limite connue acceptée pour le pilote** : la clé publique/blacklist est par
+IP, donc plusieurs visiteurs légitimes derrière une même IP publique (NAT
+d'entreprise, proxy mobile) partagent le même compteur — un cas de faux
+positif reste possible si beaucoup de monde derrière la même IP échange
+intensément avec le même chatbot en même temps. Idem, le store in-memory
+(rate limit et blacklist) ne tient pas si l'app tourne un jour sur plusieurs
+instances derrière un load balancer (cf. commentaire en tête de
+`lib/rateLimit.ts`) — à revoir avec un store partagé (Redis) si ça arrive.
 
 ---
 
