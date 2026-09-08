@@ -3,6 +3,30 @@ import { createClient } from '@/lib/supabase/server';
 import { deleteDocumentChunks } from '@/lib/elasticsearch';
 import { logInfo, logError } from '@/lib/logger';
 
+// Polled by DocumentUploader while a document is being processed in the
+// background (see waitUntil in app/api/documents/upload/route.ts).
+export async function GET(_request: Request, { params }: { params: { id: string } }) {
+  const supabase = createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) {
+    return NextResponse.json({ error: 'Non authentifié.' }, { status: 401 });
+  }
+
+  const { data: document, error } = await supabase
+    .from('documents')
+    .select('id, status, error_message, chunk_count')
+    .eq('id', params.id)
+    .single();
+
+  if (error || !document) {
+    return NextResponse.json({ error: 'Document introuvable.' }, { status: 404 });
+  }
+
+  return NextResponse.json({ document });
+}
+
 export async function DELETE(_request: Request, { params }: { params: { id: string } }) {
   const supabase = createClient();
   const {

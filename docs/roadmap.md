@@ -12,7 +12,7 @@ fixe — sert de mémoire centralisée plutôt que de planning strict.
 | 3 | RAG | Agent unique topK + reformulation | Moyen | 1, 2 (fallback si insuffisants) |
 | 4 | RAG | Reranking post-récupération | Moyen | Piste : à regrouper avec 18 en offre premium |
 | 5 | RAG | Chunking sémantique (par section) | Moyen | ✅ Fait |
-| 6 | Ingestion | Traitement asynchrone (queue) | Élevé | — |
+| 6 | Ingestion | Traitement asynchrone (queue) | Élevé | ✅ Fait (version légère) |
 | 7 | Ingestion | OCR pour PDF scannés | Élevé | — |
 | 8 | Ingestion | Formats CSV / Excel | Moyen | — |
 | 9 | Chat | Historique de conversation persistant | Moyen | — |
@@ -242,17 +242,33 @@ regroupées dans un seul chunk plutôt qu'éclatées une par une.
 
 ## 2. Pipeline d'ingestion
 
-### 6. Traitement asynchrone (queue)
+### 6. Traitement asynchrone — ✅ Fait (version légère, sans queue)
 
 **Problème** : l'ingestion (extraction → chunk → embeddings → indexation)
-tourne de façon synchrone dans la requête d'upload (`lib/ingest.ts`). Un
-document volumineux peut faire timeout.
+tournait de façon synchrone dans la requête d'upload (`lib/ingest.ts`),
+bloquant la réponse HTTP jusqu'à la fin. Un document volumineux (PDF de
+plusieurs dizaines de pages) pouvait faire timeout, surtout gênant en
+pilote réel avec de vrais documents clients — bien plus que dans les tests
+avec des petits documents synthétiques.
 
-**Proposition** : découpler l'upload de l'indexation via une file d'attente
-(queue managée ou worker dédié).
+**Solution implémentée** : pas de vraie queue (Redis/BullMQ) — trop
+d'infra pour le besoin actuel. `app/api/documents/upload/route.ts` sauvegarde
+le fichier, crée la ligne `documents` (`status: 'pending'`) et répond
+immédiatement, pendant que `processDocument` continue en tâche de fond via
+`waitUntil` (`@vercel/functions`). `waitUntil` maintient l'invocation en vie
+pour la tâche de fond côté Vercel (jusqu'à `maxDuration`) ; sur un serveur
+persistant (VPS/self-host), la promesse tourne simplement dans le même
+process — fonctionne dans les deux cas sans code conditionnel. Le front
+(`DocumentUploader.tsx`) interroge `GET /api/documents/[id]` (nouveau)
+toutes les 2s jusqu'à `indexed`/`error` au lieu de bloquer sur une requête
+unique.
 
-**Effort / compromis** : élevé — vrai changement d'architecture (job queue,
-polling ou webhook de statut côté UI).
+**Limite connue** : si le process redémarre pendant le traitement (déploi,
+crash), le document reste bloqué en `processing` sans reprise automatique —
+acceptable pour le pilote (rare, et l'utilisateur peut resupprimer/réuploader),
+à revoir avec une vraie queue si ça devient fréquent. Testé : compilation
+TypeScript clean, `waitUntil` vérifié en local (tâche de fond exécutée après
+le retour de la fonction).
 
 ### 7. OCR pour les PDF scannés
 

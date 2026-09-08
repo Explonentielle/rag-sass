@@ -1,12 +1,17 @@
 import { NextResponse } from 'next/server';
 import { File } from 'node:buffer';
 import { v4 as uuidv4 } from 'uuid';
+import { waitUntil } from '@vercel/functions';
 import { createClient } from '@/lib/supabase/server';
 import { detectFileType } from '@/lib/extract';
 import { processDocument } from '@/lib/ingest';
 import { logWarn, logError } from '@/lib/logger';
 
-export const maxDuration = 300; // ingestion can take a while for larger files
+// Ingestion (extraction/chunking/embeddings/indexing) runs in the background
+// after the response is sent — see the waitUntil call below — so this only
+// bounds how long the background work itself is allowed to run, not the
+// client's wait time. Large PDFs can still take a while to embed/index.
+export const maxDuration = 300;
 
 export async function POST(request: Request) {
   try {
@@ -97,18 +102,29 @@ export async function POST(request: Request) {
       );
     }
 
-    const result = await processDocument(supabase, {
-      documentId: document.id,
-      chatbotId: chatbot.id,
-      organizationId: chatbot.organization_id,
-      storagePath,
-      fileType,
-      filename: file.name,
-    });
+    // Fire-and-forget: respond as soon as the file is saved instead of
+    // making the client wait for extraction/chunking/embeddings/indexing.
+    // waitUntil keeps this invocation alive for the background work (up to
+    // maxDuration) on Vercel; on a persistent server (self-hosted/VPS) the
+    // promise just runs in the same process either way. The client polls
+    // GET /api/documents/[id] for status (see DocumentUploader.tsx).
+    waitUntil(
+      processDocument(supabase, {
+        documentId: document.id,
+        chatbotId: chatbot.id,
+        organizationId: chatbot.organization_id,
+        storagePath,
+        fileType,
+        filename: file.name,
+      }).catch((err) => {
+        logError('upload.background_processing_uncaught', {
+          documentId: document.id,
+          error: err instanceof Error ? err.message : String(err),
+        });
+      })
+    );
 
-    return NextResponse.json({
-      document: { ...document, status: result.status, error_message: result.errorMessage ?? null },
-    });
+    return NextResponse.json({ document });
   } catch (err) {
     // Last-resort safety net: any uncaught exception above still returns a
     // clean JSON error instead of a raw 500 with no body (which the client
