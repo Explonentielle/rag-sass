@@ -81,12 +81,12 @@ export default function DocumentUploader({ chatbotId }: { chatbotId: string }) {
       <input
         ref={inputRef}
         type="file"
-        accept=".pdf,.docx,.txt,.md"
+        accept=".pdf,.docx,.txt,.md,.csv,.xlsx,.xls"
         onChange={handleFileChange}
         disabled={uploading}
         className="hidden"
       />
-      <p className="text-xs text-slate-400">.pdf, .docx, .txt, .md</p>
+      <p className="text-xs text-slate-400">.pdf, .docx, .txt, .md, .csv, .xlsx, .xls</p>
       {error && <p className="text-sm text-red-600">{error}</p>}
     </div>
   );

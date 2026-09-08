@@ -27,3 +27,6 @@ npm-debug.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# Supabase CLI cache
+/supabase/.temp
