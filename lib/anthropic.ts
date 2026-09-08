@@ -100,7 +100,7 @@ export async function rewriteQuery(question: string): Promise<RewrittenQuery> {
     return response.parsed_output;
   } catch (err) {
     logWarn('query_rewrite.failed', {
-      question,
+      questionLength: question.length,
       provider: 'anthropic',
       error: err instanceof Error ? err.message : String(err),
     });

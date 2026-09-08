@@ -148,7 +148,7 @@ export async function rewriteQuery(question: string): Promise<RewrittenQuery> {
     return { semanticQuery: parsed.semanticQuery, keywordQuery: parsed.keywordQuery };
   } catch (err) {
     logWarn('query_rewrite.failed', {
-      question,
+      questionLength: question.length,
       error: err instanceof Error ? err.message : String(err),
     });
     return fallback;

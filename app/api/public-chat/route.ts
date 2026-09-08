@@ -146,7 +146,8 @@ export async function POST(request: Request) {
   }
 
   const logCtx = { chatbotId: chatbot.id, organizationId: chatbot.organization_id, public: true };
-  logInfo('public-chat.request', { ...logCtx, question });
+  // Length, not content — see the GDPR note in lib/logger.ts.
+  logInfo('public-chat.request', { ...logCtx, questionLength: question.length });
 
   const encoder = new TextEncoder();
 
@@ -203,8 +204,6 @@ export async function POST(request: Request) {
           ...logCtx,
           chunkCount: chunks.length,
           sourceCount: sources.length,
-          semanticQuery,
-          keywordQuery,
         });
       } catch (err) {
         const message = err instanceof Error ? err.message : 'Erreur inconnue.';

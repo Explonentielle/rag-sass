@@ -6,6 +6,11 @@ import path from 'node:path';
 // ./logs. Only works on a persistent filesystem (local dev, a VPS); on
 // serverless hosting (Vercel etc.) the filesystem isn't durable between
 // invocations, so this would need to move to a real log sink at that point.
+//
+// GDPR (docs/roadmap.md item 20): never pass raw user/visitor content here
+// (chat questions, document text, etc.) — these files have no retention
+// limit or encryption. Log lengths/counts/ids instead of content when you
+// need a debugging signal.
 
 const LOG_DIR = path.join(process.cwd(), 'logs');
 

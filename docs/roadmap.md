@@ -26,7 +26,7 @@ fixe — sert de mémoire centralisée plutôt que de planning strict.
 | 17 | Qualité | Suivi d'usage/coût par org | Moyen | — |
 | 18 | Premium | Indexation assistée par IA (doc bruts + URL) | Élevé | 6 (async), entitlement par plan |
 | 19 | Templates | Clarifier dans le front que les templates ne sont pas liés en live aux chatbots | Faible | À activer seulement si ça pose problème en usage réel |
-| 20 | RGPD | Plan d'action : rétention/purge, suppression à la demande, chiffrement, logs | Moyen (plan) | Déclenché par l'item 9 — rien d'implémenté, voir détail |
+| 20 | RGPD | Plan d'action : rétention/purge, suppression à la demande, chiffrement, logs | Moyen (plan) | A+D ✅ faits (migration 0006 à appliquer) — B/C/E/F ouverts |
 
 ---
 
@@ -523,15 +523,18 @@ React, perdu à la fermeture) à un stockage permanent en clair dans Postgres.
 Décision du produit : être conforme dès le pilote plutôt que de rattraper
 après coup — voici le plan, rien n'est encore implémenté.
 
-**A. Rétention & purge automatique** — priorité haute, avec D.
-Définir une durée de rétention (proposition : 90 jours d'inactivité par
-défaut, ajustable) puis un `DELETE` planifié via `pg_cron` (extension
-Postgres native, activable dans les Extensions du dashboard Supabase) sur
-`conversations` où `updated_at` dépasse le seuil — `messages` suit
-automatiquement (cascade déjà en place dans
-`supabase/migrations/0004_conversations.sql`). Tourne dans la base
-elle-même, indépendant de l'hébergement de l'app (Vercel ou VPS). Effort
-faible-moyen.
+**A. Rétention & purge automatique** — ✅ Fait (migration à appliquer).
+`supabase/migrations/0006_conversation_retention.sql` : active `pg_cron`
+et planifie un `DELETE` quotidien (3h UTC) sur `conversations` où
+`updated_at` dépasse 90 jours — `messages` suit automatiquement (cascade
+déjà en place). Tourne dans la base elle-même, indépendant de l'hébergement
+de l'app (Vercel ou VPS). Durée codée en dur (90 jours) mais changeable
+sans nouvelle migration : re-exécuter `cron.schedule(...)` avec le même nom
+de job (`purge-old-conversations`) et un nouvel intervalle fait un upsert.
+Si `create extension pg_cron` échoue à l'exécution de la migration,
+l'activer d'abord via Database > Extensions dans le dashboard Supabase.
+Non testé en conditions réelles (nécessite d'attendre l'échéance ou de
+vérifier `cron.job_run_details` après application).
 
 **B. Suppression à la demande (droit à l'effacement)** — priorité
 moyenne, complète A.
@@ -555,15 +558,21 @@ Compromis : plus de recherche full-text SQL possible sur le contenu (pas
 utilisé aujourd'hui, donc sans coût réel) ; la gestion de la clé (rotation,
 sauvegarde) devient un sujet à part entière. Effort moyen.
 
-**D. Angle mort : les logs locaux** — même urgence que A.
-`lib/logger.ts` (item 16) écrit déjà la question brute en clair dans
-`logs/*.log` (`chat.request`, `public-chat.request`) sans aucune limite de
-rétention non plus (déjà noté comme limite connue de l'item 16). Chiffrer
-la base tout en laissant ces mêmes questions traîner indéfiniment en clair
-sur disque annulerait une bonne partie de l'effort — retirer le champ
-`question` de ces logs (garder les métadonnées utiles au debug) ou
-appliquer la même politique de rétention aux fichiers eux-mêmes. Effort
-faible.
+**D. Angle mort : les logs locaux** — ✅ Fait.
+`lib/logger.ts` (item 16) écrivait la question brute en clair dans
+`logs/*.log` (`chat.request`, `public-chat.request`, `query_rewrite.failed`
+dans `lib/openai.ts` et `lib/anthropic.ts`, et la reformulation
+`semanticQuery`/`keywordQuery` dans `chat.success`/`public-chat.success`).
+Retiré partout, remplacé par `questionLength` (nombre de caractères) là où
+un signal de debug restait utile. En-tête de `lib/logger.ts` mis à jour
+avec la règle : jamais de contenu brut utilisateur/visiteur dans ces
+fichiers, qui n'ont ni limite de rétention ni chiffrement.
+
+**Pas encore fait** : la politique de rétention des fichiers de logs
+eux-mêmes (purge après X jours) — restait dans le plan initial en
+alternative au retrait du contenu, mais retirer le contenu couvre déjà le
+risque principal (fuite de messages personnels). La rotation/purge des
+fichiers reste une amélioration possible, pas urgente maintenant.
 
 **E. Sous-traitants tiers à documenter** — hors code.
 Vérifier/documenter la région d'hébergement du projet Supabase (UE vs US),
@@ -580,5 +589,6 @@ signer par chaque client pilote (Corpus.ai = sous-traitant, le client =
 responsable de traitement).
 
 **Ordre proposé** : A + D d'abord (rien n'est conforme sans ça, effort
-faible chacun), puis B, puis C en renforcement. E/F en parallèle, hors
-code, avant de signer un premier vrai client pilote.
+faible chacun) — ✅ fait le 2026-09-08, migration 0006 à appliquer. Puis B,
+puis C en renforcement (encore ouverts). E/F en parallèle, hors code, avant
+de signer un premier vrai client pilote (toujours ouverts).
