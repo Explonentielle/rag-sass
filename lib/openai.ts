@@ -46,20 +46,24 @@ export interface ChatTurn {
 /**
  * Streams a RAG answer from OpenAI. `history` should NOT include the
  * current question — that's passed separately as `question` and appended
- * as the final user turn.
+ * as the final user turn. No max_completion_tokens is set: the answer runs
+ * until the model naturally stops, however long that takes (a detailed
+ * technical answer can legitimately run long) — the model's own absolute
+ * output ceiling is the only limit left. The generator's return value
+ * (available via manual `.next()` iteration, not a `for await...of` loop)
+ * reports whether that ceiling was hit anyway, as a safety net.
  */
 export async function* streamAnswer(params: {
   systemPrompt: string;
   history: ChatTurn[];
   question: string;
   model?: string;
-}): AsyncGenerator<string> {
+}): AsyncGenerator<string, { truncated: boolean }, void> {
   const { systemPrompt, history, question, model } = params;
   const openai = getOpenAiClient();
 
   const stream = await openai.chat.completions.create({
     model: model || DEFAULT_CHAT_MODEL,
-    max_completion_tokens: 1024,
     stream: true,
     messages: [
       { role: 'system', content: systemPrompt },
@@ -68,10 +72,14 @@ export async function* streamAnswer(params: {
     ],
   });
 
+  let finishReason: string | null = null;
   for await (const chunk of stream) {
     const text = chunk.choices[0]?.delta?.content;
     if (text) yield text;
+    if (chunk.choices[0]?.finish_reason) finishReason = chunk.choices[0].finish_reason;
   }
+
+  return { truncated: finishReason === 'length' };
 }
 
 // ---------------------------------------------------------------------------

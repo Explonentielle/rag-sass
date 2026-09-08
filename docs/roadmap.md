@@ -14,8 +14,8 @@ fixe — sert de mémoire centralisée plutôt que de planning strict.
 | 5 | RAG | Chunking sémantique (par section) | Moyen | ✅ Fait |
 | 6 | Ingestion | Traitement asynchrone (queue) | Élevé | ✅ Fait (version légère) |
 | 7 | Ingestion | OCR pour PDF scannés | Élevé | — |
-| 8 | Ingestion | Formats CSV / Excel | Moyen | — |
-| 9 | Chat | Historique de conversation persistant | Moyen | — |
+| 8 | Ingestion | Formats CSV / Excel | Moyen | ✅ Fait |
+| 9 | Chat | Historique de conversation persistant | Moyen | ✅ Fait (migration à appliquer) |
 | 10 | Chat | Rate limiting (surtout `/api/public-chat`) | Faible | ✅ Fait |
 | 11 | LLM | Bascule génération vers OpenAI | Faible | ✅ Fait |
 | 12 | Compte | Changement d'email | Faible (code) | SMTP externe |
@@ -26,6 +26,7 @@ fixe — sert de mémoire centralisée plutôt que de planning strict.
 | 17 | Qualité | Suivi d'usage/coût par org | Moyen | — |
 | 18 | Premium | Indexation assistée par IA (doc bruts + URL) | Élevé | 6 (async), entitlement par plan |
 | 19 | Templates | Clarifier dans le front que les templates ne sont pas liés en live aux chatbots | Faible | À activer seulement si ça pose problème en usage réel |
+| 20 | RGPD | Plan d'action : rétention/purge, suppression à la demande, chiffrement, logs | Moyen (plan) | Déclenché par l'item 9 — rien d'implémenté, voir détail |
 
 ---
 
@@ -280,26 +281,101 @@ message clair (voir `lib/extract.ts`), pas de fallback.
 **Effort / compromis** : élevé — dépendance externe, coût de traitement par
 page, gestion de la qualité variable de l'OCR.
 
-### 8. Formats CSV / Excel
+### 8. Formats CSV / Excel — ✅ Fait
 
-**Problème** : hors scope du MVP initial, rejetés à l'upload.
+**Problème** : hors scope du MVP initial, rejetés à l'upload (`.csv`,
+`.xlsx`, `.xls`). Bloquant pour tout client dont les documents clés sont
+des catalogues produits ou grilles tarifaires plutôt que du texte narratif.
 
-**Effort / compromis** : moyen — extraction relativement simple, mais pose
-la question du chunking adapté à des données tabulaires (différent du texte
-brut).
+**Solution implémentée** : `lib/extract.ts` parse le CSV (`csv-parse`) ou le
+classeur Excel (`xlsx`, une feuille ou plusieurs) en lignes, puis convertit
+chaque ligne en un petit bloc Markdown (`### Ligne N` + `- Colonne: valeur`
+par champ, `### Feuille — Ligne N` si plusieurs feuilles). Ce Markdown
+synthétique passe ensuite tel quel dans le pipeline de chunking existant
+(`lib/chunking.ts`) : la stratégie structurelle regroupe plusieurs lignes
+par chunk avec leurs en-têtes de colonnes comme contexte, au lieu de
+découper à l'aveugle sur un nombre de caractères. Aucune modification du
+chunking/embedding/indexation n'a été nécessaire.
+
+**Sécurité** : le paquet `xlsx` sur le registre npm (0.18.5) a deux CVE haute
+sévérité connues (pollution de prototype, ReDoS) jamais corrigées côté npm —
+SheetJS ne publie les versions patchées que sur son propre CDN. Comme cette
+lib parse des fichiers uploadés par des utilisateurs non fiables, installé
+depuis `https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz` (patché, 0
+vulnérabilité) plutôt que `npm install xlsx`.
+
+**Limite connue** : pensé pour des fichiers de taille pilote (centaines à
+quelques milliers de lignes) — un warning est loggé au-delà de 5000 lignes
+(`LARGE_SHEET_ROW_WARNING`). Un vrai catalogue de 75 000+ lignes coûterait
+cher en appels d'embeddings synchrones et mérite son propre pipeline basé
+sur l'API Batch d'OpenAI (~50% moins cher, mais sans garantie de délai —
+adapté à une synchro en masse, pas à un upload interactif où le client
+attend de pouvoir discuter avec son document tout de suite) plutôt que cet
+endpoint d'upload.
 
 ---
 
 ## 3. Chat
 
-### 9. Historique de conversation persistant
+### 9. Historique de conversation persistant — ✅ Fait (migration à appliquer)
 
-**Problème** : le chat est stateless côté serveur — l'historique vit dans le
-state React du navigateur, perdu au rechargement. Pas de table
-`conversations`/`messages` en base.
+**Problème** : le chat était stateless côté serveur — l'historique vivait
+dans le state React du navigateur, perdu au rechargement de la page.
 
-**Effort / compromis** : moyen — nouvelle table + RLS, à faire si le besoin
-de retrouver une conversation passée se confirme avec les pilotes.
+**Solution implémentée** : tables `conversations`/`messages`
+(`supabase/migrations/0004_conversations.sql` + `0005_multiple_conversations.sql`).
+Identité = `user_id` pour le chat authentifié du dashboard, `visitor_id`
+(UUID généré côté client, stocké en localStorage — `components/ChatWidget.tsx`)
+pour le widget public/iframe, qui n'a pas de session Supabase. Le serveur
+devient la source de vérité de l'historique : `GET` (sans `conversationId`)
+liste les conversations sauvegardées d'un chatbot pour le sélecteur, `GET`
+avec `conversationId` recharge ses messages (après vérification de
+propriété), `POST` crée une conversation ou continue celle passée en
+paramètre, persiste le tour une fois la génération terminée, et renvoie
+l'id via un événement SSE `conversation` (le client en a besoin dès le
+premier message d'une conversation neuve). `DELETE` supprime une
+conversation précise.
+
+**Révision (2026-09-08)** : la première version (0004) faisait "une
+conversation par (chatbot, identité)" — "Nouvelle conversation" supprimait
+l'ancienne pour repartir à zéro, sans moyen d'y revenir. Ce n'était pas
+l'attente : l'utilisateur veut plusieurs conversations par chatbot et
+pouvoir switcher entre elles. `0005_multiple_conversations.sql` retire la
+contrainte d'unicité, et `ChatWidget.tsx` a un sélecteur (dropdown) listant
+les conversations sauvegardées ; "Nouvelle conversation" n'efface plus
+l'historique, elle démarre juste un nouveau fil à côté des précédents.
+
+**Sélecteur de conversations** : menu déroulant custom (pas un `<select>`
+natif — son menu ouvert rend avec le chrome de l'OS, impossible à styler
+finement). Chaque entrée affiche un titre (la première question posée dans
+cette conversation, tronquée à 42 caractères) plutôt qu'une date seule ;
+`lib/conversations.ts`'s `listConversations` fait une requête
+supplémentaire sur `messages` pour récupérer le premier message `user` de
+chaque conversation. "+ Nouvelle conversation" est la première entrée du
+menu plutôt qu'un bouton séparé.
+
+**RLS** : même pattern transitif que `documents` (scopé via
+`chatbots.organization_id`), pas restreint à `user_id = auth.uid()` — un
+coéquipier peut voir les conversations de test des autres membres de l'org,
+cohérent avec le reste (chatbots/documents déjà partagés à l'échelle de
+l'org). Le widget public passe par le client admin (service role, comme le
+reste de `/api/public-chat`), jamais par ce RLS — l'appartenance d'une
+conversation à un `visitor_id` est vérifiée manuellement côté code à la
+place.
+
+**À faire avant que ça fonctionne** : appliquer
+`supabase/migrations/0004_conversations.sql` PUIS
+`0005_multiple_conversations.sql` sur le projet Supabase (SQL editor du
+dashboard, dans cet ordre). `tsc --noEmit` passe ; testé manuellement pour
+le flux de base (historique qui survit au rechargement) avant la révision
+0005 — le sélecteur multi-conversations reste à valider en conditions
+réelles après application de la nouvelle migration.
+
+**Limite connue** : le `visitor_id` est une clé de persistance, pas un
+credential — sécurisé par son entropie (UUID v4), pas par une vérification
+d'identité. Quelqu'un qui obtient cet UUID peut lire l'historique de ce
+visiteur pour ce chatbot ; même modèle de confiance que la plupart des
+widgets anonymes (Intercom et équivalents).
 
 ### 10. Rate limiting — ✅ Fait
 
@@ -434,3 +510,75 @@ spécifique pour l'expliquer pour l'instant.
 visuelle (ex. dans l'éditeur de prompt du chatbot ou sur la page Templates)
 précisant que la modification d'un template ne se propage pas
 automatiquement aux chatbots existants.
+
+---
+
+## 8. Conformité RGPD
+
+### 20. Plan d'action RGPD pour le stockage des conversations
+
+**Déclencheur (2026-09-08)** : l'item 9 (historique de conversation
+persistant) fait passer les messages de chat d'un état éphémère (state
+React, perdu à la fermeture) à un stockage permanent en clair dans Postgres.
+Décision du produit : être conforme dès le pilote plutôt que de rattraper
+après coup — voici le plan, rien n'est encore implémenté.
+
+**A. Rétention & purge automatique** — priorité haute, avec D.
+Définir une durée de rétention (proposition : 90 jours d'inactivité par
+défaut, ajustable) puis un `DELETE` planifié via `pg_cron` (extension
+Postgres native, activable dans les Extensions du dashboard Supabase) sur
+`conversations` où `updated_at` dépasse le seuil — `messages` suit
+automatiquement (cascade déjà en place dans
+`supabase/migrations/0004_conversations.sql`). Tourne dans la base
+elle-même, indépendant de l'hébergement de l'app (Vercel ou VPS). Effort
+faible-moyen.
+
+**B. Suppression à la demande (droit à l'effacement)** — priorité
+moyenne, complète A.
+Déjà partiel : bouton "Nouvelle conversation" dans `ChatWidget.tsx`
+(self-service, mais suppose que le visiteur ait toujours son `visitorId`
+en localStorage). Manque : un outil côté dashboard pour qu'un membre de
+l'org retrouve et supprime une conversation précise, pour répondre à une
+demande RGPD d'un visiteur qui n'a plus son `visitorId`. La suppression
+de compte utilisateur authentifié est déjà couverte architecturalement
+(`user_id references auth.users(id) on delete cascade`). Effort
+faible-moyen.
+
+**C. Chiffrement applicatif des messages** — renforcement, pas bloquant à
+J1, peut suivre A/B/D.
+Aujourd'hui : chiffré au repos côté infra Supabase (protège en cas de vol
+de disque), mais lisible en clair par quiconque a un accès DB (rôle
+service-role notamment). Proposition : chiffrer `content`/`sources` en
+AES-256-GCM côté Node (`lib/conversations.ts`) avant insertion, déchiffrer
+à la lecture, clé dans une variable d'env — jamais stockée dans Postgres.
+Compromis : plus de recherche full-text SQL possible sur le contenu (pas
+utilisé aujourd'hui, donc sans coût réel) ; la gestion de la clé (rotation,
+sauvegarde) devient un sujet à part entière. Effort moyen.
+
+**D. Angle mort : les logs locaux** — même urgence que A.
+`lib/logger.ts` (item 16) écrit déjà la question brute en clair dans
+`logs/*.log` (`chat.request`, `public-chat.request`) sans aucune limite de
+rétention non plus (déjà noté comme limite connue de l'item 16). Chiffrer
+la base tout en laissant ces mêmes questions traîner indéfiniment en clair
+sur disque annulerait une bonne partie de l'effort — retirer le champ
+`question` de ces logs (garder les métadonnées utiles au debug) ou
+appliquer la même politique de rétention aux fichiers eux-mêmes. Effort
+faible.
+
+**E. Sous-traitants tiers à documenter** — hors code.
+Vérifier/documenter la région d'hébergement du projet Supabase (UE vs US),
+les conditions de traitement de l'API OpenAI (pas d'entraînement sur les
+données API par défaut, mais transfert hors UE à noter), Elasticsearch
+restant sous contrôle direct tant qu'il tourne en Docker sur l'infra
+propre.
+
+**F. Documentation** — hors code.
+Registre de traitement minimal (quoi, pourquoi, combien de temps, qui a
+accès), modèle de mention à afficher aux visiteurs du widget public
+(fourni par Corpus.ai, affiché par le client), modèle de DPA à faire
+signer par chaque client pilote (Corpus.ai = sous-traitant, le client =
+responsable de traitement).
+
+**Ordre proposé** : A + D d'abord (rien n'est conforme sans ça, effort
+faible chacun), puis B, puis C en renforcement. E/F en parallèle, hors
+code, avant de signer un premier vrai client pilote.

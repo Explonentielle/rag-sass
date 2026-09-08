@@ -4,6 +4,7 @@
 
 export type DocumentStatus = 'pending' | 'processing' | 'indexed' | 'error';
 export type OrgRole = 'owner' | 'admin' | 'member';
+export type MessageRole = 'user' | 'assistant';
 
 export interface Database {
   public: {
@@ -115,6 +116,58 @@ export interface Database {
           chunk_count?: number | null;
           uploaded_at?: string;
           indexed_at?: string | null;
+        };
+      };
+      conversations: {
+        Row: {
+          id: string;
+          chatbot_id: string;
+          user_id: string | null;
+          visitor_id: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          chatbot_id: string;
+          user_id?: string | null;
+          visitor_id?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          chatbot_id?: string;
+          user_id?: string | null;
+          visitor_id?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+      };
+      messages: {
+        Row: {
+          id: string;
+          conversation_id: string;
+          role: MessageRole;
+          content: string;
+          sources: string[] | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          conversation_id: string;
+          role: MessageRole;
+          content: string;
+          sources?: string[] | null;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          conversation_id?: string;
+          role?: MessageRole;
+          content?: string;
+          sources?: string[] | null;
+          created_at?: string;
         };
       };
     };

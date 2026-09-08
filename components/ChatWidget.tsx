@@ -44,8 +44,138 @@ const MARKDOWN_COMPONENTS = {
 interface Message {
   role: 'user' | 'assistant';
   content: string;
-  sources?: string[];
+  sources?: string[] | null;
   error?: string;
+  truncated?: boolean;
+}
+
+interface ConversationSummary {
+  id: string;
+  createdAt: string;
+  updatedAt: string;
+  title: string | null;
+}
+
+const TITLE_MAX_CHARS = 42;
+
+function conversationTitle(c: ConversationSummary): string {
+  if (!c.title) return 'Nouvelle conversation';
+  return c.title.length > TITLE_MAX_CHARS ? `${c.title.slice(0, TITLE_MAX_CHARS)}…` : c.title;
+}
+
+function conversationDate(c: ConversationSummary): string {
+  return new Date(c.updatedAt).toLocaleString('fr-FR', {
+    day: '2-digit',
+    month: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+}
+
+/** Custom dropdown — a native <select>'s popup can't be styled to match the
+ * rest of the UI (it renders with OS chrome). */
+function ConversationSwitcher({
+  conversations,
+  activeId,
+  onSelect,
+  onNew,
+  disabled,
+}: {
+  conversations: ConversationSummary[];
+  activeId: string | null;
+  onSelect: (id: string) => void;
+  onNew: () => void;
+  disabled: boolean;
+}) {
+  const [open, setOpen] = useState(false);
+  const rootRef = useRef<HTMLDivElement>(null);
+  const active = conversations.find((c) => c.id === activeId) ?? null;
+
+  useEffect(() => {
+    if (!open) return;
+    function handleClickOutside(e: MouseEvent) {
+      if (rootRef.current && !rootRef.current.contains(e.target as Node)) setOpen(false);
+    }
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [open]);
+
+  return (
+    <div ref={rootRef} className="relative min-w-0">
+      <button
+        type="button"
+        disabled={disabled}
+        onClick={() => setOpen((v) => !v)}
+        className="flex max-w-full items-center gap-1 rounded-md px-1.5 py-0.5 text-xs font-medium text-slate-600 hover:bg-slate-100 disabled:opacity-50"
+      >
+        <span className="truncate">{active ? conversationTitle(active) : 'Nouvelle conversation'}</span>
+        <svg
+          className={`h-3 w-3 flex-shrink-0 text-slate-400 transition-transform ${open ? 'rotate-180' : ''}`}
+          viewBox="0 0 20 20"
+          fill="currentColor"
+        >
+          <path
+            fillRule="evenodd"
+            d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z"
+            clipRule="evenodd"
+          />
+        </svg>
+      </button>
+
+      {open && (
+        <div className="absolute left-0 top-full z-10 mt-1 max-h-72 w-64 overflow-y-auto rounded-lg border border-slate-200 bg-white py-1 shadow-lg">
+          <button
+            type="button"
+            onClick={() => {
+              onNew();
+              setOpen(false);
+            }}
+            className="flex w-full items-center gap-1.5 px-3 py-2 text-left text-sm font-medium text-brand-700 hover:bg-slate-50"
+          >
+            + Nouvelle conversation
+          </button>
+          {conversations.length > 0 && <div className="my-1 border-t border-slate-100" />}
+          {conversations.map((c) => (
+            <button
+              key={c.id}
+              type="button"
+              onClick={() => {
+                onSelect(c.id);
+                setOpen(false);
+              }}
+              className={`block w-full px-3 py-2 text-left text-sm hover:bg-slate-50 ${
+                c.id === activeId ? 'bg-slate-50 font-medium text-slate-900' : 'text-slate-600'
+              }`}
+            >
+              <div className="truncate">{conversationTitle(c)}</div>
+              <div className="text-xs text-slate-400">{conversationDate(c)}</div>
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+const VISITOR_ID_KEY = 'corpus-visitor-id';
+
+// Anonymous identity for the public widget/embed — there's no Supabase
+// session to key conversation history on. Stored per-origin, so an iframe
+// embed keeps its own id scoped to wherever it's mounted (fine: it only
+// needs to survive a reload of that same page, not follow the visitor
+// across sites). Falls back to a fresh, unpersisted id if storage is
+// unavailable (private browsing, storage blocked) — history just won't
+// survive a reload in that case, same as before this feature existed.
+function getOrCreateVisitorId(): string {
+  try {
+    const existing = localStorage.getItem(VISITOR_ID_KEY);
+    if (existing) return existing;
+    const fresh = crypto.randomUUID();
+    localStorage.setItem(VISITOR_ID_KEY, fresh);
+    return fresh;
+  } catch {
+    return crypto.randomUUID();
+  }
 }
 
 function parseSseChunk(chunk: string): { event: string; data: any }[] {
@@ -72,10 +202,64 @@ export default function ChatWidget({
   placeholder?: string;
   className?: string;
 }) {
+  const isPublic = apiEndpoint === '/api/public-chat';
+
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
+  const [conversations, setConversations] = useState<ConversationSummary[]>([]);
+  const [activeConversationId, setActiveConversationId] = useState<string | null>(null);
+  // Read from localStorage in an effect, not a useState initializer — that
+  // initializer also runs during server-side rendering, where localStorage
+  // doesn't exist.
+  const [visitorId, setVisitorId] = useState<string | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (isPublic) setVisitorId(getOrCreateVisitorId());
+  }, [isPublic]);
+
+  function historyUrl(conversationId?: string) {
+    const params = new URLSearchParams({ chatbotId });
+    if (isPublic) params.set('visitorId', visitorId!);
+    if (conversationId) params.set('conversationId', conversationId);
+    return `${apiEndpoint}?${params.toString()}`;
+  }
+
+  async function loadConversation(conversationId: string) {
+    const res = await fetch(historyUrl(conversationId)).catch(() => null);
+    if (!res?.ok) return;
+    const body = await res.json().catch(() => null);
+    if (Array.isArray(body?.messages)) {
+      setActiveConversationId(conversationId);
+      setMessages(body.messages);
+    }
+  }
+
+  // On mount: list saved conversations for the switcher, and open the most
+  // recent one (if any) so a reload doesn't lose it — see
+  // supabase/migrations/0004_conversations.sql and 0005 (multiple
+  // conversations per chatbot). Public mode waits for visitorId first.
+  useEffect(() => {
+    if (isPublic && !visitorId) return;
+    let cancelled = false;
+
+    async function loadConversationList() {
+      const res = await fetch(historyUrl()).catch(() => null);
+      if (!res?.ok || cancelled) return;
+      const body = await res.json().catch(() => null);
+      const list: ConversationSummary[] = Array.isArray(body?.conversations) ? body.conversations : [];
+      if (cancelled) return;
+      setConversations(list);
+      if (list.length > 0) await loadConversation(list[0].id);
+    }
+
+    loadConversationList();
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isPublic, visitorId, chatbotId]);
 
   // Scroll only when a new message is *added* (user question + empty
   // assistant placeholder), not on every streamed token — otherwise the
@@ -86,22 +270,35 @@ export default function ChatWidget({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [messages.length]);
 
+  function handleReset() {
+    if (loading) return;
+    // No delete — the previous conversation stays in `conversations` and
+    // stays reachable from the switcher. The next message creates a fresh
+    // one server-side (no conversationId sent).
+    setActiveConversationId(null);
+    setMessages([]);
+  }
+
+  function handleSelectConversation(id: string) {
+    if (loading || id === activeConversationId) return;
+    loadConversation(id);
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     const question = input.trim();
-    if (!question || loading) return;
-
-    const history = messages.map(({ role, content }) => ({ role, content }));
+    if (!question || loading || (isPublic && !visitorId)) return;
 
     setMessages((prev) => [...prev, { role: 'user', content: question }, { role: 'assistant', content: '' }]);
     setInput('');
     setLoading(true);
 
     try {
+      const payload = { chatbotId, question, conversationId: activeConversationId ?? undefined };
       const res = await fetch(apiEndpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ chatbotId, question, history }),
+        body: JSON.stringify(isPublic ? { ...payload, visitorId } : payload),
       });
 
       if (!res.ok || !res.body) {
@@ -130,7 +327,23 @@ export default function ChatWidget({
         for (const part of parts) {
           const events = parseSseChunk(part + '\n\n');
           for (const { event, data } of events) {
-            if (event === 'sources') {
+            if (event === 'conversation') {
+              setActiveConversationId((prev) => {
+                if (prev === data.conversationId) return prev;
+                // First message of a brand new conversation — add it to the
+                // switcher immediately rather than waiting for a refetch.
+                setConversations((prevList) => [
+                  {
+                    id: data.conversationId,
+                    createdAt: new Date().toISOString(),
+                    updatedAt: new Date().toISOString(),
+                    title: prevList.find((c) => c.id === data.conversationId)?.title ?? question,
+                  },
+                  ...prevList.filter((c) => c.id !== data.conversationId),
+                ]);
+                return data.conversationId;
+              });
+            } else if (event === 'sources') {
               setMessages((prev) => {
                 const next = [...prev];
                 next[next.length - 1] = { ...next[next.length - 1], sources: data.sources };
@@ -149,6 +362,12 @@ export default function ChatWidget({
                 next[next.length - 1] = { ...next[next.length - 1], error: data.message };
                 return next;
               });
+            } else if (event === 'truncated') {
+              setMessages((prev) => {
+                const next = [...prev];
+                next[next.length - 1] = { ...next[next.length - 1], truncated: true };
+                return next;
+              });
             }
           }
         }
@@ -160,6 +379,17 @@ export default function ChatWidget({
 
   return (
     <div className={`flex flex-1 flex-col overflow-hidden bg-white ${className}`}>
+      {(conversations.length > 0 || messages.length > 0) && (
+        <div className="border-b border-slate-200 px-2 py-1.5">
+          <ConversationSwitcher
+            conversations={conversations}
+            activeId={activeConversationId}
+            onSelect={handleSelectConversation}
+            onNew={handleReset}
+            disabled={loading}
+          />
+        </div>
+      )}
       <div className="flex-1 space-y-4 overflow-y-auto p-6">
         {messages.length === 0 && (
           <div className="flex h-full items-center justify-center">
@@ -185,6 +415,13 @@ export default function ChatWidget({
               )}
 
               {m.error && <p className="mt-1 text-xs text-red-600">{m.error}</p>}
+
+              {m.truncated && (
+                <p className="mt-1 text-xs text-amber-600">
+                  ⚠ Réponse tronquée (limite de longueur atteinte) — reformulez pour une réponse
+                  plus courte si besoin.
+                </p>
+              )}
 
               {m.sources && m.sources.length > 0 && (
                 <div className="mt-2 border-t border-slate-300/60 pt-1.5 text-xs text-slate-500">
