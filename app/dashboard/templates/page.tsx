@@ -28,6 +28,10 @@ export default async function TemplatesPage() {
             Points de départ pour le comportement de vos chatbots, applicables depuis la page de
             chaque chatbot.
           </p>
+          <p className="mt-1 text-xs text-slate-400">
+            Modifier un template ici ne change pas les chatbots qui l'utilisent déjà : chacun garde
+            sa propre copie, prise au moment où le template a été appliqué.
+          </p>
         </div>
         <CreateTemplateForm organizationId={org.id} />
       </div>

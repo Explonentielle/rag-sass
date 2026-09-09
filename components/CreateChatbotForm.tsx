@@ -22,6 +22,7 @@ export default function CreateChatbotForm({
   const router = useRouter();
   const [name, setName] = useState('');
   const [templateKey, setTemplateKey] = useState(`default:${PROMPT_TEMPLATES[0].id}`);
+  const [useDocuments, setUseDocuments] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [open, setOpen] = useState(false);
@@ -46,6 +47,7 @@ export default function CreateChatbotForm({
         organizationId,
         name,
         systemPromptTemplate: resolveTemplateText(templateKey),
+        useDocuments,
       }),
     });
 
@@ -101,6 +103,25 @@ export default function CreateChatbotForm({
             </select>
             <p className="text-xs text-slate-400">Modifiable ensuite dans la page du chatbot.</p>
           </div>
+
+          <label className="flex items-start gap-2.5">
+            <input
+              type="checkbox"
+              checked={useDocuments}
+              onChange={(e) => setUseDocuments(e.target.checked)}
+              className="mt-0.5 h-4 w-4 rounded border-slate-300 text-brand-700 focus:ring-brand-500"
+            />
+            <span>
+              <span className="block text-sm font-medium text-slate-900">
+                Ce chatbot se base sur des documents à uploader
+              </span>
+              <span className="block text-xs text-slate-400">
+                Décocher si vous n'avez pas de documents — le chatbot répondra uniquement à partir
+                du prompt ci-dessus (utilisez le template "Assistant simple (sans documents)" pour
+                y écrire directement vos infos/FAQ).
+              </span>
+            </span>
+          </label>
 
           {error && <p className="text-sm text-red-600">{error}</p>}
 

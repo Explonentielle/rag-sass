@@ -17,6 +17,10 @@ export async function POST(request: Request) {
   // Full prompt text, resolved client-side from either a default or a
   // custom (org-owned) template — the server doesn't need to distinguish.
   const systemPromptTemplate: string | undefined = body?.systemPromptTemplate?.trim();
+  // Defaults true (current behavior: answers grounded in uploaded
+  // documents). false = "prompt-only" chatbot, no retrieval at all — see
+  // docs/roadmap.md item 23.
+  const useDocuments: boolean = body?.useDocuments !== false;
 
   if (!organizationId || !name) {
     return NextResponse.json({ error: 'organizationId et name sont requis.' }, { status: 400 });
@@ -30,6 +34,7 @@ export async function POST(request: Request) {
       organization_id: organizationId,
       name,
       system_prompt_template: systemPromptTemplate || PROMPT_TEMPLATES[0].template,
+      use_documents: useDocuments,
     })
     .select('id')
     .single();

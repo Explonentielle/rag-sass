@@ -1,6 +1,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { Database, MessageRole } from '@/types/database';
 import type { ChatTurn } from '@/lib/openai';
+import { encryptText, decryptText } from '@/lib/crypto';
 
 export interface StoredMessage {
   role: MessageRole;
@@ -16,6 +17,13 @@ export interface ConversationSummary {
    * conversation row that exists but never got a message appended (e.g.
    * generation failed right after creating it). */
   title: string | null;
+}
+
+export interface AdminConversationSummary extends ConversationSummary {
+  /** Who this conversation belongs to — an org member (dashboard test chat)
+   * or an anonymous widget visitor. Distinguishes the two in the admin list
+   * since a chatbot mixes both. */
+  identity: { type: 'user'; userId: string } | { type: 'visitor'; visitorId: string };
 }
 
 interface ConversationIdentity {
@@ -81,7 +89,7 @@ export async function listConversations(
   const titleByConversation = new Map<string, string>();
   for (const msg of firstMessages ?? []) {
     if (!titleByConversation.has(msg.conversation_id)) {
-      titleByConversation.set(msg.conversation_id, msg.content);
+      titleByConversation.set(msg.conversation_id, decryptText(msg.content));
     }
   }
 
@@ -91,6 +99,84 @@ export async function listConversations(
     updatedAt: row.updated_at,
     title: titleByConversation.get(row.id) ?? null,
   }));
+}
+
+/**
+ * All conversations for a chatbot, across every identity — org test-chat
+ * users and anonymous widget visitors alike. For the dashboard's GDPR
+ * lookup tool: a member finds and deletes a specific visitor's conversation
+ * on request, without needing that visitor's localStorage visitorId (see
+ * roadmap.md item 20-B). Relies on RLS (conversations_select) to scope this
+ * to the caller's org — no explicit organization filter needed here.
+ */
+export async function listAllConversationsForChatbot(
+  supabase: SupabaseClient<Database>,
+  chatbotId: string
+): Promise<AdminConversationSummary[]> {
+  const { data, error } = await supabase
+    .from('conversations')
+    .select('id, created_at, updated_at, user_id, visitor_id')
+    .eq('chatbot_id', chatbotId)
+    .order('updated_at', { ascending: false });
+
+  if (error) {
+    throw new Error(`Impossible de lister les conversations: ${error.message}`);
+  }
+  const conversations = data ?? [];
+  if (conversations.length === 0) return [];
+
+  const { data: firstMessages, error: msgError } = await supabase
+    .from('messages')
+    .select('conversation_id, content, created_at')
+    .in(
+      'conversation_id',
+      conversations.map((c) => c.id)
+    )
+    .eq('role', 'user')
+    .order('created_at', { ascending: true });
+
+  if (msgError) {
+    throw new Error(`Impossible de charger les titres de conversation: ${msgError.message}`);
+  }
+
+  const titleByConversation = new Map<string, string>();
+  for (const msg of firstMessages ?? []) {
+    if (!titleByConversation.has(msg.conversation_id)) {
+      titleByConversation.set(msg.conversation_id, decryptText(msg.content));
+    }
+  }
+
+  return conversations.map((row) => ({
+    id: row.id,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+    title: titleByConversation.get(row.id) ?? null,
+    identity: row.user_id
+      ? { type: 'user' as const, userId: row.user_id }
+      : { type: 'visitor' as const, visitorId: row.visitor_id! },
+  }));
+}
+
+/**
+ * Deletes a conversation by id, scoped only to its chatbot — not to any
+ * identity. Used by the dashboard admin tool (20-B), where a member deletes
+ * a visitor's conversation on their behalf. RLS (conversations_delete)
+ * still enforces that the caller belongs to the chatbot's org.
+ */
+export async function deleteConversationForChatbot(
+  supabase: SupabaseClient<Database>,
+  conversationId: string,
+  chatbotId: string
+): Promise<void> {
+  const { error } = await supabase
+    .from('conversations')
+    .delete()
+    .eq('id', conversationId)
+    .eq('chatbot_id', chatbotId);
+
+  if (error) {
+    throw new Error(`Impossible de supprimer la conversation: ${error.message}`);
+  }
 }
 
 /**
@@ -118,6 +204,19 @@ export async function getConversationForIdentity(
   return data;
 }
 
+/** Decrypts one stored row. `sources` is a jsonb column: a plain string
+ * means an encrypted blob (see lib/crypto.ts), an array means a legacy row
+ * written before this feature existed — both are handled, no migration
+ * needed for pre-existing data. */
+function decryptStoredMessage(row: { role: MessageRole; content: string; sources: unknown }): StoredMessage {
+  const rawSources = row.sources;
+  const sources =
+    typeof rawSources === 'string'
+      ? (JSON.parse(decryptText(rawSources)) as string[])
+      : ((rawSources as string[] | null) ?? null);
+  return { role: row.role, content: decryptText(row.content), sources };
+}
+
 export async function loadHistory(
   supabase: SupabaseClient<Database>,
   conversationId: string
@@ -131,7 +230,7 @@ export async function loadHistory(
   if (error) {
     throw new Error(`Impossible de charger l'historique: ${error.message}`);
   }
-  return data ?? [];
+  return (data ?? []).map(decryptStoredMessage);
 }
 
 /** Maps stored history to the shape lib/openai.ts's streamAnswer expects. */
@@ -144,9 +243,13 @@ export async function appendTurn(
   conversationId: string,
   turn: { question: string; answer: string; sources: string[] }
 ): Promise<void> {
+  // sources is a jsonb column; storing the encrypted blob as its JSON string
+  // value (rather than an array) is what decryptStoredMessage above expects
+  // — the DB type says string[], but the cast is deliberate, see lib/crypto.ts.
+  const encryptedSources = encryptText(JSON.stringify(turn.sources)) as unknown as string[];
   const { error } = await supabase.from('messages').insert([
-    { conversation_id: conversationId, role: 'user', content: turn.question, sources: null },
-    { conversation_id: conversationId, role: 'assistant', content: turn.answer, sources: turn.sources },
+    { conversation_id: conversationId, role: 'user', content: encryptText(turn.question), sources: null },
+    { conversation_id: conversationId, role: 'assistant', content: encryptText(turn.answer), sources: encryptedSources },
   ]);
 
   if (error) {

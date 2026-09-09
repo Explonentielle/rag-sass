@@ -1,4 +1,4 @@
-import { Badge, Card } from '@/components/ui/Card';
+import { Card } from '@/components/ui/Card';
 import { Icon, IconBadge, ICONS } from '@/components/icons';
 
 export default function DocsPage() {
@@ -82,42 +82,44 @@ export default function DocsPage() {
 
       <section className="space-y-3">
         <h2 className="flex items-center gap-2 font-semibold text-slate-900">
-          <IconBadge tone="amber" size="sm" spacing="">
-            {ICONS.alert}
+          <IconBadge tone="green" size="sm" spacing="">
+            {ICONS.shield}
           </IconBadge>
-          Limitations connues
-          <Badge tone="amber">à traiter avant un vrai lancement public</Badge>
+          Contrôles d'accès pour les embeds publics
         </h2>
-        <Card className="border-amber-200 bg-amber-50 p-6">
+        <Card className="p-6">
           <ul className="list-inside list-disc space-y-2 text-sm leading-relaxed text-slate-700">
             <li>
-              <strong>Pas de restriction de domaine</strong> : n'importe qui connaissant l'ID d'un
-              chatbot peut l'interroger via <code className="rounded bg-white px-1 py-0.5 text-xs">/api/public-chat</code>, depuis n'importe quel
-              site.
+              <strong>Toggle public / privé</strong> : chaque chatbot a un interrupteur "Accessible
+              via le widget public et l'embed" (section "Accès public / embed" de sa page). Désactivé,
+              <code className="rounded bg-slate-100 px-1 py-0.5 text-xs">/api/public-chat</code> et{' '}
+              <code className="rounded bg-slate-100 px-1 py-0.5 text-xs">/embed/[chatbotId]</code> renvoient 404,
+              quel que soit le site appelant.
             </li>
             <li>
-              <strong>Pas de rate limiting</strong> : un ID de chatbot exposé publiquement peut en
-              théorie être spammé, avec un coût réel (appels OpenAI, embeddings + chat).
-            </li>
-            <li>
-              <strong>Pas de contrôle "ce chatbot est-il embeddable"</strong> : tous les chatbots
-              sont accessibles dès qu'on connaît leur ID, pas de case à cocher par chatbot.
+              <strong>Restriction par domaine</strong> : liste optionnelle de domaines autorisés à
+              embarquer le chatbot. Vide = pas de restriction (comportement historique). Appliquée via
+              un header CSP <code className="rounded bg-slate-100 px-1 py-0.5 text-xs">frame-ancestors</code> au
+              chargement de la page d'embed (bloque le navigateur lui-même sur les sites non listés),
+              plus une vérification d'origine sur l'API pour les appels directs.
             </li>
           </ul>
           <p className="mt-3 text-sm text-slate-600">
-            Acceptable pour du test interne / pilotes de confiance, à corriger avant d'exposer un
-            lien d'embed à un client final.
+            Les deux sont opt-in (désactivés par défaut) — un chatbot existant reste accessible comme
+            avant tant que son propriétaire n'active pas la restriction.
           </p>
         </Card>
+        <p className="text-sm text-emerald-700">
+          <strong>Rate limiting : fait.</strong> 20 req/min par (chatbot, IP), blacklist automatique
+          24h en cas d'abus soutenu — voir <code className="rounded bg-slate-100 px-1 py-0.5 text-xs">lib/rateLimit.ts</code>.
+          Contrôle *combien* d'accès, orthogonal aux deux points ci-dessus qui contrôlent *qui* accède.
+        </p>
       </section>
 
       <section className="space-y-3">
         <h2 className="font-semibold text-slate-900">Idées pour la suite (non fait)</h2>
         <Card className="p-6">
           <ul className="list-inside list-disc space-y-1.5 text-sm text-slate-600">
-            <li>Whitelist de domaines autorisés par chatbot.</li>
-            <li>Rate limiting par chatbot ou par IP sur <code className="rounded bg-slate-100 px-1 py-0.5 text-xs">/api/public-chat</code>.</li>
-            <li>Toggle "chatbot public / privé" dans les paramètres du chatbot.</li>
             <li>Personnalisation visuelle du widget embed (couleurs, position) par client.</li>
           </ul>
         </Card>

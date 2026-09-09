@@ -4,6 +4,7 @@ import { hybridSearch } from '@/lib/elasticsearch';
 import { buildSystemPrompt } from '@/lib/prompts';
 import { logInfo, logWarn, logError } from '@/lib/logger';
 import { checkPublicChatRateLimit, getClientIp } from '@/lib/rateLimit';
+import { getRequestOrigin, isOriginAllowed } from '@/lib/embedAccess';
 import {
   createConversation,
   listConversations,
@@ -20,10 +21,11 @@ export const maxDuration = 120;
 
 // Public, unauthenticated chat endpoint for the floating widget and iframe
 // embeds. No login required by design (that's the point of an embeddable
-// widget) — the only access control is knowing the chatbotId. Rate-limited
+// widget) — access control is: knowing the chatbotId, the chatbot's
+// `is_public` flag, and (if the owner configured any) `allowed_origins`
+// (see getAccessibleChatbot below and docs/integration.md). Rate-limited
 // per chatbot+visitor, with auto-blacklist of IPs that exhaust the window
-// twice in a row (see lib/rateLimit.ts); there is still no per-chatbot
-// allowlist of embedding domains — see docs/integration.md.
+// twice in a row (see lib/rateLimit.ts).
 //
 // Conversation history is keyed by a client-generated visitorId (UUID kept
 // in the widget's localStorage, see components/ChatWidget.tsx) instead of
@@ -40,6 +42,53 @@ function isValidVisitorId(v: unknown): v is string {
   return typeof v === 'string' && /^[0-9a-f-]{16,64}$/i.test(v);
 }
 
+type ChatbotAccessResult =
+  | {
+      ok: true;
+      chatbot: {
+        id: string;
+        organization_id: string;
+        system_prompt_template: string;
+        use_documents: boolean;
+      };
+    }
+  | { ok: false; reason: 'not_found' | 'private' | 'origin_blocked' };
+
+/**
+ * Looks up a chatbot and checks it's reachable anonymously from this
+ * request: exists, `is_public`, and — if the owner configured any —
+ * `allowed_origins` includes the caller's Origin/Referer. Same-origin
+ * requests (our own domain, e.g. the site's own FloatingChatWidget, or a
+ * fetch made by JS running *inside* our /embed/[chatbotId] iframe — that JS
+ * is same-origin to us, not to the parent page framing it) always pass;
+ * `allowed_origins` only applies to *other* origins calling this API
+ * directly. Restricting which sites may actually iframe /embed/[chatbotId]
+ * is a separate, browser-enforced mechanism (CSP frame-ancestors, see
+ * middleware.ts) — an Origin check here can't see who framed the page that
+ * made the fetch, only what page made it.
+ */
+async function getAccessibleChatbot(
+  admin: ReturnType<typeof getAdminClient>,
+  chatbotId: string,
+  request: Request
+): Promise<ChatbotAccessResult> {
+  const { data: chatbot, error } = await admin
+    .from('chatbots')
+    .select('id, organization_id, system_prompt_template, is_public, allowed_origins, use_documents')
+    .eq('id', chatbotId)
+    .single();
+
+  if (error || !chatbot) return { ok: false, reason: 'not_found' };
+  if (!chatbot.is_public) return { ok: false, reason: 'private' };
+
+  const selfOrigin = new URL(request.url).origin;
+  const requestOrigin = getRequestOrigin(request);
+  const originOk = requestOrigin === selfOrigin || isOriginAllowed(requestOrigin, chatbot.allowed_origins);
+  if (!originOk) return { ok: false, reason: 'origin_blocked' };
+
+  return { ok: true, chatbot };
+}
+
 // With no conversationId: lists this visitor's saved conversations for the
 // switcher. With one: replays its messages, after verifying ownership.
 export async function GET(request: Request) {
@@ -53,6 +102,12 @@ export async function GET(request: Request) {
   }
 
   const admin = getAdminClient();
+  const access = await getAccessibleChatbot(admin, chatbotId, request);
+  if (!access.ok) {
+    logWarn('public-chat.get_blocked', { chatbotId, reason: access.reason });
+    return new Response('Chatbot introuvable.', { status: 404 });
+  }
+
   try {
     if (!conversationId) {
       const conversations = await listConversations(admin, { chatbotId, visitorId });
@@ -83,6 +138,12 @@ export async function DELETE(request: Request) {
   }
 
   const admin = getAdminClient();
+  const access = await getAccessibleChatbot(admin, chatbotId, request);
+  if (!access.ok) {
+    logWarn('public-chat.delete_blocked', { chatbotId, reason: access.reason });
+    return new Response('Chatbot introuvable.', { status: 404 });
+  }
+
   const { error } = await admin
     .from('conversations')
     .delete()
@@ -124,16 +185,12 @@ export async function POST(request: Request) {
   }
 
   const admin = getAdminClient();
-  const { data: chatbot, error: chatbotError } = await admin
-    .from('chatbots')
-    .select('id, organization_id, system_prompt_template')
-    .eq('id', chatbotId)
-    .single();
-
-  if (chatbotError || !chatbot) {
-    logWarn('public-chat.chatbot_not_found', { chatbotId, error: chatbotError?.message });
+  const access = await getAccessibleChatbot(admin, chatbotId, request);
+  if (!access.ok) {
+    logWarn('public-chat.post_blocked', { chatbotId, reason: access.reason });
     return new Response('Chatbot introuvable.', { status: 404 });
   }
+  const { chatbot } = access;
 
   if (requestedConversationId) {
     const owned = await getConversationForIdentity(admin, requestedConversationId, {
@@ -163,15 +220,20 @@ export async function POST(request: Request) {
           ? toChatTurns(await loadHistory(admin, conversationId))
           : [];
 
-        const { semanticQuery, keywordQuery } = await rewriteQuery(question);
-        const queryEmbedding = await embedText(semanticQuery);
+        // Prompt-only chatbots (docs/roadmap.md item 23) skip retrieval
+        // entirely — see the matching comment in app/api/chat/route.ts.
+        let chunks: Awaited<ReturnType<typeof hybridSearch>> = [];
+        if (chatbot.use_documents) {
+          const { semanticQuery, keywordQuery } = await rewriteQuery(question);
+          const queryEmbedding = await embedText(semanticQuery);
 
-        const chunks = await hybridSearch({
-          organizationId: chatbot.organization_id,
-          chatbotId: chatbot.id,
-          queryText: keywordQuery,
-          queryEmbedding,
-        });
+          chunks = await hybridSearch({
+            organizationId: chatbot.organization_id,
+            chatbotId: chatbot.id,
+            queryText: keywordQuery,
+            queryEmbedding,
+          });
+        }
 
         const sources = Array.from(
           new Map(chunks.map((c) => [c.document_id, c.document_filename])).values()
@@ -181,6 +243,7 @@ export async function POST(request: Request) {
         const systemPrompt = buildSystemPrompt({
           systemPromptTemplate: chatbot.system_prompt_template,
           contextChunks: chunks,
+          useDocuments: chatbot.use_documents,
         });
 
         let answer = '';

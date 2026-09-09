@@ -131,7 +131,7 @@ export async function POST(request: Request) {
   // RLS scopes this to chatbots the caller's org owns.
   const { data: chatbot, error: chatbotError } = await supabase
     .from('chatbots')
-    .select('id, organization_id, system_prompt_template')
+    .select('id, organization_id, system_prompt_template, use_documents')
     .eq('id', chatbotId)
     .single();
 
@@ -171,15 +171,22 @@ export async function POST(request: Request) {
           ? toChatTurns(await loadHistory(supabase, conversationId))
           : [];
 
-        const { semanticQuery, keywordQuery } = await rewriteQuery(question);
-        const queryEmbedding = await embedText(semanticQuery);
+        // Prompt-only chatbots (docs/roadmap.md item 23) skip retrieval
+        // entirely — no documents to search, and forcing the "answer only
+        // from documents" instruction with zero chunks would make the model
+        // refuse every question instead of using what's in the prompt.
+        let chunks: Awaited<ReturnType<typeof hybridSearch>> = [];
+        if (chatbot.use_documents) {
+          const { semanticQuery, keywordQuery } = await rewriteQuery(question);
+          const queryEmbedding = await embedText(semanticQuery);
 
-        const chunks = await hybridSearch({
-          organizationId: chatbot.organization_id,
-          chatbotId: chatbot.id,
-          queryText: keywordQuery,
-          queryEmbedding,
-        });
+          chunks = await hybridSearch({
+            organizationId: chatbot.organization_id,
+            chatbotId: chatbot.id,
+            queryText: keywordQuery,
+            queryEmbedding,
+          });
+        }
 
         const sources = Array.from(
           new Map(chunks.map((c) => [c.document_id, c.document_filename])).values()
@@ -189,6 +196,7 @@ export async function POST(request: Request) {
         const systemPrompt = buildSystemPrompt({
           systemPromptTemplate: chatbot.system_prompt_template,
           contextChunks: chunks,
+          useDocuments: chatbot.use_documents,
         });
 
         let answer = '';

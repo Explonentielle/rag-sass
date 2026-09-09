@@ -40,6 +40,9 @@ export interface Database {
           organization_id: string;
           name: string;
           system_prompt_template: string;
+          is_public: boolean;
+          allowed_origins: string[];
+          use_documents: boolean;
           created_at: string;
         };
         Insert: {
@@ -47,6 +50,9 @@ export interface Database {
           organization_id: string;
           name: string;
           system_prompt_template?: string;
+          is_public?: boolean;
+          allowed_origins?: string[];
+          use_documents?: boolean;
           created_at?: string;
         };
         Update: {
@@ -54,6 +60,9 @@ export interface Database {
           organization_id?: string;
           name?: string;
           system_prompt_template?: string;
+          is_public?: boolean;
+          allowed_origins?: string[];
+          use_documents?: boolean;
           created_at?: string;
         };
       };

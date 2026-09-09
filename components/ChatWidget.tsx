@@ -79,12 +79,14 @@ function ConversationSwitcher({
   activeId,
   onSelect,
   onNew,
+  onDelete,
   disabled,
 }: {
   conversations: ConversationSummary[];
   activeId: string | null;
   onSelect: (id: string) => void;
   onNew: () => void;
+  onDelete: (id: string) => void;
   disabled: boolean;
 }) {
   const [open, setOpen] = useState(false);
@@ -136,20 +138,43 @@ function ConversationSwitcher({
           </button>
           {conversations.length > 0 && <div className="my-1 border-t border-slate-100" />}
           {conversations.map((c) => (
-            <button
+            <div
               key={c.id}
-              type="button"
-              onClick={() => {
-                onSelect(c.id);
-                setOpen(false);
-              }}
-              className={`block w-full px-3 py-2 text-left text-sm hover:bg-slate-50 ${
-                c.id === activeId ? 'bg-slate-50 font-medium text-slate-900' : 'text-slate-600'
+              className={`group flex w-full items-center gap-1 px-1.5 py-1 text-left text-sm hover:bg-slate-50 ${
+                c.id === activeId ? 'bg-slate-50' : ''
               }`}
             >
-              <div className="truncate">{conversationTitle(c)}</div>
-              <div className="text-xs text-slate-400">{conversationDate(c)}</div>
-            </button>
+              <button
+                type="button"
+                onClick={() => {
+                  onSelect(c.id);
+                  setOpen(false);
+                }}
+                className={`min-w-0 flex-1 rounded px-1.5 py-1 text-left ${
+                  c.id === activeId ? 'font-medium text-slate-900' : 'text-slate-600'
+                }`}
+              >
+                <div className="truncate">{conversationTitle(c)}</div>
+                <div className="text-xs text-slate-400">{conversationDate(c)}</div>
+              </button>
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onDelete(c.id);
+                }}
+                title="Supprimer cette conversation"
+                className="flex-shrink-0 rounded p-1.5 text-slate-300 opacity-0 hover:bg-red-50 hover:text-red-600 group-hover:opacity-100"
+              >
+                <svg viewBox="0 0 20 20" fill="currentColor" className="h-3.5 w-3.5">
+                  <path
+                    fillRule="evenodd"
+                    d="M8.75 1A2.75 2.75 0 006 3.75v.443c-.795.077-1.584.176-2.365.298a.75.75 0 10.23 1.482l.149-.022.841 10.518A2.75 2.75 0 007.596 19h4.807a2.75 2.75 0 002.742-2.53l.841-10.52.149.023a.75.75 0 00.23-1.482A41.03 41.03 0 0014 4.193V3.75A2.75 2.75 0 0011.25 1h-2.5zM10 4c.84 0 1.673.025 2.5.075V3.75c0-.69-.56-1.25-1.25-1.25h-2.5c-.69 0-1.25.56-1.25 1.25v.325C8.327 4.025 9.16 4 10 4zM8.58 7.72a.75.75 0 00-1.5.06l.3 7.5a.75.75 0 101.5-.06l-.3-7.5zm4.34.06a.75.75 0 10-1.5-.06l-.3 7.5a.75.75 0 101.5.06l.3-7.5z"
+                    clipRule="evenodd"
+                  />
+                </svg>
+              </button>
+            </div>
           ))}
         </div>
       )}
@@ -284,6 +309,20 @@ export default function ChatWidget({
     loadConversation(id);
   }
 
+  async function handleDeleteConversation(id: string) {
+    if (loading) return;
+    if (!confirm('Supprimer cette conversation ? Cette action est irréversible.')) return;
+
+    const res = await fetch(historyUrl(id), { method: 'DELETE' }).catch(() => null);
+    if (!res?.ok) return;
+
+    setConversations((prev) => prev.filter((c) => c.id !== id));
+    if (id === activeConversationId) {
+      setActiveConversationId(null);
+      setMessages([]);
+    }
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     const question = input.trim();
@@ -386,6 +425,7 @@ export default function ChatWidget({
             activeId={activeConversationId}
             onSelect={handleSelectConversation}
             onNew={handleReset}
+            onDelete={handleDeleteConversation}
             disabled={loading}
           />
         </div>

@@ -57,18 +57,51 @@ Règles absolues :
 - Cet assistant ne fournit AUCUN avis médical, diagnostic ou recommandation clinique, même si la question semble d'ordre médical : redirige systématiquement vers un professionnel de santé ou le secrétariat du cabinet.
 - Si l'information demandée n'est pas dans le contexte fourni, dis-le explicitement plutôt que d'inventer une réponse.`,
   },
+  {
+    id: 'simple-sans-documents',
+    label: 'Assistant simple (sans documents)',
+    // No "based on the documents provided" language on purpose — this
+    // template is meant for chatbots run with use_documents=false, where
+    // there's no retrieval at all: this text alone (once filled in) is
+    // the model's entire knowledge. See lib/prompts.ts's buildSystemPrompt.
+    template: `Tu es l'assistant virtuel de [Nom de l'entreprise]. Tu réponds aux questions des visiteurs de façon claire et amicale, en te basant UNIQUEMENT sur les informations ci-dessous.
+
+## Informations sur l'entreprise
+- Activité : [ex. plombier, boulangerie, salon de coiffure...]
+- Horaires : [ex. lundi-vendredi 9h-18h, samedi 9h-12h]
+- Adresse / zone d'intervention : [...]
+- Contact : [téléphone, email]
+- Services proposés : [...]
+- Tarifs (si pertinent) : [...]
+- Questions fréquentes : [ajoute ici toute question/réponse récurrente]
+
+Règle absolue : si la question sort de ces informations, dis-le honnêtement ("Je n'ai pas cette information, contactez-nous directement au [téléphone]") plutôt que d'inventer une réponse. Ne fais aucune supposition sur des points non listés ci-dessus.`,
+  },
 ];
 
 export function getPromptTemplate(id: string): PromptTemplate | undefined {
   return PROMPT_TEMPLATES.find((t) => t.id === id);
 }
 
-/** Builds the final system prompt sent to Claude: base template + retrieved context. */
+/**
+ * Builds the final system prompt sent to the model: base template + (in RAG
+ * mode) retrieved context. When `useDocuments` is false — a chatbot with no
+ * documents, whose entire "knowledge" lives directly in its prompt (see the
+ * "simple-sans-documents" template above) — the template is sent as-is, with
+ * no document wrapper and no "answer only from documents" instruction: that
+ * instruction would make the model refuse every question, since there are
+ * never any chunks to ground it in.
+ */
 export function buildSystemPrompt(params: {
   systemPromptTemplate: string;
   contextChunks: { content: string; document_filename: string }[];
+  useDocuments?: boolean;
 }): string {
-  const { systemPromptTemplate, contextChunks } = params;
+  const { systemPromptTemplate, contextChunks, useDocuments = true } = params;
+
+  if (!useDocuments) {
+    return systemPromptTemplate;
+  }
 
   const context = contextChunks.length
     ? contextChunks

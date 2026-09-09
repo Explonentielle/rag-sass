@@ -16,15 +16,18 @@ export default function SystemPromptEditor({
   chatbotId,
   organizationId,
   initialValue,
+  initialUseDocuments,
   customTemplates,
 }: {
   chatbotId: string;
   organizationId: string;
   initialValue: string;
+  initialUseDocuments: boolean;
   customTemplates: CustomTemplate[];
 }) {
   const router = useRouter();
   const [value, setValue] = useState(initialValue);
+  const [useDocuments, setUseDocuments] = useState(initialUseDocuments);
   const [saved, setSaved] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -52,7 +55,7 @@ export default function SystemPromptEditor({
     const res = await fetch(`/api/chatbots/${chatbotId}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ systemPromptTemplate: value }),
+      body: JSON.stringify({ systemPromptTemplate: value, useDocuments }),
     });
 
     setSaving(false);
@@ -117,6 +120,10 @@ export default function SystemPromptEditor({
           <Badge tone="neutral">Personnalisé</Badge>
         )}
       </div>
+      <p className="-mt-1 text-xs text-slate-400">
+        Appliquer un template copie son contenu ici — modifier le template plus tard ne mettra pas
+        à jour ce chatbot.
+      </p>
 
       <textarea
         value={value}
@@ -127,6 +134,27 @@ export default function SystemPromptEditor({
         rows={10}
         className="w-full rounded-md border border-slate-300 px-3 py-2 font-mono text-xs text-slate-800 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
       />
+
+      <label className="flex items-start gap-2.5 border-t border-slate-100 pt-3">
+        <input
+          type="checkbox"
+          checked={useDocuments}
+          onChange={(e) => {
+            setUseDocuments(e.target.checked);
+            setSaved(false);
+          }}
+          className="mt-0.5 h-4 w-4 rounded border-slate-300 text-brand-700 focus:ring-brand-500"
+        />
+        <span>
+          <span className="block text-sm font-medium text-slate-900">
+            Ce chatbot se base sur des documents à uploader
+          </span>
+          <span className="block text-xs text-slate-400">
+            Décoché, il répond uniquement à partir du prompt ci-dessus (aucune recherche dans des
+            documents) — utile pour un chatbot simple dont toutes les infos tiennent dans le prompt.
+          </span>
+        </span>
+      </label>
 
       {error && <p className="text-sm text-red-600">{error}</p>}
 

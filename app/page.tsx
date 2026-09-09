@@ -1,10 +1,9 @@
 import Link from 'next/link';
 import { createClient } from '@/lib/supabase/server';
-import styles from './landing.module.css';
-
-// Fonts are loaded once, globally, in app/layout.tsx (--font-display,
-// --font-body, --font-label) — this page just consumes those variables via
-// landing.module.css, same as every other page in the app now.
+import { ButtonLink } from '@/components/ui/Button';
+import { Card, Container } from '@/components/ui/Card';
+import { Logo } from '@/components/ui/Logo';
+import { Icon, IconBadge, ICONS } from '@/components/icons';
 
 export default async function LandingPage() {
   const supabase = createClient();
@@ -13,14 +12,13 @@ export default async function LandingPage() {
   } = await supabase.auth.getUser();
 
   return (
-    <div className={styles.page}>
+    <div className="flex min-h-screen flex-col">
       <Nav isLoggedIn={!!user} />
       <Hero isLoggedIn={!!user} />
       <TrustBar />
-      <Thesis />
       <HowItWorks />
       <Features />
-      <Catalogue />
+      <UseCases />
       <Pricing isLoggedIn={!!user} />
       <Testimonials />
       <Faq />
@@ -32,138 +30,155 @@ export default async function LandingPage() {
 
 function Nav({ isLoggedIn }: { isLoggedIn: boolean }) {
   return (
-    <header className={styles.nav}>
-      <div className={`${styles.wrap} ${styles.navInner}`}>
-        <Link href="/" className={styles.logo}>
-          <span className={styles.mark}>C</span>
-          Corpus.ai
-        </Link>
-        <nav className={styles.navLinks}>
-          <a href="#comment-ca-marche">Comment ça marche</a>
-          <a href="#fonctionnalites">Fonctionnalités</a>
-          <a href="#catalogue">Catalogue</a>
-          <a href="#tarifs">Tarifs</a>
+    <header className="border-b border-slate-200 bg-white/80 backdrop-blur">
+      <Container className="flex h-16 items-center justify-between">
+        <Logo />
+        <nav className="hidden items-center gap-8 text-sm font-medium text-slate-600 md:flex">
+          <a href="#comment-ca-marche" className="hover:text-slate-900">
+            Comment ça marche
+          </a>
+          <a href="#fonctionnalites" className="hover:text-slate-900">
+            Fonctionnalités
+          </a>
+          <a href="#cas-usage" className="hover:text-slate-900">
+            Cas d'usage
+          </a>
+          <a href="#tarifs" className="hover:text-slate-900">
+            Tarifs
+          </a>
         </nav>
-        <div className={styles.navActions}>
+        <div className="flex items-center gap-3">
           {isLoggedIn ? (
-            <Link href="/dashboard" className={`${styles.btn} ${styles.btnSm} ${styles.btnPrimary}`}>
+            <ButtonLink href="/dashboard" size="sm">
               Aller au dashboard
-            </Link>
+            </ButtonLink>
           ) : (
             <>
-              <Link href="/login" className={styles.navLogin}>
+              <Link
+                href="/login"
+                className="hidden text-sm font-medium text-slate-600 hover:text-slate-900 sm:block"
+              >
                 Connexion
               </Link>
-              <Link href="/signup" className={`${styles.btn} ${styles.btnSm} ${styles.btnPrimary}`}>
+              <ButtonLink href="/signup" size="sm">
                 Essayer gratuitement
-              </Link>
+              </ButtonLink>
             </>
           )}
         </div>
-      </div>
+      </Container>
     </header>
   );
 }
 
 function Hero({ isLoggedIn }: { isLoggedIn: boolean }) {
   return (
-    <header className={styles.hero}>
-      <div className={`${styles.wrap} ${styles.heroGrid}`}>
+    <section className="relative overflow-hidden border-b border-slate-200 bg-brand-950">
+      <div
+        className="pointer-events-none absolute inset-0"
+        style={{
+          backgroundImage:
+            'radial-gradient(ellipse 80% 60% at 50% -10%, rgba(84,116,199,0.35), transparent)',
+        }}
+      />
+      <Container className="relative grid gap-12 py-16 md:grid-cols-2 md:items-center md:py-24">
         <div>
-          <span className={styles.eyebrow}>Pilote gratuit pour les premières entreprises</span>
-          <h1 className={styles.heroTitle}>
-            De vos documents
-            <br />à un assistant qui <em>répond</em> —<br />
-            bientôt, qui <em>agit</em>.
-          </h1>
-          <p className={styles.heroLede}>
-            Corpus.ai transforme les documents et process de n&apos;importe quelle PME ou
-            indépendant en un assistant IA opérationnel dès aujourd&apos;hui. Un forfait simple,
-            aucun jargon technique, sources citées à chaque réponse.
+          <p className="mb-4 inline-flex items-center rounded-full bg-white/10 px-3 py-1 text-xs font-medium text-brand-100">
+            Pilote gratuit pour les premières entreprises
           </p>
-          <div className={styles.heroCtas}>
-            <Link
-              href={isLoggedIn ? '/dashboard' : '/signup'}
-              className={`${styles.btn} ${styles.btnPrimary}`}
+          <h1 className="text-4xl font-semibold tracking-tight text-white sm:text-5xl">
+            Le chatbot qui connaît vos documents par cœur.
+          </h1>
+          <p className="mt-6 text-lg leading-relaxed text-brand-100">
+            Uploadez vos scripts de vente, procédures et FAQ. Corpus.ai répond à vos équipes et
+            vos clients en citant ses sources, fidèle à vos documents et sans approximation.
+          </p>
+          <div className="mt-10 flex flex-wrap items-center gap-4">
+            <ButtonLink href={isLoggedIn ? '/dashboard' : '/signup'} size="lg">
+              {isLoggedIn ? 'Aller au dashboard' : 'Commencer gratuitement'}
+            </ButtonLink>
+            <a
+              href="#comment-ca-marche"
+              className="text-sm font-medium text-brand-100 hover:text-white"
             >
-              {isLoggedIn ? 'Aller au dashboard' : 'Commencer gratuitement →'}
-            </Link>
-            <a href="#comment-ca-marche" className={`${styles.btn} ${styles.btnGhost}`}>
-              Voir comment ça marche
+              Voir comment ça marche →
             </a>
           </div>
-          <p className={styles.heroNote}>Sans engagement, sans carte bancaire pour démarrer.</p>
         </div>
+        <ChatMockup />
+      </Container>
+    </section>
+  );
+}
 
-        <div className={styles.dossier} aria-hidden="true">
-          <div className={`${styles.docCard} ${styles.doc1}`}>
-            <div className={styles.docLabel}>Procédures.pdf</div>
-            <div className={styles.docLine}></div>
-            <div className={styles.docLine}></div>
-            <div className={styles.docLine}></div>
-            <div className={styles.docLine}></div>
+function ChatMockup() {
+  return (
+    <Card className="border-white/10 bg-white p-4 shadow-2xl">
+      <div className="flex items-center gap-2 border-b border-slate-100 pb-3">
+        <span className="h-2.5 w-2.5 rounded-full bg-red-400" />
+        <span className="h-2.5 w-2.5 rounded-full bg-amber-400" />
+        <span className="h-2.5 w-2.5 rounded-full bg-emerald-400" />
+        <span className="ml-2 text-xs font-medium text-slate-400">Assistant commercial</span>
+      </div>
+      <div className="space-y-3 pt-4">
+        <div className="flex justify-end">
+          <div className="max-w-[80%] rounded-lg bg-brand-800 px-3 py-2 text-sm text-white">
+            Le client trouve que le prix est trop élevé, je réponds quoi ?
           </div>
-          <div className={`${styles.docCard} ${styles.doc2}`}>
-            <div className={styles.docLabel}>Tarifs.xlsx</div>
-            <div className={styles.docLine}></div>
-            <div className={styles.docLine}></div>
-            <div className={styles.docLine}></div>
-          </div>
-          <div className={`${styles.docCard} ${styles.doc3}`}>
-            <div className={styles.docLabel}>Script-objections.pdf</div>
-            <div className={styles.docLine}></div>
-            <div className={styles.docLine}></div>
-            <div className={styles.docLine}></div>
-            <div className={styles.docLine}></div>
-          </div>
-          <div className={styles.chatBubble}>
-            <div className={styles.chatBubbleWho}>Assistant</div>
-            Ne baisse jamais le prix directement — reformule la valeur perçue, comparée au coût
-            de l&apos;inaction.
+        </div>
+        <div className="flex justify-start">
+          <div className="max-w-[85%] rounded-lg bg-slate-100 px-3 py-2 text-sm text-slate-800">
+            Ne baisse jamais le prix directement. Reformule la valeur perçue : demande-lui ce qui
+            compte le plus dans sa décision, puis compare au coût de l'inaction.
+            <div className="mt-2 border-t border-slate-300/60 pt-1 text-xs text-slate-500">
+              Sources : script-objections.pdf
+            </div>
           </div>
         </div>
       </div>
-    </header>
+    </Card>
   );
 }
 
 function TrustBar() {
   const items = [
-    { title: 'Données isolées', body: 'Chaque organisation est cloisonnée au niveau base de données.' },
-    { title: 'Réponses sourcées', body: 'Chaque réponse pointe vers le document utilisé.' },
-    { title: 'Indexation rapide', body: "De l'upload au chatbot prêt, en quelques minutes." },
+    {
+      icon: ICONS.shield,
+      title: 'Données isolées',
+      body: 'Chaque organisation est cloisonnée au niveau base de données.',
+    },
+    {
+      icon: ICONS.quote,
+      title: 'Réponses sourcées',
+      body: 'Chaque réponse pointe vers le document utilisé.',
+    },
+    {
+      icon: ICONS.bolt,
+      title: 'Indexation rapide',
+      body: "De l'upload au chatbot prêt, en quelques minutes.",
+    },
   ];
+
   return (
-    <section className={styles.trust}>
-      <div className={styles.wrap}>
-        <div className={styles.trustGrid}>
+    <section className="border-b border-slate-200 bg-white py-12">
+      <Container>
+        <p className="text-center text-xs font-semibold uppercase tracking-wider text-slate-400">
+          Pensé pour les entreprises qui s'appuient sur une documentation métier
+        </p>
+        <div className="mx-auto mt-10 grid max-w-4xl gap-8 sm:grid-cols-3">
           {items.map((item) => (
-            <div key={item.title} className={styles.trustItem}>
-              <span className={styles.trustDot} />
+            <div key={item.title} className="flex items-start gap-3">
+              <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-lg bg-brand-100 text-brand-700">
+                <Icon className="h-4 w-4">{item.icon}</Icon>
+              </div>
               <div>
-                <strong>{item.title}</strong>
-                <span>{item.body}</span>
+                <p className="text-sm font-semibold text-slate-900">{item.title}</p>
+                <p className="mt-0.5 text-sm text-slate-500">{item.body}</p>
               </div>
             </div>
           ))}
         </div>
-      </div>
-    </section>
-  );
-}
-
-function Thesis() {
-  return (
-    <section className={styles.thesis}>
-      <div className={`${styles.wrap} ${styles.thesisInner}`}>
-        <span className={styles.tag}>Vision produit</span>
-        <blockquote className={styles.thesisQuote}>
-          Corpus.ai est la plateforme qui transforme les documents et process de
-          n&apos;importe quelle PME ou indépendant en un assistant IA qui répond dès
-          aujourd&apos;hui, et qui agira demain — vendue simplement, sans jargon technique
-          ni promesse au-delà de ce qui est construit.
-        </blockquote>
-      </div>
+      </Container>
     </section>
   );
 }
@@ -171,156 +186,155 @@ function Thesis() {
 function HowItWorks() {
   const steps = [
     {
-      k: 'Étape 01',
-      title: 'Avec documents, ou sans',
-      body: "Uploadez vos fichiers (PDF, Word, texte, CSV, Excel) — ou décrivez simplement votre métier si vous n'avez rien à uploader.",
+      n: '01',
+      icon: ICONS.upload,
+      title: 'Uploadez vos documents',
+      body: 'Scripts de vente, procédures internes, FAQ : PDF, Word ou texte brut.',
     },
     {
-      k: 'Étape 02',
+      n: '02',
+      icon: ICONS.index,
       title: 'Indexation automatique',
-      body: 'Vos documents sont découpés, vectorisés et indexés en quelques minutes, sans configuration de votre côté.',
+      body: 'Vos documents sont découpés, vectorisés et indexés en quelques minutes.',
     },
     {
-      k: 'Étape 03',
+      n: '03',
+      icon: ICONS.chat,
       title: 'Vos équipes posent leurs questions',
       body: 'Réponses instantanées et sourcées, strictement fondées sur vos documents.',
     },
   ];
+
   return (
-    <section id="comment-ca-marche" className={styles.how}>
-      <div className={styles.wrap}>
-        <div className={`${styles.sectionHead} ${styles.sectionHeadCenter}`}>
-          <span className={styles.sectionLabel}>Comment ça marche</span>
-          <h2>De vos documents à un assistant fiable, en 3 étapes</h2>
-        </div>
-        <div className={styles.steps}>
+    <section id="comment-ca-marche" className="bg-slate-50 py-16">
+      <Container>
+        <SectionHeading
+          eyebrow="Comment ça marche"
+          title="De vos documents à un assistant fiable, en 3 étapes"
+        />
+        <div className="relative mt-10 grid gap-8 md:grid-cols-3">
+          <div className="absolute left-0 right-0 top-5 hidden h-px bg-slate-200 md:block" />
           {steps.map((s) => (
-            <div key={s.k} className={styles.step}>
-              <div className={styles.stepK}>{s.k}</div>
-              <h4>{s.title}</h4>
-              <p>{s.body}</p>
-            </div>
+            <Card key={s.n} className="relative p-6">
+              <div className="flex items-center gap-3">
+                <IconBadge>{s.icon}</IconBadge>
+                <span className="text-xs font-semibold uppercase tracking-wider text-brand-500">
+                  Étape {s.n}
+                </span>
+              </div>
+              <h3 className="mt-3 text-lg font-semibold text-slate-900">{s.title}</h3>
+              <p className="mt-2 text-sm leading-relaxed text-slate-600">{s.body}</p>
+            </Card>
           ))}
         </div>
-      </div>
+      </Container>
     </section>
   );
 }
 
 function Features() {
   const features = [
-    { title: 'Réponses toujours sourcées', body: 'Chaque réponse cite les documents utilisés, vos équipes vérifient en un clic.' },
-    { title: 'Aucune approximation', body: "Si une information ne figure pas dans vos documents, l'assistant le signale plutôt que de deviner." },
-    { title: 'Recherche hybride', body: 'Combine recherche par mots-clés et recherche sémantique pour ne rien manquer.' },
-    { title: 'Multi-organisation', body: 'Isolation stricte des données entre organisations, sécurité au niveau base de données.' },
-    { title: "Templates prêts à l'emploi", body: 'Vente, support, immobilier, secrétariat médical : un point de départ par secteur.' },
-    { title: 'Répond dans la langue du visiteur', body: 'Une même base documentaire, des réponses en français, anglais ou toute autre langue.' },
+    {
+      icon: ICONS.quote,
+      title: 'Réponses toujours sourcées',
+      body: 'Chaque réponse cite les documents utilisés, vos équipes vérifient en un clic.',
+    },
+    {
+      icon: ICONS.checkCircle,
+      title: 'Aucune approximation',
+      body: "Si une information ne figure pas dans vos documents, l'assistant le signale clairement plutôt que de deviner.",
+    },
+    {
+      icon: ICONS.search,
+      title: 'Recherche hybride',
+      body: 'Combine recherche par mots-clés et recherche sémantique pour ne rien manquer.',
+    },
+    {
+      icon: ICONS.shield,
+      title: 'Multi-organisation',
+      body: 'Isolation stricte des données entre organisations, avec sécurité au niveau base de données.',
+    },
+    {
+      icon: ICONS.document,
+      title: 'Templates prêts à l\'emploi',
+      body: 'Vente, support client, immobilier, secrétariat médical : un point de départ par secteur, personnalisable en un clic.',
+    },
+    {
+      icon: ICONS.bolt,
+      title: 'Réponses en streaming',
+      body: "Génération rapide, mot par mot, propulsée par OpenAI.",
+    },
   ];
+
   return (
-    <section id="fonctionnalites" className={styles.features}>
-      <div className={`${styles.wrap} ${styles.featuresGrid}`}>
-        <div className={styles.featuresIntro}>
-          <span className={styles.sectionLabel}>Fonctionnalités</span>
-          <h2>Tout ce qu&apos;il faut, rien de superflu</h2>
-          <p>
-            Pas de fonctionnalités gadget : chaque point ci-contre répond à une exigence
-            concrète pour un assistant utilisable en production.
+    <section id="fonctionnalites" className="bg-brand-950 py-16">
+      <Container className="grid gap-10 md:grid-cols-[minmax(0,1fr)_minmax(0,1.5fr)] md:gap-16">
+        <div>
+          <p className="text-sm font-semibold uppercase tracking-wider text-brand-300">
+            Fonctionnalités
+          </p>
+          <h2 className="mt-2 text-3xl font-semibold tracking-tight text-white">
+            Tout ce qu'il faut, rien de superflu
+          </h2>
+          <p className="mt-4 text-sm leading-relaxed text-brand-200">
+            Pas de fonctionnalités gadget : chaque point ci-contre répond à une exigence concrète
+            pour un assistant utilisable en production par une équipe.
           </p>
         </div>
-        <div className={styles.featureList}>
+        <div className="grid gap-x-8 gap-y-6 sm:grid-cols-2">
           {features.map((f) => (
-            <div key={f.title} className={styles.featureItem}>
-              <span className={styles.featureDot} />
+            <div key={f.title} className="flex gap-3">
+              <IconBadge tone="white" spacing="mt-0.5">
+                {f.icon}
+              </IconBadge>
               <div>
-                <strong>{f.title}</strong>
-                <span>{f.body}</span>
+                <h3 className="font-semibold text-white">{f.title}</h3>
+                <p className="mt-1 text-sm leading-relaxed text-brand-200">{f.body}</p>
               </div>
             </div>
           ))}
         </div>
-      </div>
+      </Container>
     </section>
   );
 }
 
-interface CatalogueEntry {
-  title: string;
-  body: string;
-  who: string;
-}
-
-function Catalogue() {
-  const available: CatalogueEntry[] = [
-    { title: 'Chatbot documentaire', body: 'Répond aux questions à partir de vos documents, sources citées à chaque réponse.', who: 'Tout le monde' },
-    { title: 'Assistant sans documents', body: 'Le savoir tient dans quelques consignes — zéro upload, zéro indexation, en ligne en minutes.', who: 'Indépendants, artisans' },
-    { title: 'Wiki interne conversationnel', body: "Un nouvel employé pose sa question de process plutôt que de fouiller un dossier partagé.", who: 'PME, ETI en croissance' },
-    { title: 'Copilote commercial', body: 'Argumentaires et réponses aux objections retrouvés en quelques secondes, en plein appel.', who: 'Équipes vente structurées' },
-    { title: 'Assistant conformité', body: '« Puis-je faire X ? » posé directement sur vos politiques internes.', who: 'Secteurs réglementés' },
-    { title: 'Agence immobilière', body: "Procédures de visite, mandats, pièces à fournir — un modèle prêt à l'emploi.", who: 'Agences, indépendants immo' },
-    { title: 'Secrétariat médical virtuel', body: 'Horaires, documents à apporter, préparation avant rendez-vous.', who: 'Cabinets, petites structures de santé' },
-    { title: 'Second cerveau', body: 'Déposez vos notes et supports, retrouvez-les en langage naturel — pour vous seul.', who: 'Coachs, consultants, formateurs' },
-    { title: 'Assistant multilingue', body: 'Un visiteur écrit en anglais ou en espagnol, la même base documentaire répond dans sa langue.', who: 'Clientèle internationale, tourisme' },
-  ];
-
-  const roadmap: CatalogueEntry[] = [
-    { title: 'Indexation assistée par IA', body: 'Uploadez un document brut ou une URL, sans rien préparer — une IA nettoie et structure le contenu.', who: 'Tout document mal formaté' },
-    { title: 'Réponse aux avis clients', body: 'Un brouillon de réponse à chaque avis Google ou Trustpilot, dans le ton de la marque.', who: 'Commerces, restauration, hôtellerie' },
-    { title: 'Coach de simulation', body: "Un nouvel employé s'entraîne face à des scénarios clients générés à partir de vos procédures.", who: "Onboarding, centres d'appel" },
-    { title: 'Agent de qualification', body: 'Engage un visiteur, pose les bonnes questions, score et route le contact.', who: 'B2B à cycle de vente long' },
-    { title: 'Brouillon de réponse email', body: 'Rédige une réponse client à partir de la base de connaissance, à valider avant envoi.', who: 'Support à fort volume' },
-    { title: 'Analyseur de contrats', body: "Dépose un contrat, obtiens l'extraction des clauses clés et pose tes questions dessus.", who: 'PME sans juriste interne' },
-    { title: 'Digitaliseur de paperasse', body: 'Factures et formulaires papier transformés en données structurées exploitables.', who: 'Comptabilité, administratif' },
-    { title: 'Standard IA téléphone / WhatsApp', body: 'Le même assistant, sur un canal vocal ou messagerie.', who: 'Commerces de proximité' },
-    { title: 'Veille & synthèse', body: 'Surveille un corpus interne ou externe, pousse un résumé périodique des nouveautés.', who: 'Veille concurrentielle, R&D' },
+function UseCases() {
+  const cases = [
+    {
+      icon: ICONS.briefcase,
+      title: 'Vente & relation client',
+      body: 'Argumentaires, traitement des objections, scripts : vos équipes retrouvent la bonne réponse en quelques secondes.',
+    },
+    {
+      icon: ICONS.headset,
+      title: 'Support client',
+      body: 'FAQ et procédures centralisées : des réponses cohérentes et sourcées, sans réinventer la roue à chaque demande.',
+    },
+    {
+      icon: ICONS.book,
+      title: 'Formation & onboarding',
+      body: 'Un point d\'accès unique à votre documentation interne pour vos nouvelles recrues, disponible à toute heure.',
+    },
   ];
 
   return (
-    <section id="catalogue" className={styles.catalogue}>
-      <div className={styles.wrap}>
-        <div className={`${styles.sectionHead} ${styles.sectionHeadCenter}`}>
-          <span className={styles.sectionLabel}>Catalogue</span>
-          <h2>Ce que Corpus.ai peut faire pour votre activité</h2>
-          <p className={styles.dek}>
-            Une base large de cas d&apos;usage — certains tournent déjà, d&apos;autres sont
-            notre feuille de route.
-          </p>
+    <section id="cas-usage" className="bg-slate-50 py-16">
+      <Container>
+        <SectionHeading
+          eyebrow="Cas d'usage"
+          title="Utile partout où vos équipes s'appuient sur de la documentation"
+        />
+        <div className="mt-10 grid gap-6 md:grid-cols-3">
+          {cases.map((c) => (
+            <Card key={c.title} className="p-8">
+              <IconBadge>{c.icon}</IconBadge>
+              <h3 className="text-lg font-semibold text-slate-900">{c.title}</h3>
+              <p className="mt-3 text-sm leading-relaxed text-slate-600">{c.body}</p>
+            </Card>
+          ))}
         </div>
-
-        <div className={styles.registerNote}>
-          <span className={styles.registerKey}>
-            <span className={`${styles.swatch} ${styles.swatchNow}`} /> Disponible aujourd&apos;hui
-          </span>
-          <span className={styles.registerKey}>
-            <span className={`${styles.swatch} ${styles.swatchNext}`} /> Feuille de route — à venir
-          </span>
-        </div>
-
-        <div className={styles.catGroup}>
-          <div className={styles.catGroupHead}>Disponible aujourd&apos;hui</div>
-          <div className={styles.catGrid}>
-            {available.map((c) => (
-              <div key={c.title} className={styles.catCard}>
-                <h4>{c.title}</h4>
-                <p>{c.body}</p>
-                <span className={styles.catFor}>Pour → {c.who}</span>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        <div className={styles.catGroup}>
-          <div className={styles.catGroupHead}>Feuille de route</div>
-          <div className={styles.catGrid}>
-            {roadmap.map((c) => (
-              <div key={c.title} className={`${styles.catCard} ${styles.catCardRoadmap}`}>
-                <h4>{c.title}</h4>
-                <p>{c.body}</p>
-                <span className={styles.catFor}>Pour → {c.who}</span>
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
+      </Container>
     </section>
   );
 }
@@ -328,79 +342,91 @@ function Catalogue() {
 function Pricing({ isLoggedIn }: { isLoggedIn: boolean }) {
   const plans = [
     {
-      name: 'Solo',
-      who: 'Indépendant, un seul assistant',
-      price: '9€',
-      per: '/ mois',
-      included: '300 messages inclus',
-      features: ['1 assistant, avec ou sans documents', 'Widget intégrable sur votre site', 'Historique de conversation conservé'],
+      name: 'Pilote',
+      price: '0€',
+      period: '',
+      description: "Pour tester sur vos propres documents avant de généraliser.",
+      features: ['1 chatbot', "Jusqu'à 20 documents", '100 messages / mois', 'Support par email'],
       cta: 'Commencer gratuitement',
-      featured: false,
+      highlighted: false,
     },
     {
-      name: 'PME',
-      who: 'Plusieurs assistants, équipe partagée',
+      name: 'Pro',
       price: '49€',
-      per: '/ mois',
-      included: '1 500 messages inclus · +2€ / 100 au-delà',
-      features: ['Assistants illimités', 'Formats étendus : CSV, Excel, multi-documents', "Membres d'équipe multiples"],
+      period: '/ mois',
+      description: 'Pour une équipe qui déploie son assistant en continu.',
+      features: [
+        "Jusqu'à 5 chatbots",
+        'Documents illimités',
+        '1 500 messages / mois',
+        'Support prioritaire',
+      ],
       cta: 'Commencer gratuitement',
-      featured: true,
+      highlighted: true,
     },
     {
-      name: 'Métier',
-      who: 'Besoins spécifiques, volumes élevés',
+      name: 'Entreprise',
       price: 'Sur devis',
-      per: '',
-      included: 'Volume et intégrations à définir',
-      features: ['Fonctionnalités de la feuille de route en priorité', 'Accompagnement à la mise en place', 'Facturation adaptée au volume réel'],
+      period: '',
+      description: 'Pour plusieurs équipes, avec des besoins spécifiques.',
+      features: [
+        'Chatbots illimités',
+        'Volumes sur mesure',
+        'Accompagnement dédié',
+        'Hébergement dédié possible',
+      ],
       cta: 'Nous contacter',
-      featured: false,
+      highlighted: false,
     },
   ];
 
   return (
-    <section id="tarifs" className={styles.pricing}>
-      <div className={styles.wrap}>
-        <div className={`${styles.sectionHead} ${styles.sectionHeadCenter}`}>
-          <span className={styles.sectionLabel}>Tarifs</span>
-          <h2>Un forfait, un dépassement à la tranche</h2>
-          <p className={styles.dek}>Tarifs indicatifs pour la phase pilote, susceptibles d&apos;évoluer.</p>
-        </div>
-        <div className={styles.priceGrid}>
+    <section id="tarifs" className="bg-white py-16">
+      <Container>
+        <SectionHeading eyebrow="Tarifs" title="Des tarifs simples, qui évoluent avec vous" />
+        <p className="mx-auto mt-3 max-w-xl text-center text-sm text-slate-500">
+          Tarifs indicatifs pour la phase pilote, susceptibles d'évoluer.
+        </p>
+        <div className="mt-10 grid gap-6 md:grid-cols-3">
           {plans.map((plan) => (
-            <div
+            <Card
               key={plan.name}
-              className={`${styles.priceCard} ${plan.featured ? styles.priceCardFeatured : ''}`}
+              className={`flex flex-col p-8 ${
+                plan.highlighted ? 'border-brand-600 ring-1 ring-brand-600' : ''
+              }`}
             >
-              {plan.featured && <span className={styles.priceBadge}>Le plus choisi</span>}
-              <h3>{plan.name}</h3>
-              <p className={styles.priceWho}>{plan.who}</p>
-              <div className={styles.amount}>
-                {plan.price}
-                {plan.per && <span className={styles.per}> {plan.per}</span>}
+              {plan.highlighted && (
+                <span className="mb-4 inline-flex w-fit items-center rounded-full bg-brand-100 px-2.5 py-1 text-xs font-medium text-brand-800">
+                  Le plus populaire
+                </span>
+              )}
+              <h3 className="text-lg font-semibold text-slate-900">{plan.name}</h3>
+              <p className="mt-1 text-sm text-slate-500">{plan.description}</p>
+              <div className="mt-6 flex items-baseline gap-1">
+                <span className="text-3xl font-semibold tracking-tight text-slate-900">
+                  {plan.price}
+                </span>
+                {plan.period && <span className="text-sm text-slate-500">{plan.period}</span>}
               </div>
-              <p className={styles.included}>{plan.included}</p>
-              <ul className={styles.priceList}>
+              <ul className="mt-6 flex-1 space-y-3 text-sm text-slate-600">
                 {plan.features.map((f) => (
-                  <li key={f}>{f}</li>
+                  <li key={f} className="flex items-start gap-2">
+                    <span className="mt-0.5 text-brand-600">✓</span>
+                    {f}
+                  </li>
                 ))}
               </ul>
-              <Link
+              <ButtonLink
                 href={isLoggedIn ? '/dashboard' : '/signup'}
-                className={`${styles.btn} ${plan.featured ? styles.btnPrimary : styles.btnGhost}`}
-                style={{ marginTop: 24, justifyContent: 'center' }}
+                variant={plan.highlighted ? 'primary' : 'secondary'}
+                className="mt-8 w-full"
               >
                 {plan.cta}
-              </Link>
-            </div>
+              </ButtonLink>
+            </Card>
           ))}
         </div>
-        <p className={styles.priceNote}>
-          Toute capacité issue de la feuille de route se facturera strictement à l&apos;usage
-          une fois construite, jamais incluse par avance dans un forfait fixe.
-        </p>
-      </div>
+      </Container>
     </section>
   );
 }
@@ -408,29 +434,39 @@ function Pricing({ isLoggedIn }: { isLoggedIn: boolean }) {
 function Testimonials() {
   // Placeholder quotes, replace with real pilot client feedback before launch.
   const quotes = [
-    { quote: 'Outil très utile, on a gagné un temps précieux sur le support client.', name: 'John Doe', role: 'CEO, Acme Corp' },
-    { quote: "Nos commerciaux retrouvent l'argumentaire en quelques secondes, ça change tout en appel.", name: 'Jane Doe', role: 'Responsable des ventes, Exemple SAS' },
-    { quote: 'Simple à mettre en place, et les réponses citent toujours la bonne procédure.', name: 'Paul Martin', role: 'Support client, Entreprise Test' },
+    {
+      quote: 'Outil très utile, on a gagné un temps précieux sur le support client.',
+      name: 'John Doe',
+      role: 'CEO, Acme Corp',
+    },
+    {
+      quote: "Nos commerciaux retrouvent l'argumentaire en quelques secondes, ça change tout en appel.",
+      name: 'Jane Doe',
+      role: 'Responsable des ventes, Exemple SAS',
+    },
+    {
+      quote: 'Simple à mettre en place, et les réponses citent toujours la bonne procédure.',
+      name: 'Paul Martin',
+      role: 'Support client, Entreprise Test',
+    },
   ];
+
   return (
-    <section className={styles.testimonials}>
-      <div className={styles.wrap}>
-        <div className={`${styles.sectionHead} ${styles.sectionHeadCenter}`}>
-          <span className={styles.sectionLabel}>Avis</span>
-          <h2>Ce qu&apos;en disent nos premiers utilisateurs</h2>
-        </div>
-        <div className={styles.testiGrid}>
-          {quotes.map((t) => (
-            <div key={t.name} className={styles.testiCard}>
-              <p className={styles.testiQuote}>{t.quote}</p>
-              <div className={styles.testiMeta}>
-                <strong>{t.name}</strong>
-                <span>{t.role}</span>
+    <section className="bg-slate-50 py-16">
+      <Container>
+        <SectionHeading eyebrow="Avis" title="Ce qu'en disent nos premiers utilisateurs" />
+        <div className="mt-10 grid gap-6 md:grid-cols-3">
+          {quotes.map((t, i) => (
+            <Card key={i} className="border-dashed p-6">
+              <p className="text-sm italic leading-relaxed text-slate-500">{t.quote}</p>
+              <div className="mt-4 border-t border-slate-100 pt-3">
+                <p className="text-sm font-medium text-slate-700">{t.name}</p>
+                <p className="text-xs text-slate-400">{t.role}</p>
               </div>
-            </div>
+            </Card>
           ))}
         </div>
-      </div>
+      </Container>
     </section>
   );
 }
@@ -447,77 +483,89 @@ function Faq() {
     },
     {
       q: 'Quels formats de documents sont supportés ?',
-      a: "PDF avec texte natif, Word (.docx), texte brut (.txt), CSV et Excel (.xlsx, .xls). Les PDF scannés (sans texte extractible) ne sont pas encore supportés — l'OCR est sur notre feuille de route.",
+      a: "PDF avec texte natif, Word (.docx), Markdown (.md), texte brut (.txt), ainsi que tableurs CSV et Excel (.csv, .xlsx, .xls). Les PDF scannés (sans texte extractible) ne sont pas encore supportés.",
     },
-    { q: 'Puis-je annuler à tout moment ?', a: 'Oui, sans engagement ni préavis.' },
+    {
+      q: "Dois-je forcément uploader des documents ?",
+      a: 'Non — pour un besoin simple (FAQ courte, infos pratiques), un chatbot peut fonctionner uniquement à partir d\'un prompt que vous rédigez vous-même, sans document à uploader.',
+    },
+    {
+      q: 'Puis-je annuler à tout moment ?',
+      a: "Oui, sans engagement ni préavis.",
+    },
     {
       q: 'Que se passe-t-il si je dépasse mon quota de messages ?',
-      a: "Le forfait Solo inclut 300 messages/mois, le forfait PME 1 500. Au-delà, la tranche supplémentaire de 100 messages est facturée 2€ plutôt que de couper le service.",
-    },
-    {
-      q: "Puis-je changer de cas d'usage après coup ?",
-      a: "Oui. Chaque chatbot reste indépendant : vous pouvez ajuster ses documents, son prompt ou son cas d'usage à tout moment, sans repartir de zéro.",
+      a: "Vous serez prévenu pour ajuster votre forfait plutôt que de voir le service coupé brutalement.",
     },
   ];
+
   return (
-    <section className={styles.faq}>
-      <div className={styles.wrap}>
-        <div className={`${styles.sectionHead} ${styles.sectionHeadCenter}`}>
-          <span className={styles.sectionLabel}>Questions fréquentes</span>
-          <h2>Tout ce qu&apos;on nous demande</h2>
-        </div>
-        <div className={styles.faqList}>
+    <section className="bg-white py-16">
+      <Container className="max-w-3xl">
+        <SectionHeading eyebrow="Questions fréquentes" title="Tout ce qu'on nous demande" />
+        <div className="mt-8 divide-y divide-slate-200">
           {items.map((item) => (
-            <details key={item.q} className={styles.faqItem}>
-              <summary>
+            <details key={item.q} className="group py-5">
+              <summary className="flex cursor-pointer list-none items-center justify-between text-sm font-medium text-slate-900">
                 {item.q}
-                <span className={styles.faqPlus}>+</span>
+                <span className="ml-4 text-slate-400 transition-transform group-open:rotate-45">
+                  +
+                </span>
               </summary>
-              <p>{item.a}</p>
+              <p className="mt-3 text-sm leading-relaxed text-slate-600">{item.a}</p>
             </details>
           ))}
         </div>
-      </div>
+      </Container>
     </section>
   );
 }
 
 function FinalCta({ isLoggedIn }: { isLoggedIn: boolean }) {
   return (
-    <section className={styles.closing}>
-      <div className={styles.wrap}>
-        <div className={styles.closingInner}>
-          <div>
-            <h3>Prêt à essayer sur vos documents ?</h3>
-            <p>Pilote gratuit, sans engagement, pour les premières entreprises.</p>
-          </div>
-          <Link
-            href={isLoggedIn ? '/dashboard' : '/signup'}
-            className={`${styles.btn} ${styles.btnBrass}`}
-          >
+    <section className="bg-brand-950 py-14">
+      <Container className="text-center">
+        <h2 className="text-3xl font-semibold text-white">Prêt à essayer sur vos documents ?</h2>
+        <p className="mx-auto mt-3 max-w-xl text-brand-100">
+          Pilote gratuit, sans engagement, pour les premières entreprises.
+        </p>
+        <div className="mt-8">
+          <ButtonLink href={isLoggedIn ? '/dashboard' : '/signup'} size="lg">
             {isLoggedIn ? 'Aller au dashboard' : 'Commencer gratuitement'}
-          </Link>
+          </ButtonLink>
         </div>
-      </div>
+      </Container>
     </section>
   );
 }
 
 function Footer() {
   return (
-    <footer className={styles.footer}>
-      <div className={`${styles.wrap} ${styles.footerInner}`}>
-        <span className={styles.logo}>
-          <span className={styles.mark}>C</span>
-          Corpus.ai
-        </span>
-        <nav className={styles.footerLinks}>
-          <Link href="/legal/mentions-legales">Mentions légales</Link>
-          <Link href="/legal/confidentialite">Confidentialité</Link>
-          <Link href="/legal/cgu">CGU</Link>
+    <footer className="border-t border-slate-200 bg-white py-10">
+      <Container className="flex flex-col items-center justify-between gap-4 sm:flex-row">
+        <Logo />
+        <nav className="flex items-center gap-6 text-sm text-slate-400">
+          <Link href="/legal/mentions-legales" className="hover:text-slate-600">
+            Mentions légales
+          </Link>
+          <Link href="/legal/confidentialite" className="hover:text-slate-600">
+            Confidentialité
+          </Link>
+          <Link href="/legal/cgu" className="hover:text-slate-600">
+            CGU
+          </Link>
         </nav>
-        <p className={styles.footerCopy}>© {new Date().getFullYear()} Corpus.ai</p>
-      </div>
+        <p className="text-sm text-slate-400">© {new Date().getFullYear()} Corpus.ai</p>
+      </Container>
     </footer>
+  );
+}
+
+function SectionHeading({ eyebrow, title }: { eyebrow: string; title: string }) {
+  return (
+    <div className="mx-auto max-w-2xl text-center">
+      <p className="text-sm font-semibold uppercase tracking-wider text-brand-600">{eyebrow}</p>
+      <h2 className="mt-2 text-3xl font-semibold tracking-tight text-slate-900">{title}</h2>
+    </div>
   );
 }
