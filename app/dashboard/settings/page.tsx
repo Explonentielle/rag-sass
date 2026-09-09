@@ -4,7 +4,9 @@ import { getCurrentOrg } from '@/lib/org';
 import OrgSettingsForm from '@/components/OrgSettingsForm';
 import ChangePasswordForm from '@/components/ChangePasswordForm';
 import TeamMembers from '@/components/TeamMembers';
+import DeleteOrgSection from '@/components/DeleteOrgSection';
 import { Badge, Card } from '@/components/ui/Card';
+import { PLAN_LABELS } from '@/lib/usage';
 
 export default async function SettingsPage() {
   const org = await getCurrentOrg();
@@ -30,14 +32,32 @@ export default async function SettingsPage() {
 
       <section className="space-y-3">
         <h2 className="font-semibold text-slate-900">Organisation</h2>
-        <Card className="p-6">
-          <OrgSettingsForm orgId={org.id} initialName={org.name} />
-        </Card>
+        {org.role === 'owner' || org.role === 'admin' ? (
+          <Card className="p-6">
+            <OrgSettingsForm orgId={org.id} initialName={org.name} initialPlan={org.plan} />
+          </Card>
+        ) : (
+          <Card className="divide-y divide-slate-100">
+            <div className="flex items-center justify-between px-6 py-4 text-sm">
+              <span className="text-slate-500">Nom</span>
+              <span className="font-medium text-slate-900">{org.name}</span>
+            </div>
+            <div className="flex items-center justify-between px-6 py-4 text-sm">
+              <span className="text-slate-500">Plan</span>
+              <span className="font-medium text-slate-900">{PLAN_LABELS[org.plan]}</span>
+            </div>
+            <p className="px-6 py-3 text-xs text-slate-400">
+              Réservé aux propriétaires et administrateurs.
+            </p>
+          </Card>
+        )}
       </section>
 
       <section className="space-y-3">
         <h2 className="font-semibold text-slate-900">Membres</h2>
-        <TeamMembers organizationId={org.id} />
+        {user && (
+          <TeamMembers organizationId={org.id} currentUserId={user.id} currentUserRole={org.role} />
+        )}
       </section>
 
       <section className="space-y-3">
@@ -60,6 +80,13 @@ export default async function SettingsPage() {
           <ChangePasswordForm />
         </Card>
       </section>
+
+      {org.role === 'owner' && (
+        <section className="space-y-3">
+          <h2 className="font-semibold text-slate-900">Zone dangereuse</h2>
+          <DeleteOrgSection orgId={org.id} orgName={org.name} />
+        </section>
+      )}
     </div>
   );
 }

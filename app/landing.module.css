@@ -1,4 +1,10 @@
+/* Light-only by deliberate choice, not omission: the whole app (dashboard
+   included) has no dark mode today, and this palette is built around a
+   "paper" ground (--paper/--card/--ink) that a naive dark-mode inversion
+   would fight rather than complement. Revisit as a real design pass if
+   dark mode becomes a real ask, not by bolting a media query onto this. */
 .page {
+  color-scheme: light;
   --paper: #EEF0E8;
   --paperDeep: #F8F8F3;
   --card: #FFFFFF;
@@ -71,8 +77,6 @@
 .btnGhost:hover { border-color: var(--forest); }
 .btnBrass { background: var(--brass); color: #241B0A; }
 .btnBrass:hover { transform: translateY(-1px); box-shadow: 0 6px 18px -8px var(--brass); }
-.btnOnDark { background: transparent; border-color: rgba(243,247,242,0.32); color: #F3F7F2; }
-.btnOnDark:hover { border-color: rgba(243,247,242,0.6); }
 
 /* ---------- hero ---------- */
 .hero { position: relative; padding: 72px 0 88px; overflow: hidden; border-bottom: 1px solid var(--line); }

@@ -7,6 +7,7 @@ import { DocumentStatusBadge } from '@/components/DocumentStatusBadge';
 import { Card } from '@/components/ui/Card';
 import { IconBadge, ICONS } from '@/components/icons';
 import { PROMPT_TEMPLATES } from '@/lib/prompts';
+import { getMonthlyMessageCount, PLAN_LABELS, PLAN_LIMITS } from '@/lib/usage';
 import type { DocumentStatus } from '@/types/database';
 
 export default async function DashboardPage() {
@@ -18,23 +19,25 @@ export default async function DashboardPage() {
 
   const supabase = createClient();
 
-  const [{ data: chatbots }, { data: documents }, { data: customTemplates }] = await Promise.all([
-    supabase
-      .from('chatbots')
-      .select('id, name, created_at')
-      .eq('organization_id', org.id)
-      .order('created_at', { ascending: false }),
-    supabase
-      .from('documents')
-      .select('id, filename, status, chunk_count, uploaded_at, chatbot_id, chatbots!inner(id, name, organization_id)')
-      .eq('chatbots.organization_id', org.id)
-      .order('uploaded_at', { ascending: false }),
-    supabase
-      .from('custom_templates')
-      .select('id, label, template')
-      .eq('organization_id', org.id)
-      .order('created_at', { ascending: false }),
-  ]);
+  const [{ data: chatbots }, { data: documents }, { data: customTemplates }, messagesThisMonth] =
+    await Promise.all([
+      supabase
+        .from('chatbots')
+        .select('id, name, created_at')
+        .eq('organization_id', org.id)
+        .order('created_at', { ascending: false }),
+      supabase
+        .from('documents')
+        .select('id, filename, status, chunk_count, uploaded_at, chatbot_id, chatbots!inner(id, name, organization_id)')
+        .eq('chatbots.organization_id', org.id)
+        .order('uploaded_at', { ascending: false }),
+      supabase
+        .from('custom_templates')
+        .select('id, label, template')
+        .eq('organization_id', org.id)
+        .order('created_at', { ascending: false }),
+      getMonthlyMessageCount(supabase, org.id),
+    ]);
 
   const allDocuments = documents ?? [];
   const recentChatbots = (chatbots ?? []).slice(0, 4);
@@ -69,6 +72,8 @@ export default async function DashboardPage() {
         <StatCard icon={ICONS.upload} tone="amber" label="En traitement" value={stats.inProgress} />
         <StatCard icon={ICONS.alert} tone="red" label="Erreurs" value={stats.errors} />
       </div>
+
+      <UsageCard plan={org.plan} messagesThisMonth={messagesThisMonth} />
 
       <section className="space-y-3">
         <div className="flex items-center justify-between">
@@ -154,6 +159,58 @@ export default async function DashboardPage() {
         </Card>
       </Link>
     </div>
+  );
+}
+
+function UsageCard({
+  plan,
+  messagesThisMonth,
+}: {
+  plan: 'solo' | 'pme' | 'metier';
+  messagesThisMonth: number;
+}) {
+  const limit = PLAN_LIMITS[plan];
+  const ratio = limit ? Math.min(messagesThisMonth / limit, 1) : 0;
+  const over = limit !== null && messagesThisMonth > limit;
+
+  return (
+    <Card className="p-5">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="flex items-center gap-2">
+          <span className="text-xs font-medium uppercase tracking-wide text-slate-400">
+            Messages ce mois-ci
+          </span>
+          <span className="rounded-full bg-brand-50 px-2 py-0.5 text-xs font-medium text-brand-700">
+            Plan {PLAN_LABELS[plan]}
+          </span>
+        </div>
+        <Link href="/dashboard/settings" className="text-xs font-medium text-brand-700 hover:text-brand-800">
+          Changer de plan →
+        </Link>
+      </div>
+      <p className="mt-2 text-2xl font-semibold text-slate-900">
+        {messagesThisMonth}
+        {limit !== null && <span className="text-base font-normal text-slate-400"> / {limit}</span>}
+      </p>
+      {limit !== null ? (
+        <>
+          <div className="mt-3 h-1.5 w-full overflow-hidden rounded-full bg-slate-100">
+            <div
+              className={`h-full rounded-full ${over ? 'bg-red-500' : 'bg-brand-600'}`}
+              style={{ width: `${Math.max(ratio * 100, over ? 100 : 2)}%` }}
+            />
+          </div>
+          {over && (
+            <p className="mt-2 text-xs text-red-600">
+              Au-delà du forfait Solo/PME affiché sur la landing — pas encore facturé
+              automatiquement, aucun message n'est bloqué.
+            </p>
+          )}
+        </>
+      ) : (
+        <p className="mt-2 text-xs text-slate-400">Plan Métier : volume sur devis, pas de limite fixe.</p>
+      )}
+    </Card>
   );
 }
 

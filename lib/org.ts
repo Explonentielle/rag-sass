@@ -1,11 +1,13 @@
 import { cookies } from 'next/headers';
 import { createClient } from '@/lib/supabase/server';
+import type { OrgPlan } from '@/types/database';
 
 export const ACTIVE_ORG_COOKIE = 'active_org_id';
 
 export interface CurrentOrg {
   id: string;
   name: string;
+  plan: OrgPlan;
   role: 'owner' | 'admin' | 'member';
 }
 
@@ -18,17 +20,26 @@ export async function getUserOrgs(): Promise<CurrentOrg[]> {
   } = await supabase.auth.getUser();
   if (!user) return [];
 
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from('users_organizations')
-    .select('role, created_at, organizations(id, name)')
+    .select('role, created_at, organizations(id, name, plan)')
     .eq('user_id', user.id)
     .order('created_at', { ascending: true });
+
+  // A failed query must never be mistaken for "user has zero orgs" — that
+  // silently sends an existing user through onboarding again (and risks
+  // them creating a duplicate org). Surface it instead, e.g. if a migration
+  // (like 0009_organization_plan.sql, adding the `plan` column this query
+  // selects) hasn't been applied yet to this database.
+  if (error) {
+    throw new Error(`getUserOrgs: ${error.message}`);
+  }
 
   return (data ?? [])
     .map((row) => {
       const org = Array.isArray(row.organizations) ? row.organizations[0] : row.organizations;
       if (!org) return null;
-      return { id: org.id, name: org.name, role: row.role };
+      return { id: org.id, name: org.name, plan: org.plan, role: row.role };
     })
     .filter((o): o is CurrentOrg => o !== null);
 }

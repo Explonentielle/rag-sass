@@ -182,8 +182,8 @@ function HowItWorks() {
     },
     {
       k: 'Étape 03',
-      title: 'Vos équipes posent leurs questions',
-      body: 'Réponses instantanées et sourcées, strictement fondées sur vos documents.',
+      title: 'Votre équipe ou vos clients posent leurs questions',
+      body: 'En interne ou via le widget public sur votre site — réponses instantanées et sourcées, strictement fondées sur vos documents.',
     },
   ];
   return (
@@ -253,23 +253,17 @@ function Catalogue() {
   const available: CatalogueEntry[] = [
     { title: 'Chatbot documentaire', body: 'Répond aux questions à partir de vos documents, sources citées à chaque réponse.', who: 'Tout le monde' },
     { title: 'Assistant sans documents', body: 'Le savoir tient dans quelques consignes — zéro upload, zéro indexation, en ligne en minutes.', who: 'Indépendants, artisans' },
-    { title: 'Wiki interne conversationnel', body: "Un nouvel employé pose sa question de process plutôt que de fouiller un dossier partagé.", who: 'PME, ETI en croissance' },
     { title: 'Copilote commercial', body: 'Argumentaires et réponses aux objections retrouvés en quelques secondes, en plein appel.', who: 'Équipes vente structurées' },
     { title: 'Assistant conformité', body: '« Puis-je faire X ? » posé directement sur vos politiques internes.', who: 'Secteurs réglementés' },
     { title: 'Agence immobilière', body: "Procédures de visite, mandats, pièces à fournir — un modèle prêt à l'emploi.", who: 'Agences, indépendants immo' },
-    { title: 'Secrétariat médical virtuel', body: 'Horaires, documents à apporter, préparation avant rendez-vous.', who: 'Cabinets, petites structures de santé' },
     { title: 'Second cerveau', body: 'Déposez vos notes et supports, retrouvez-les en langage naturel — pour vous seul.', who: 'Coachs, consultants, formateurs' },
-    { title: 'Assistant multilingue', body: 'Un visiteur écrit en anglais ou en espagnol, la même base documentaire répond dans sa langue.', who: 'Clientèle internationale, tourisme' },
   ];
 
   const roadmap: CatalogueEntry[] = [
     { title: 'Indexation assistée par IA', body: 'Uploadez un document brut ou une URL, sans rien préparer — une IA nettoie et structure le contenu.', who: 'Tout document mal formaté' },
-    { title: 'Réponse aux avis clients', body: 'Un brouillon de réponse à chaque avis Google ou Trustpilot, dans le ton de la marque.', who: 'Commerces, restauration, hôtellerie' },
-    { title: 'Coach de simulation', body: "Un nouvel employé s'entraîne face à des scénarios clients générés à partir de vos procédures.", who: "Onboarding, centres d'appel" },
     { title: 'Agent de qualification', body: 'Engage un visiteur, pose les bonnes questions, score et route le contact.', who: 'B2B à cycle de vente long' },
     { title: 'Brouillon de réponse email', body: 'Rédige une réponse client à partir de la base de connaissance, à valider avant envoi.', who: 'Support à fort volume' },
     { title: 'Analyseur de contrats', body: "Dépose un contrat, obtiens l'extraction des clauses clés et pose tes questions dessus.", who: 'PME sans juriste interne' },
-    { title: 'Digitaliseur de paperasse', body: 'Factures et formulaires papier transformés en données structurées exploitables.', who: 'Comptabilité, administratif' },
     { title: 'Standard IA téléphone / WhatsApp', body: 'Le même assistant, sur un canal vocal ou messagerie.', who: 'Commerces de proximité' },
     { title: 'Veille & synthèse', body: 'Surveille un corpus interne ou externe, pousse un résumé périodique des nouveautés.', who: 'Veille concurrentielle, R&D' },
   ];

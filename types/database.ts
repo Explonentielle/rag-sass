@@ -5,14 +5,15 @@
 export type DocumentStatus = 'pending' | 'processing' | 'indexed' | 'error';
 export type OrgRole = 'owner' | 'admin' | 'member';
 export type MessageRole = 'user' | 'assistant';
+export type OrgPlan = 'solo' | 'pme' | 'metier';
 
 export interface Database {
   public: {
     Tables: {
       organizations: {
-        Row: { id: string; name: string; created_at: string };
-        Insert: { id?: string; name: string; created_at?: string };
-        Update: { id?: string; name?: string; created_at?: string };
+        Row: { id: string; name: string; plan: OrgPlan; created_at: string };
+        Insert: { id?: string; name: string; plan?: OrgPlan; created_at?: string };
+        Update: { id?: string; name?: string; plan?: OrgPlan; created_at?: string };
       };
       users_organizations: {
         Row: {

@@ -23,7 +23,7 @@ fixe — sert de mémoire centralisée plutôt que de planning strict.
 | 14 | Infra | Self-host Supabase (VPS) | Élevé | VPS provisionné |
 | 15 | Qualité | Tests automatisés | Élevé | — |
 | 16 | Qualité | Logs locaux (debug/incident) | Faible | ✅ Fait (voir note) |
-| 17 | Qualité | Suivi d'usage/coût par org | Moyen | — |
+| 17 | Qualité | Suivi d'usage/coût par org | Moyen | Mesure + plan (étiquette) ✅ faits — facturation réelle (Stripe) dépend d'une intégration absente |
 | 18 | Premium | Indexation assistée par IA (doc bruts + URL) | Élevé | 6 (async), entitlement par plan — référencé sur la landing (catalogue, feuille de route) |
 | 19 | Templates | Clarifier dans le front que les templates ne sont pas liés en live aux chatbots | Faible | À activer seulement si ça pose problème en usage réel |
 | 20 | RGPD | Plan d'action : rétention/purge, suppression à la demande, chiffrement, logs | Moyen (plan) | A+B+C+D ✅ faits (migrations 0004-0006 à appliquer) — E/F ouverts |
@@ -36,10 +36,13 @@ fixe — sert de mémoire centralisée plutôt que de planning strict.
 | 27 | Catalogue | Réponse automatique aux avis clients | Moyen | — |
 | 28 | Catalogue | Coach de simulation (entraînement par scénario) | Élevé | — |
 | 29 | Chat | Widget d'intégration prêt à l'emploi (bulle flottante) | Moyen | ✅ Fait |
-| 30 | Compte | Suppression d'organisation + gestion des membres (retirer, changer de rôle) | Moyen | — |
+| 30 | Compte | Suppression d'organisation + gestion des membres (retirer, changer de rôle) | Moyen | ✅ Fait |
 | 31 | Sécurité | Restriction de domaine + toggle "chatbot public/privé" pour les embeds | Moyen | ✅ Fait — couvre la limite notée à l'item 29 |
 | 32 | RAG | Mode "prompt seul" (chatbot sans document obligatoire) | Faible-moyen | ✅ Fait — même besoin identifié indépendamment côté landing (item 21bis "Assistant sans documents") |
 | 33 | Intégrations | Branchement sur plateformes tierces (calendrier, email) | Élevé | Item 3 (agent), items 21/25/26 du catalogue en sont des variantes |
+| 34 | Pricing | Plan gratuit | Moyen | Item 17 (plan), item 10 (rate limiting déjà en place) |
+| 35 | Pricing | Calcul réel de coût/rentabilité par message | Moyen | Item 17 (comptage déjà fait) — bloqué sur le $/token réel du modèle |
+| 36 | Pricing | Comportement du plan Solo à la limite atteinte | Faible (décision) | Item 17, item 34 (le palier gratuit a le même besoin) |
 
 ---
 
@@ -533,9 +536,39 @@ hors scope de cette demande (logs locaux uniquement, pas de service tiers).
 
 ### 17. Suivi d'usage/coût par organisation
 
-**Problème** : les paliers de prix affichés sur la landing (nombre de
-messages/mois) ne sont pas encore appliqués ni mesurés techniquement — rien
-n'empêche aujourd'hui un org de dépasser son palier.
+**Problème initial** : les paliers de prix affichés sur la landing (nombre
+de messages/mois) n'étaient ni mesurés ni appliqués techniquement — rien
+n'empêchait un org de dépasser son palier.
+
+**Mesure ✅ faite (2026-09-09)** : `lib/usage.ts`
+(`getMonthlyMessageCount`) compte les messages assistant du mois en cours
+pour un org, à travers `messages` → `conversations` → `chatbots`.
+
+**Plan (étiquette, pas facturation) ✅ fait (2026-09-09)** : colonne
+`organizations.plan` (`solo`/`pme`/`metier`, défaut `solo` — migration
+`0009_organization_plan.sql`), réglable par un admin/owner dans
+`Paramètres > Organisation` (`OrgSettingsForm.tsx`). `lib/usage.ts`
+(`PLAN_LIMITS`, `PLAN_LABELS`) associe une limite fixe par plan (300/1 500/
+`null` pour Métier), reprise des chiffres de la landing. Le dashboard
+(`UsageCard` dans `app/dashboard/page.tsx`) affiche "16 / 300", une barre de
+progression, et passe en rouge au-delà du seuil — mais **rien n'est
+bloqué** : c'est un affichage informatif, pas un garde-fou technique. Le
+plan n'est relié à aucun paiement réel — n'importe quel admin peut se
+mettre "Métier" sans que rien ne se passe derrière.
+
+**Vraie facturation — pas fait** : nécessite une intégration Stripe (ou
+équivalent) qui rendrait `organizations.plan` réellement contraignant
+(paiement récurrent, upgrade/downgrade, blocage ou surfacturation en cas de
+dépassement) plutôt qu'une étiquette libre. Prématuré tant que la landing
+reste en phase pilote.
+
+**Coût réel (pas chiffré)** : le modèle de chat (`gpt-5.6-luna`, configurable
+via `OPENAI_CHAT_MODEL`) est trop récent pour qu'une estimation $/token
+fiable soit donnée ici plutôt que devinée — contrairement à l'estimation
+Claude Haiku 4.5 de l'item 18 (section 0), qui s'appuie sur un tarif public
+connu. Avec le comptage de messages maintenant en place, la bonne méthode
+est de lire le coût réel sur le dashboard de facturation OpenAI une fois du
+trafic réel accumulé, plutôt que d'extrapoler un tarif non vérifié.
 
 ---
 
@@ -659,6 +692,18 @@ des pistes au-delà de ce qui est construit — marquées "à venir", jamais
 comme un engagement de délai. Cette section documente ces pistes pour
 qu'elles ne restent pas seulement dans le code de la landing. Rien
 d'implémenté, aucune date visée.
+
+**Mise à jour (2026-09-09)** : la landing n'affiche plus les 9+9 entrées
+d'origine mais une sélection resserrée (6 "disponible" + 6 "feuille de
+route") — 18 cartes en une seule section était dense pour un premier
+scroll, et plusieurs entrées ("Wiki interne conversationnel", "Assistant
+multilingue", "Secrétariat médical virtuel" côté disponible ; "Réponse aux
+avis clients", "Coach de simulation", "Digitaliseur de paperasse" côté
+feuille de route) étaient soit redondantes avec une autre entrée déjà
+affichée, soit déjà couvertes ailleurs sur la page (le multilingue est
+listé dans Fonctionnalités). Les items 21-28 ci-dessous restent la liste
+complète des idées — le tri n'affecte que ce qui est *affiché*, pas ce qui
+est documenté.
 
 ### 21. Agent de qualification de leads
 
@@ -836,3 +881,179 @@ déclencher"). À dimensionner sérieusement avant de s'y engager — pas une
 extension mineure du pipeline actuel.
 
 **Effort** : élevé. Reste une idée backlog, aucun code à ce stade.
+
+---
+
+## 13. Pricing — suite de l'item 17
+
+### 34. Plan gratuit
+
+**Idée (2026-09-09)** : la landing promet déjà implicitement du gratuit
+("Pilote gratuit pour les premières entreprises", "sans carte bancaire pour
+démarrer") sans qu'il existe de palier `free` réel dans `organizations.plan`
+— aujourd'hui le plus bas est Solo à 9€. Ambiguïté à trancher d'abord :
+**palier permanent** (le plus simple, aucune notion d'expiration à gérer,
+cohérent avec l'absence actuelle de facturation réelle) vs **essai limité
+dans le temps** (14 jours puis bascule/verrouillage — plus proche d'un vrai
+funnel SaaS, mais suppose de stocker une date de début d'essai et une
+logique de fin, prématuré tant que Stripe n'existe pas).
+
+**Proposition si palier permanent** : très contraint pour borner le risque
+de coût (abus par inscriptions jetables) — ex. 1 chatbot, 50 messages/mois,
+mode "sans documents" uniquement (item 32 : zéro embedding, zéro appel
+Elasticsearch, donc le message le moins cher possible du pipeline) ou un
+plafond de documents bas si le RAG complet reste autorisé. Le rate limiting
+existant (item 10 : 20 req/min par chatbot+IP, blacklist 24h) protège déjà
+`/api/public-chat`, mais pas `/api/chat` (chat de test authentifié) — un
+palier gratuit rendrait pertinent d'y appliquer aussi un plafond mensuel
+(via `getMonthlyMessageCount`, déjà en place depuis l'item 17).
+
+**Dépend de** : item 36 (comportement à la limite) — un palier gratuit a
+exactement le même besoin qu'un Solo qui déborde, juste avec un seuil plus
+bas.
+
+### 35. Calcul réel de coût/rentabilité par message
+
+**Pourquoi ce n'est pas déjà chiffré** : `DEFAULT_CHAT_MODEL` pointe vers
+`gpt-5.6-luna` (`lib/openai.ts`) — un identifiant de modèle sur lequel je
+n'ai pas de tarification $/token fiable à date de rédaction, contrairement
+à l'estimation Claude Haiku 4.5 de l'item 18 (section 0) qui s'appuie sur
+un tarif public connu et vérifiable. Donner un chiffre de rentabilité ici
+serait une invention présentée comme un fait — risqué pour une vraie
+décision de pricing. Mieux vaut mesurer que deviner.
+
+**Ce qu'il faut réellement pour un calcul fiable** :
+1. **Capturer les tokens réels par appel**, pas juste compter les messages
+   (ce que fait déjà `getMonthlyMessageCount`, item 17). Les trois appels
+   du pipeline par message (`rewriteQuery`, `embedText`, `streamAnswer`)
+   renvoient chacun un objet `usage` (tokens prompt/completion) — pour
+   `streamAnswer` en mode streaming, ça suppose de passer
+   `stream_options: { include_usage: true }` à l'appel OpenAI (paramètre
+   existant de l'API, pas encore utilisé dans `lib/openai.ts`).
+2. **Stocker ces tokens** (ex. colonnes sur `messages`, ou table dédiée
+   `usage_events` séparée si on veut aussi tracer le coût d'ingestion par
+   document) plutôt que de les jeter après la requête.
+3. **Appliquer un tarif $/token configurable** (variable d'env plutôt que
+   codé en dur — les prix changent, et ça évite de re-déployer pour un
+   ajustement). Le tarif à renseigner doit venir de la page de tarification
+   officielle du modèle réellement utilisé, vérifiée par vous à la date où
+   ce calcul sera fait — pas d'un chiffre que j'avance ici sans certitude.
+4. **Rentabilité** = (prix du palier ÷ messages inclus) − (coût moyen réel
+   par message, mesuré sur du trafic réel, pas estimé). Avec le comptage de
+   messages déjà en place (item 17), le plus rapide et le plus fiable
+   reste de lire le coût réel sur le dashboard de facturation OpenAI une
+   fois un peu de trafic accumulé, en parallèle de l'instrumentation
+   ci-dessus pour avoir le détail par message.
+
+**Effort** : moyen — surtout du plomberie (capturer/stocker des champs déjà
+renvoyés par l'API), pas de nouvelle dépendance.
+
+### 36. Comportement du plan Solo (et du futur plan gratuit) à la limite
+
+**Problème** : `UsageCard` (item 17) affiche un avertissement visuel au-delà
+du seuil, mais aucun message n'est aujourd'hui bloqué ou surfacturé — un org
+Solo à 400/300 messages continue de discuter normalement.
+
+**Options, à trancher plus tard** (aucune implémentée) :
+- **Blocage dur** : simple à coder, protège la marge, mais mauvaise
+  expérience (coupure sans transition) — risque de churn sur un plan
+  d'entrée déjà à petit prix.
+- **Dépassement à la tranche** (même logique que le palier PME affiché sur
+  la landing, +2€/100 messages) : cohérent avec ce qui existe déjà pour
+  PME, mais suppose une vraie facturation à l'usage (Stripe metered billing
+  ou équivalent) — même blocage que le reste de l'item 17.
+- **Mur souple avec incitation à l'upgrade** (recommandé comme premher pas) :
+  bloque l'envoi de nouveaux messages une fois la limite dépassée, avec un
+  message explicite ("Vous avez atteint votre forfait Solo, passez au plan
+  PME pour continuer") plutôt qu'un silence ou une erreur générique — ne
+  nécessite pas de facturation à l'usage, juste une vérification du
+  comptage avant d'accepter un message (`getMonthlyMessageCount` déjà en
+  place) dans `app/api/chat/route.ts`/`app/api/public-chat/route.ts`.
+- **Dégradation gracieuse** (repli automatique en mode "sans documents",
+  item 32, moins coûteux) : créatif mais change silencieusement la qualité
+  des réponses sans que l'utilisateur comprenne pourquoi — écarté sauf si
+  clairement annoncé.
+
+**Recommandation** : mur souple avec upgrade d'abord (le moins coûteux à
+construire, pas de dépendance à Stripe), tranche facturée en évolution une
+fois la facturation réelle existante. S'applique de la même façon au futur
+plan gratuit (item 34).
+
+---
+
+## 14. Compte / gestion d'organisation
+
+### 30. Suppression d'organisation + gestion des membres — ✅ fait
+
+**Déclencheur (2026-09-09)** : en nettoyant 6 organisations en double créées
+par un bug de formulaire (migration 0009 pas encore appliquée faisant
+échouer silencieusement `getUserOrgs()`), suppression faite à la main en
+SQL faute d'autre moyen — confirme qu'il manquait une vraie fonctionnalité,
+pas juste un nice-to-have.
+
+**Gestion des membres** (`app/api/organizations/[id]/members/[userId]/route.ts`,
+nouveau) :
+- `PATCH` change le rôle d'un membre (`owner`/`admin`/`member`). Un
+  `admin` peut déplacer quelqu'un entre `admin` et `member`, mais seul un
+  `owner` peut attribuer ou retirer le rôle `owner` lui-même — empêche un
+  admin de s'auto-promouvoir owner via l'API même si l'UI le cache.
+  Toujours au moins un `owner` restant : refuse de rétrograder le dernier.
+- `DELETE` retire un membre. Owner/admin peuvent retirer quelqu'un d'autre ;
+  n'importe qui peut se retirer soi-même ("quitter l'organisation"), sauf
+  si c'est le dernier `owner` (doit d'abord transférer le rôle ou supprimer
+  l'organisation). Un `admin` ne peut pas retirer un `owner`.
+- **Migration `0010_org_member_self_leave.sql`** nécessaire : la policy RLS
+  `users_organizations_delete` d'origine n'autorisait que
+  `is_org_admin(organization_id)` — bloquait un membre simple qui essaie de
+  supprimer sa propre ligne (se retirer). Ajout de `or user_id = auth.uid()`
+  à la policy ; la vraie règle métier (jamais retirer le dernier owner)
+  reste appliquée côté API avant la tentative de suppression, la policy RLS
+  ne fait qu'arrêter de bloquer un cas déjà validé par l'app.
+- UI : `TeamMembers.tsx` — sélecteur de rôle inline + bouton
+  Retirer/Quitter par ligne, visibilité conditionnée au rôle de l'utilisateur
+  courant (transmis depuis `app/dashboard/settings/page.tsx`).
+
+**Suppression d'organisation** (`app/api/organizations/[id]/route.ts`,
+nouveau, `DELETE`) :
+- Owner uniquement — volontairement plus strict que la policy RLS
+  `organizations_delete` (qui autorise aussi `admin`) : supprimer toute une
+  organisation mérite la barre la plus haute disponible, pas seulement
+  "peut administrer".
+- La cascade DB (`on delete cascade`, migration 0001) couvre chatbots,
+  documents, conversations, messages, templates personnalisés et
+  memberships — mais **pas** les chunks Elasticsearch ni les fichiers
+  Supabase Storage, indexés séparément de Postgres. Les deux sont nettoyés
+  explicitement avant la suppression de la ligne `organizations` :
+  - `lib/elasticsearch.ts` : nouvelle fonction `deleteOrganizationChunks()`
+    — un seul `deleteByQuery` sur `organization_id` (le champ existait déjà
+    dans le mapping) plutôt que boucler `deleteDocumentChunks()` par
+    document.
+  - Suppression Storage en un seul appel `.remove([...paths])` (accepte un
+    tableau) plutôt qu'un appel par fichier.
+  - Best-effort sur les deux (erreur loggée, ne bloque pas la suppression)
+    — cohérent avec le même choix déjà fait sur la suppression d'un
+    document unique (`app/api/documents/[id]/route.ts`).
+- UI : `DeleteOrgSection.tsx` sur `/dashboard/settings`, visible seulement
+  pour un `owner`. Confirmation façon GitHub — il faut retaper le nom exact
+  de l'organisation avant que le bouton de suppression définitive
+  s'active.
+
+**Non géré** : pas de transfert d'ownership en un clic (il faut promouvoir
+quelqu'un d'autre en `owner` via le sélecteur de rôle, puis éventuellement
+se rétrograder soi-même) — suffisant pour l'usage actuel, une UI dédiée
+"transférer la propriété" serait un raffinement, pas un blocage.
+
+**Bug trouvé en marge (2026-09-09) et corrigé** : `/dashboard/settings`
+affichait le formulaire d'édition nom/plan à **tout le monde**, y compris
+un `member` — qui ne peut pas réellement l'enregistrer (`organizations_update`
+exige `is_org_admin`), mais voyait un formulaire fonctionnel qui aurait
+échoué avec une erreur RLS peu claire au moment de sauvegarder. Corrigé :
+un `member` voit maintenant nom + plan en lecture seule.
+
+**Précision sur le reste de l'app** : cette clarification des rôles ne
+concerne que l'organisation et ses membres. Chatbots/documents/templates
+gardent le modèle plat déjà en place avant cet item (`0001_init.sql` :
+"any org member can read/create/edit; kept simple for the MVP") — un
+`member` peut toujours créer/modifier/supprimer des documents et modifier
+des chatbots, au même titre qu'un `owner`. Choix assumé, pas un oubli —
+à resserrer plus tard si ça pose un problème réel en usage d'équipe.
