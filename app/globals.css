@@ -5,3 +5,7 @@
 body {
   @apply bg-slate-50 text-slate-900;
 }
+
+h1, h2, h3 {
+  font-family: var(--font-display), Georgia, serif;
+}

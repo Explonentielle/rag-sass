@@ -1,27 +1,10 @@
 import Link from 'next/link';
-import { Newsreader, Work_Sans, JetBrains_Mono } from 'next/font/google';
 import { createClient } from '@/lib/supabase/server';
 import styles from './landing.module.css';
 
-const display = Newsreader({
-  subsets: ['latin'],
-  weight: ['400', '500', '600'],
-  style: ['normal', 'italic'],
-  variable: '--font-display',
-  display: 'swap',
-});
-const body = Work_Sans({
-  subsets: ['latin'],
-  weight: ['400', '500', '600', '700'],
-  variable: '--font-body',
-  display: 'swap',
-});
-const label = JetBrains_Mono({
-  subsets: ['latin'],
-  weight: ['400', '500', '600'],
-  variable: '--font-label',
-  display: 'swap',
-});
+// Fonts are loaded once, globally, in app/layout.tsx (--font-display,
+// --font-body, --font-label) — this page just consumes those variables via
+// landing.module.css, same as every other page in the app now.
 
 export default async function LandingPage() {
   const supabase = createClient();
@@ -30,7 +13,7 @@ export default async function LandingPage() {
   } = await supabase.auth.getUser();
 
   return (
-    <div className={`${styles.page} ${display.variable} ${body.variable} ${label.variable}`}>
+    <div className={styles.page}>
       <Nav isLoggedIn={!!user} />
       <Hero isLoggedIn={!!user} />
       <TrustBar />
