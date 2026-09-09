@@ -168,6 +168,13 @@ export const ICONS = {
       <circle cx="12" cy="17" r="0.6" fill="currentColor" stroke="none" />
     </>
   ),
+  globe: (
+    <>
+      <circle cx="12" cy="12" r="9" />
+      <ellipse cx="12" cy="12" rx="4" ry="9" />
+      <line x1="3" y1="12" x2="21" y2="12" />
+    </>
+  ),
   logout: (
     <>
       <rect x="4" y="4" width="10" height="16" rx="1" />
