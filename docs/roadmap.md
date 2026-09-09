@@ -24,9 +24,18 @@ fixe — sert de mémoire centralisée plutôt que de planning strict.
 | 15 | Qualité | Tests automatisés | Élevé | — |
 | 16 | Qualité | Logs locaux (debug/incident) | Faible | ✅ Fait (voir note) |
 | 17 | Qualité | Suivi d'usage/coût par org | Moyen | — |
-| 18 | Premium | Indexation assistée par IA (doc bruts + URL) | Élevé | 6 (async), entitlement par plan |
+| 18 | Premium | Indexation assistée par IA (doc bruts + URL) | Élevé | 6 (async), entitlement par plan — référencé sur la landing (catalogue, feuille de route) |
 | 19 | Templates | Clarifier dans le front que les templates ne sont pas liés en live aux chatbots | Faible | À activer seulement si ça pose problème en usage réel |
 | 20 | RGPD | Plan d'action : rétention/purge, suppression à la demande, chiffrement, logs | Moyen (plan) | A+D ✅ faits (migration 0006 à appliquer) — B/C/E/F ouverts |
+| 21 | Catalogue | Agent de qualification de leads | Élevé | Item 3 (agent) |
+| 22 | Catalogue | Brouillon de réponse email | Moyen | — |
+| 23 | Catalogue | Analyseur de contrats (extraction de clauses) | Moyen | — |
+| 24 | Catalogue | Digitaliseur de paperasse (factures, formulaires) | Élevé | Item 7 (OCR) |
+| 25 | Catalogue | Standard IA téléphone / WhatsApp | Élevé | Nouveau canal, hors chat web |
+| 26 | Catalogue | Agent de veille & synthèse | Élevé | Item 3 (agent) |
+| 27 | Catalogue | Réponse automatique aux avis clients | Moyen | — |
+| 28 | Catalogue | Coach de simulation (entraînement par scénario) | Élevé | — |
+| 29 | Chat | Widget d'intégration prêt à l'emploi (bulle flottante) | Moyen | ✅ Fait |
 
 ---
 
@@ -419,6 +428,39 @@ intensément avec le même chatbot en même temps. Idem, le store in-memory
 instances derrière un load balancer (cf. commentaire en tête de
 `lib/rateLimit.ts`) — à revoir avec un store partagé (Redis) si ça arrive.
 
+### 29. Widget d'intégration prêt à l'emploi — ✅ Fait
+
+**Déclencheur (2026-09-09)** : en testant l'embed sur un vrai site externe,
+constat que `/embed/[chatbotId]` (page brute, sans chrome) obligeait le
+client à coder lui-même la bulle flottante et le toggle — `docs/integration.md`
+était d'ailleurs référencé dans plusieurs commentaires du code sans jamais
+avoir été écrit.
+
+**Solution implémentée** : `public/widget.js`, un loader vanilla JS servi
+statiquement, à coller en une ligne (`<script src=".../widget.js"
+data-chatbot-id="...">`). Il crée une iframe pointant vers
+`/embed/[chatbotId]?widget=1`, qui rend son propre chrome bulle+toggle
+(`components/EmbedBubbleWidget.tsx`). Une iframe ne pouvant pas dessiner
+par-dessus le reste de la page hôte, l'ouverture/fermeture est communiquée
+à la page parente via `postMessage`, qui redimensionne l'élément iframe en
+conséquence (petit cercle fermé, panneau ouvert, plein écran sur mobile).
+Le mode brut (`/embed/[chatbotId]` sans `?widget=1`) reste disponible pour
+un client qui préfère gérer son propre wrapper — voir `docs/integration.md`
+pour les deux options. Testé en direct : `/widget.js` servi (200), le mode
+bulle de la page d'embed rend correctement.
+
+**Fix (2026-09-09)** : `app/globals.css` met un `background bg-slate-50`
+global sur `body`, hérité par la page d'embed — visible en marge autour du
+bouton rond et du panneau (l'iframe étant redimensionnée/arrondie par
+`widget.js`, tout ce qui n'est pas couvert par le bouton/panneau doit être
+transparent, pas coloré). Corrigé dans `EmbedBubbleWidget.tsx` (force
+`background: transparent` sur `html`/`body` au montage). Repéré et signalé
+par l'utilisateur en testant l'intégration sur un vrai site externe.
+
+**Limite connue** : pas d'allowlist de domaines — n'importe quel site
+connaissant un `chatbotId` peut l'embarquer aujourd'hui, documenté dans
+`docs/integration.md`.
+
 ---
 
 ## 4. Modèles LLM
@@ -592,3 +634,73 @@ responsable de traitement).
 faible chacun) — ✅ fait le 2026-09-08, migration 0006 à appliquer. Puis B,
 puis C en renforcement (encore ouverts). E/F en parallèle, hors code, avant
 de signer un premier vrai client pilote (toujours ouverts).
+
+---
+
+## 9. Catalogue produit — pistes créatives
+
+**Contexte (2026-09-09)** : suite au repositionnement de la landing (vision
+"plateforme pour PME/indépendants", catalogue en deux registres "disponible
+aujourd'hui" / "feuille de route"), la page affiche désormais publiquement
+des pistes au-delà de ce qui est construit — marquées "à venir", jamais
+comme un engagement de délai. Cette section documente ces pistes pour
+qu'elles ne restent pas seulement dans le code de la landing. Rien
+d'implémenté, aucune date visée.
+
+### 21. Agent de qualification de leads
+
+**Idée** : engage un visiteur du widget, pose des questions de
+qualification, score le contact et le route — jusqu'à proposer un
+rendez-vous. **Dépend de** l'item 3 (agent unique topK + reformulation) et
+plus largement d'une vraie boucle agentique (tool calling), pas juste du
+RAG actuel.
+
+### 22. Brouillon de réponse email
+
+**Idée** : à partir d'un email client entrant, rédige un brouillon de
+réponse fondé sur la base de connaissance et le ton de marque, à valider
+avant envoi. Proche techniquement du chat existant (même pipeline RAG),
+la différence est l'interface (email plutôt que widget) et le mode
+brouillon-à-valider plutôt que réponse directe.
+
+### 23. Analyseur de contrats
+
+**Idée** : upload d'un contrat, extraction des clauses clés (structured
+outputs, comme `rewriteQuery`), questions-réponses dessus. Peut réutiliser
+le pipeline RAG existant presque tel quel — la nouveauté est surtout
+l'extraction structurée en amont.
+
+### 24. Digitaliseur de paperasse
+
+**Idée** : factures et formulaires papier transformés en données
+structurées exploitables. **Dépend de** l'item 7 (OCR) — sans texte
+extractible, rien à structurer derrière.
+
+### 25. Standard IA téléphone / WhatsApp
+
+**Idée** : le même assistant, sur un canal vocal ou messagerie plutôt que
+le widget web — pour les commerces sans présence web. Chantier à part
+entière (intégration téléphonie/WhatsApp Business API), pas une extension
+mineure du chat actuel.
+
+### 26. Agent de veille & synthèse
+
+**Idée** : surveille un corpus interne ou externe, pousse un résumé
+périodique des nouveautés. Suppose un déclenchement planifié (proche de la
+purge `pg_cron` de l'item 20) plutôt qu'une réponse à une question posée —
+mode "push" inédit dans le produit actuel, entièrement request/response.
+
+### 27. Réponse automatique aux avis clients
+
+**Idée neuve, née de la session de repositionnement** (pas dans le
+catalogue initial). Un brouillon de réponse à chaque avis Google ou
+Trustpilot, dans le ton de la marque, conforme à la politique interne —
+même logique que l'item 22 (brouillon email) appliqué à un canal différent.
+
+### 28. Coach de simulation
+
+**Idée neuve, née de la session de repositionnement**. Un nouvel employé
+s'entraîne face à des scénarios clients réalistes générés à partir des
+procédures internes, avant son premier vrai appel — un mode "roleplay"
+plutôt que Q&A, nécessite un system prompt et une boucle de conversation
+différents de l'assistant documentaire standard.

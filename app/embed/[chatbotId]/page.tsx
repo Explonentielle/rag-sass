@@ -1,8 +1,24 @@
 import ChatWidget from '@/components/ChatWidget';
+import EmbedBubbleWidget from '@/components/EmbedBubbleWidget';
 
-// Minimal, chrome-free page designed to be loaded inside an <iframe> on a
-// third-party site. No auth, no nav — see docs/integration.md.
-export default function EmbedPage({ params }: { params: { chatbotId: string } }) {
+// Loaded inside an <iframe> on a third-party site. No auth, no nav — see
+// docs/integration.md. Two modes:
+// - default: chrome-free, fills whatever the host page's iframe is sized
+//   to — for a client building their own bubble/toggle wrapper.
+// - ?widget=1: self-contained bubble+toggle chrome (EmbedBubbleWidget),
+//   paired with public/widget.js on the host page, which resizes the
+//   iframe itself in response — the "one script tag" integration path.
+export default function EmbedPage({
+  params,
+  searchParams,
+}: {
+  params: { chatbotId: string };
+  searchParams: { widget?: string };
+}) {
+  if (searchParams.widget === '1') {
+    return <EmbedBubbleWidget chatbotId={params.chatbotId} />;
+  }
+
   return (
     <div className="flex h-screen flex-col bg-white">
       <ChatWidget
