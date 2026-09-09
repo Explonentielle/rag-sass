@@ -24,13 +24,22 @@ fixe — sert de mémoire centralisée plutôt que de planning strict.
 | 15 | Qualité | Tests automatisés | Élevé | — |
 | 16 | Qualité | Logs locaux (debug/incident) | Faible | ✅ Fait (voir note) |
 | 17 | Qualité | Suivi d'usage/coût par org | Moyen | — |
-| 18 | Premium | Indexation assistée par IA (doc bruts + URL) | Élevé | 6 (async), entitlement par plan |
-| 19 | Templates | Clarifier dans le front que les templates ne sont pas liés en live aux chatbots | Faible | ✅ Fait |
+| 18 | Premium | Indexation assistée par IA (doc bruts + URL) | Élevé | 6 (async), entitlement par plan — référencé sur la landing (catalogue, feuille de route) |
+| 19 | Templates | Clarifier dans le front que les templates ne sont pas liés en live aux chatbots | Faible | À activer seulement si ça pose problème en usage réel |
 | 20 | RGPD | Plan d'action : rétention/purge, suppression à la demande, chiffrement, logs | Moyen (plan) | A+B+C+D ✅ faits (migrations 0004-0006 à appliquer) — E/F ouverts |
-| 21 | Compte | Suppression d'organisation + gestion des membres (retirer, changer de rôle) | Moyen | — |
-| 22 | Sécurité | Restriction de domaine + toggle "chatbot public/privé" pour les embeds | Moyen | ✅ Fait |
-| 23 | RAG | Mode "prompt seul" (chatbot sans document obligatoire) | Faible-moyen | ✅ Fait |
-| 24 | Intégrations | Branchement sur plateformes tierces (calendrier, email) | Élevé | — |
+| 21 | Catalogue | Agent de qualification de leads | Élevé | Item 3 (agent) |
+| 22 | Catalogue | Brouillon de réponse email | Moyen | — |
+| 23 | Catalogue | Analyseur de contrats (extraction de clauses) | Moyen | — |
+| 24 | Catalogue | Digitaliseur de paperasse (factures, formulaires) | Élevé | Item 7 (OCR) |
+| 25 | Catalogue | Standard IA téléphone / WhatsApp | Élevé | Nouveau canal, hors chat web |
+| 26 | Catalogue | Agent de veille & synthèse | Élevé | Item 3 (agent) |
+| 27 | Catalogue | Réponse automatique aux avis clients | Moyen | — |
+| 28 | Catalogue | Coach de simulation (entraînement par scénario) | Élevé | — |
+| 29 | Chat | Widget d'intégration prêt à l'emploi (bulle flottante) | Moyen | ✅ Fait |
+| 30 | Compte | Suppression d'organisation + gestion des membres (retirer, changer de rôle) | Moyen | — |
+| 31 | Sécurité | Restriction de domaine + toggle "chatbot public/privé" pour les embeds | Moyen | ✅ Fait — couvre la limite notée à l'item 29 |
+| 32 | RAG | Mode "prompt seul" (chatbot sans document obligatoire) | Faible-moyen | ✅ Fait — même besoin identifié indépendamment côté landing (item 21bis "Assistant sans documents") |
+| 33 | Intégrations | Branchement sur plateformes tierces (calendrier, email) | Élevé | Item 3 (agent), items 21/25/26 du catalogue en sont des variantes |
 
 ---
 
@@ -243,46 +252,6 @@ section + plusieurs mini-sections FAQ) — la grosse section sous-découpée
 sur 3 chunks sans jamais couper une question/réponse, les mini-FAQ toutes
 regroupées dans un seul chunk plutôt qu'éclatées une par une.
 
-### 23. Mode "prompt seul" (chatbot sans document obligatoire) — ✅ fait
-
-**Constat (2026-09-08)** : chaque template par défaut instruit explicitement
-"base-toi STRICTEMENT sur les documents fournis en contexte", et
-`buildSystemPrompt` (`lib/prompts.ts`) ajoutait systématiquement "N'utilise
-aucune connaissance externe à ces extraits. Si la réponse n'y figure pas,
-dis-le clairement." — même sans aucun chunk retrouvé. Résultat : un chatbot
-sans document indexé refusait **toute** question, même une FAQ triviale que
-le propriétaire aurait pu écrire lui-même dans le prompt (cas typique : un
-artisan qui veut un petit chatbot pour son site sans vouloir gérer
-d'upload de documents).
-
-**Ce qui a été fait** :
-1. Nouvelle colonne `chatbots.use_documents` (booléen, défaut `true` —
-   comportement historique inchangé pour les chatbots existants).
-   Migration `0008_chatbot_no_document_mode.sql`.
-2. `buildSystemPrompt()` accepte un paramètre `useDocuments` : à `false`,
-   retourne le `system_prompt_template` tel quel, sans wrapper "documents
-   comme unique source de vérité" — le prompt devient la seule connaissance
-   du modèle.
-3. `app/api/chat/route.ts` et `app/api/public-chat/route.ts` : si
-   `chatbot.use_documents` est `false`, `rewriteQuery`/`embedText`/
-   `hybridSearch` sont entièrement sautés (gain de latence et de coût en
-   plus du fix fonctionnel — un appel LLM et un aller-retour Elasticsearch
-   en moins par message).
-4. Nouveau template par défaut **"Assistant simple (sans documents)"**
-   (`lib/prompts.ts`) : pas de langage "documents fournis", structure à
-   remplir directement (activité, horaires, contact, FAQ...) — pensé pour
-   être utilisé tel quel avec `use_documents=false`.
-5. UI : case à cocher "Ce chatbot se base sur des documents à uploader"
-   dans `CreateChatbotForm` (à la création) et `SystemPromptEditor` (sur un
-   chatbot existant, page `/dashboard/chatbots/[id]`) — décochée, un
-   avertissement apparaît dans la section Documents pour rappeler que les
-   documents uploadés ne seront pas utilisés tant que le mode est actif.
-
-**Limite connue** : pas de bascule automatique entre les deux modes selon
-le contenu réel (ex. passer en mode RAG dès qu'un premier document est
-indexé) — le choix reste manuel, pas de détection intelligente. Comportement
-jugé prévisible plutôt que "magique" pour l'instant.
-
 ---
 
 ## 2. Pipeline d'ingestion
@@ -463,6 +432,39 @@ intensément avec le même chatbot en même temps. Idem, le store in-memory
 instances derrière un load balancer (cf. commentaire en tête de
 `lib/rateLimit.ts`) — à revoir avec un store partagé (Redis) si ça arrive.
 
+### 29. Widget d'intégration prêt à l'emploi — ✅ Fait
+
+**Déclencheur (2026-09-09)** : en testant l'embed sur un vrai site externe,
+constat que `/embed/[chatbotId]` (page brute, sans chrome) obligeait le
+client à coder lui-même la bulle flottante et le toggle — `docs/integration.md`
+était d'ailleurs référencé dans plusieurs commentaires du code sans jamais
+avoir été écrit.
+
+**Solution implémentée** : `public/widget.js`, un loader vanilla JS servi
+statiquement, à coller en une ligne (`<script src=".../widget.js"
+data-chatbot-id="...">`). Il crée une iframe pointant vers
+`/embed/[chatbotId]?widget=1`, qui rend son propre chrome bulle+toggle
+(`components/EmbedBubbleWidget.tsx`). Une iframe ne pouvant pas dessiner
+par-dessus le reste de la page hôte, l'ouverture/fermeture est communiquée
+à la page parente via `postMessage`, qui redimensionne l'élément iframe en
+conséquence (petit cercle fermé, panneau ouvert, plein écran sur mobile).
+Le mode brut (`/embed/[chatbotId]` sans `?widget=1`) reste disponible pour
+un client qui préfère gérer son propre wrapper — voir `docs/integration.md`
+pour les deux options. Testé en direct : `/widget.js` servi (200), le mode
+bulle de la page d'embed rend correctement.
+
+**Fix (2026-09-09)** : `app/globals.css` met un `background bg-slate-50`
+global sur `body`, hérité par la page d'embed — visible en marge autour du
+bouton rond et du panneau (l'iframe étant redimensionnée/arrondie par
+`widget.js`, tout ce qui n'est pas couvert par le bouton/panneau doit être
+transparent, pas coloré). Corrigé dans `EmbedBubbleWidget.tsx` (force
+`background: transparent` sur `html`/`body` au montage). Repéré et signalé
+par l'utilisateur en testant l'intégration sur un vrai site externe.
+
+**Limite connue** : pas d'allowlist de domaines — n'importe quel site
+connaissant un `chatbotId` peut l'embarquer aujourd'hui, documenté dans
+`docs/integration.md`.
+
 ---
 
 ## 4. Modèles LLM
@@ -498,48 +500,6 @@ simple (peu d'effort une fois le SMTP en place).
 **Contexte** : mis de côté après un bug de facturation Egress sur Supabase
 Cloud. Le code est déjà portable (URL/clés en variables d'env, migrations
 SQL pures) — le switch reste low-effort le jour où un VPS est provisionné.
-
-### 21. Suppression d'organisation + gestion des membres
-
-**Constat (2026-09-08)** : la gestion multi-tenant est unidirectionnelle —
-on peut créer une organisation (`CreateOrgForm`/`CreateOrgModal`), la
-renommer (`OrgSettingsForm`), inviter un membre existant
-(`TeamMembers.tsx` + `POST /api/organizations/[id]/members`), mais rien
-côté suppression/retrait :
-
-- **Pas de suppression d'organisation.** Aucune route `DELETE`, aucun bouton.
-  Une org créée par erreur, ou un pilote qu'on veut nettoyer, reste en base
-  indéfiniment (avec tous ses chatbots/documents/conversations en cascade).
-- **Pas de retrait de membre.** `TeamMembers.tsx` affiche la liste avec le
-  rôle de chacun, mais aucune action dessus — un membre ajouté par erreur ne
-  peut être retiré qu'en SQL direct.
-- **Pas de changement de rôle** après coup (promouvoir un `member` en
-  `admin`, ou l'inverse) — le rôle est figé à `member` dès l'ajout
-  (`POST /api/organizations/[id]/members`, ligne `role: 'member'` en dur).
-- **Pas de "quitter l'organisation"** pour un membre qui veut partir de
-  lui-même sans passer par un admin.
-- **Cas non géré : dernier `owner` qui part/est retiré** — une organisation
-  sans propriétaire est un état à empêcher explicitement, pas juste "ça
-  arrive et personne ne peut plus rien administrer".
-
-**Proposition (pas encore chiffrée en détail)** :
-1. Suppression d'org : réservée au(x) `owner`(s), confirmation forte
-   (retaper le nom de l'org, pattern classique "danger zone"), cascade déjà
-   correcte en DB (`organization_id` FK `on delete cascade` sur
-   chatbots/documents/conversations) — donc surtout un problème de route API
-   + UI, pas de schéma.
-2. Retrait de membre + changement de rôle : actions sur chaque ligne de
-   `TeamMembers.tsx`, nouvelles routes `PATCH`/`DELETE` sur
-   `/api/organizations/[id]/members/[userId]`, réservées aux `owner`/`admin`
-   (RLS `is_org_admin` déjà disponible, voir `types/database.ts`).
-3. Garde-fou dernier owner : bloquer le retrait/départ/rétrogradation du
-   dernier `owner` d'une organisation (erreur explicite côté API), et/ou
-   exiger un transfert de propriété avant de partir.
-
-**Effort** : moyen — pas de nouveau concept technique (RLS et rôles
-existent déjà), mais plusieurs routes + UI + le garde-fou dernier-owner à
-bien tester (cas limites : org à un seul membre, retrait de soi-même,
-retrait simultané par deux admins).
 
 ---
 
@@ -581,22 +541,21 @@ n'empêche aujourd'hui un org de dépasser son palier.
 
 ## 7. Templates
 
-### 19. Clarifier dans le front que les templates ne sont pas liés en live — ✅ fait
+### 19. Clarifier dans le front que les templates ne sont pas liés en live
 
 **Contexte** : un template (par défaut ou personnalisé) n'est qu'un point de
 départ copié dans le champ `system_prompt_template` propre à chaque chatbot
 au moment où on l'applique. Modifier un template après coup (page Templates)
 ne met **pas** à jour les chatbots qui l'utilisaient déjà — chaque chatbot a
-sa propre copie indépendante, pas une référence live. Comportement
-volontaire, pas un bug.
+sa propre copie indépendante, pas une référence live.
 
-**Ce qui a été fait (2026-09-08)** : deux notes discrètes (`text-xs
-text-slate-400`, cohérent avec le reste du design), pas de changement de
-comportement. `app/dashboard/templates/page.tsx` — sous le titre de la
-page : "Modifier un template ici ne change pas les chatbots qui l'utilisent
-déjà [...]". `components/SystemPromptEditor.tsx` — sous la rangée de
-boutons "Partir d'un template" : "Appliquer un template copie son contenu
-ici — modifier le template plus tard ne mettra pas à jour ce chatbot."
+**Décision actuelle** : comportement volontaire, pas un bug. Pas de UI
+spécifique pour l'expliquer pour l'instant.
+
+**À faire si ça pose problème en usage réel** : ajouter une indication
+visuelle (ex. dans l'éditeur de prompt du chatbot ou sur la page Templates)
+précisant que la modification d'un template ne se propage pas
+automatiquement aux chatbots existants.
 
 ---
 
@@ -623,64 +582,36 @@ l'activer d'abord via Database > Extensions dans le dashboard Supabase.
 Non testé en conditions réelles (nécessite d'attendre l'échéance ou de
 vérifier `cron.job_run_details` après application).
 
-**B. Suppression à la demande (droit à l'effacement)** — ✅ fait
-(2026-09-08).
-Deux couches : (1) `ChatWidget.tsx` — bouton "supprimer" (icône poubelle,
-au survol) sur chaque entrée du sélecteur de conversations, pour son
-propre historique (test chat authentifié ou widget public via
-`visitorId`), branché sur le `DELETE` déjà existant dans
-`app/api/chat/route.ts`/`app/api/public-chat/route.ts`. (2) Le vrai
-besoin RGPD — un membre de l'org retrouve et supprime la conversation
-**d'un visiteur** qui n'a plus son `visitorId` : nouvelle route
-`app/api/chatbots/[id]/conversations/route.ts` (`GET`/`DELETE`),
-nouvelles fonctions `lib/conversations.ts` (`listAllConversationsForChatbot`,
+**B. Suppression à la demande (droit à l'effacement)** — ✅ fait.
+Deux couches : (1) bouton "supprimer" (icône poubelle, au survol) sur
+chaque entrée du sélecteur de conversations dans `ChatWidget.tsx`, pour
+son propre historique (chat de test authentifié ou widget public via
+`visitorId`). (2) Le vrai besoin RGPD — un membre de l'org retrouve et
+supprime la conversation **d'un visiteur** qui n'a plus son `visitorId` :
+route `app/api/chatbots/[id]/conversations/route.ts` (`GET`/`DELETE`),
+fonctions `lib/conversations.ts` (`listAllConversationsForChatbot`,
 `deleteConversationForChatbot`) qui ne filtrent que par `chatbot_id`, pas
-par identité — contrairement au `DELETE` de (1) qui reste scopé
-`user_id = caller`. Nouveau composant `components/ConversationsPanel.tsx`
-(recherche par titre ou par id visiteur/utilisateur + bouton supprimer),
-affiché dans une section "Conversations" sur `app/dashboard/chatbots/[id]/page.tsx`.
-Sécurité : aucun filtre d'identité applicatif sur cette route — RLS
-(`conversations_delete`, transitif via `chatbots.organization_id`) est le
-seul garde-fou, cohérent avec le modèle existant (un coéquipier peut déjà
-voir/gérer les conversations de test des autres membres de l'org). La
-suppression de compte utilisateur authentifié reste couverte
-architecturalement (`user_id references auth.users(id) on delete cascade`).
-`tsc --noEmit` et `npm run build` passent ; non testé en conditions
-réelles (pas encore de projet Supabase connecté sur cette machine au
-moment de l'implémentation — migrations 0004/0005/0006 à vérifier/appliquer
-avant validation manuelle).
+par identité. Composant `components/ConversationsPanel.tsx` intégré à la
+page de chaque chatbot. La suppression de compte utilisateur authentifié
+reste couverte architecturalement (`user_id references auth.users(id) on
+delete cascade`).
 
-**C. Chiffrement applicatif des messages** — ✅ fait (2026-09-08).
-`lib/crypto.ts` (nouveau) : `encryptText`/`decryptText`, AES-256-GCM,
-clé `CONVERSATION_ENCRYPTION_KEY` (32 octets, base64) lue depuis les
-variables d'env uniquement — jamais stockée dans Postgres, absence =
-erreur explicite au premier appel plutôt qu'un fallback silencieux en
-clair. Branché dans `lib/conversations.ts` : `appendTurn` chiffre
-`content` (les deux rôles) et `sources` avant insertion ; `loadHistory`,
-`listConversations` et `listAllConversationsForChatbot` déchiffrent à la
-lecture (cette dernière pour le titre affiché dans le nouvel outil
-dashboard de l'item B).
-
-**Compatibilité avec les données existantes** : pas de migration de
-données. `sources` est une colonne `jsonb` — un tableau JSON signale une
-ligne écrite avant cette fonctionnalité (rendue telle quelle), une chaîne
-JSON signale un blob chiffré (déchiffré) ; la distinction est native au
-typage jsonb, pas une heuristique. `content` est une colonne `text` sans
-cette distinction de type : `decryptText` reconnaît un blob chiffré au
-format `base64:base64:base64` (`CIPHERTEXT_PATTERN` dans `lib/crypto.ts`)
-et renvoie tel quel tout ce qui ne matche pas ce motif — un message en
-clair préexistant ne matchera jamais ce format par hasard. Décision
-délibérée plutôt qu'une migration de ré-écriture : le projet est encore
-pré-pilote (pas de client réel utilisant l'historique à ce stade).
-
-**Compromis assumés** : recherche full-text SQL sur le contenu impossible
-désormais (non utilisée aujourd'hui, coût réel nul) ; gestion de la clé
-(rotation, sauvegarde — perdre la clé rend l'historique définitivement
-illisible) devient un sujet à part entière, pas traité ici. Roundtrip
-chiffrement/déchiffrement et passthrough des lignes legacy validés par un
-script ad hoc (`node -e ...`, hors repo) ; `tsc --noEmit` et
-`npm run build` passent. Non testé contre une vraie base Supabase (même
-blocage que B).
+**C. Chiffrement applicatif des messages** — ✅ fait.
+`lib/crypto.ts` : `content`/`sources` chiffrés en AES-256-GCM avant
+insertion (`encryptText`), déchiffrés à la lecture (`decryptText`) dans
+`lib/conversations.ts` — protège contre un accès DB direct (rôle
+service-role notamment), en complément du chiffrement au repos déjà géré
+par l'infra Supabase (qui protège seulement contre le vol de disque). Clé
+dans `CONVERSATION_ENCRYPTION_KEY` (variable d'env, jamais stockée en
+base) — générée avec `openssl rand -base64 32`, doit décoder en 32 octets
+(AES-256), sinon `getKey()` lève une erreur explicite. Détection des
+lignes antérieures à la fonctionnalité (écrites en clair) via
+`CIPHERTEXT_PATTERN` — un texte qui ne matche pas le format
+`base64:base64:base64` est retourné tel quel plutôt que de faire échouer
+le déchiffrement, donc pas de migration de données nécessaire. Compromis
+assumé : plus de recherche full-text SQL possible sur le contenu (pas
+utilisé aujourd'hui, donc sans coût réel) ; la rotation de clé n'est pas
+gérée (à traiter si besoin réel).
 
 **D. Angle mort : les logs locaux** — ✅ Fait.
 `lib/logger.ts` (item 16) écrivait la question brute en clair dans
@@ -714,21 +645,91 @@ responsable de traitement).
 
 **Ordre proposé** : A + D d'abord (rien n'est conforme sans ça, effort
 faible chacun) — ✅ fait le 2026-09-08, migration 0006 à appliquer. Puis B,
-puis C en renforcement — ✅ les deux faits le 2026-09-08 également (code non
-testé contre une vraie base Supabase, voir détails ci-dessus). E/F restent
-en parallèle, hors code, avant de signer un premier vrai client pilote
-(toujours ouverts).
+puis C en renforcement (encore ouverts). E/F en parallèle, hors code, avant
+de signer un premier vrai client pilote (toujours ouverts).
 
 ---
 
-## 9. Sécurité des embeds publics
+## 9. Catalogue produit — pistes créatives
 
-### 22. Restriction de domaine + toggle "chatbot public/privé" — ✅ fait
+**Contexte (2026-09-09)** : suite au repositionnement de la landing (vision
+"plateforme pour PME/indépendants", catalogue en deux registres "disponible
+aujourd'hui" / "feuille de route"), la page affiche désormais publiquement
+des pistes au-delà de ce qui est construit — marquées "à venir", jamais
+comme un engagement de délai. Cette section documente ces pistes pour
+qu'elles ne restent pas seulement dans le code de la landing. Rien
+d'implémenté, aucune date visée.
 
-**Contexte** : `docs/integration.md` listait deux limitations connues avant
-un vrai lancement public — n'importe qui connaissant un `chatbotId` pouvait
-l'interroger via `/api/public-chat` depuis n'importe quel site, et il
-n'existait aucun moyen de désactiver l'accès anonyme à un chatbot.
+### 21. Agent de qualification de leads
+
+**Idée** : engage un visiteur du widget, pose des questions de
+qualification, score le contact et le route — jusqu'à proposer un
+rendez-vous. **Dépend de** l'item 3 (agent unique topK + reformulation) et
+plus largement d'une vraie boucle agentique (tool calling), pas juste du
+RAG actuel.
+
+### 22. Brouillon de réponse email
+
+**Idée** : à partir d'un email client entrant, rédige un brouillon de
+réponse fondé sur la base de connaissance et le ton de marque, à valider
+avant envoi. Proche techniquement du chat existant (même pipeline RAG),
+la différence est l'interface (email plutôt que widget) et le mode
+brouillon-à-valider plutôt que réponse directe.
+
+### 23. Analyseur de contrats
+
+**Idée** : upload d'un contrat, extraction des clauses clés (structured
+outputs, comme `rewriteQuery`), questions-réponses dessus. Peut réutiliser
+le pipeline RAG existant presque tel quel — la nouveauté est surtout
+l'extraction structurée en amont.
+
+### 24. Digitaliseur de paperasse
+
+**Idée** : factures et formulaires papier transformés en données
+structurées exploitables. **Dépend de** l'item 7 (OCR) — sans texte
+extractible, rien à structurer derrière.
+
+### 25. Standard IA téléphone / WhatsApp
+
+**Idée** : le même assistant, sur un canal vocal ou messagerie plutôt que
+le widget web — pour les commerces sans présence web. Chantier à part
+entière (intégration téléphonie/WhatsApp Business API), pas une extension
+mineure du chat actuel.
+
+### 26. Agent de veille & synthèse
+
+**Idée** : surveille un corpus interne ou externe, pousse un résumé
+périodique des nouveautés. Suppose un déclenchement planifié (proche de la
+purge `pg_cron` de l'item 20) plutôt qu'une réponse à une question posée —
+mode "push" inédit dans le produit actuel, entièrement request/response.
+
+### 27. Réponse automatique aux avis clients
+
+**Idée neuve, née de la session de repositionnement** (pas dans le
+catalogue initial). Un brouillon de réponse à chaque avis Google ou
+Trustpilot, dans le ton de la marque, conforme à la politique interne —
+même logique que l'item 22 (brouillon email) appliqué à un canal différent.
+
+### 28. Coach de simulation
+
+**Idée neuve, née de la session de repositionnement**. Un nouvel employé
+s'entraîne face à des scénarios clients réalistes générés à partir des
+procédures internes, avant son premier vrai appel — un mode "roleplay"
+plutôt que Q&A, nécessite un system prompt et une boucle de conversation
+différents de l'assistant documentaire standard.
+
+---
+
+## 10. Sécurité des embeds publics
+
+### 31. Restriction de domaine + toggle "chatbot public/privé" — ✅ fait
+
+**Contexte** : couvre exactement la limite notée à l'item 29 ("pas
+d'allowlist de domaines — n'importe quel site connaissant un `chatbotId`
+peut l'embarquer") — développé en parallèle sur une autre machine, avant
+que le widget `widget.js`/`EmbedBubbleWidget` n'existe, donc la protection
+s'applique à `/embed/[chatbotId]` indépendamment du mode (brut ou
+`?widget=1`).
 
 **Ce qui a été fait (2026-09-08)** :
 1. Colonnes `chatbots.is_public` (défaut `true`) et `chatbots.allowed_origins`
@@ -749,7 +750,8 @@ n'existait aucun moyen de désactiver l'accès anonyme à un chatbot.
    `allowed_origins` au chargement de la page — **c'est le vrai mécanisme
    de restriction pour l'iframe**, pas une vérification d'origine sur l'API.
    Raison technique : le JS qui tourne à l'intérieur de `/embed/[chatbotId]`
-   est servi depuis notre propre domaine, donc ses appels `fetch()` vers
+   (que ce soit le mode brut ou le chrome bulle de `EmbedBubbleWidget`) est
+   servi depuis notre propre domaine, donc ses appels `fetch()` vers
    `/api/public-chat` ont toujours `Origin` = notre domaine, jamais celui
    du site tiers qui embarque l'iframe — un Origin-check seul ne peut pas
    voir qui a chargé la page en iframe, seulement qui a appelé l'API.
@@ -761,18 +763,70 @@ n'existait aucun moyen de désactiver l'accès anonyme à un chatbot.
 runtime compatible, pas d'API Node-only importée). Pas encore validé avec
 un vrai embed cross-domain en conditions réelles.
 
+**Reste ouvert** : pas de rôles/permissions différents par domaine
+autorisé (`allowed_origins` est une liste plate, tout domaine listé a le
+même accès) — noté aussi dans `docs/integration.md`.
+
 ---
 
-## 10. Intégrations tierces
+## 11. Mode sans documents
 
-### 24. Branchement sur des plateformes annexes (calendrier, email, etc.)
+### 32. Mode "prompt seul" (chatbot sans document obligatoire) — ✅ fait
+
+**Constat (2026-09-08)** : chaque template par défaut instruit explicitement
+"base-toi STRICTEMENT sur les documents fournis en contexte", et
+`buildSystemPrompt` (`lib/prompts.ts`) ajoutait systématiquement "N'utilise
+aucune connaissance externe à ces extraits. Si la réponse n'y figure pas,
+dis-le clairement." — même sans aucun chunk retrouvé. Résultat : un chatbot
+sans document indexé refusait **toute** question, même une FAQ triviale que
+le propriétaire aurait pu écrire lui-même dans le prompt (cas typique : un
+artisan qui veut un petit chatbot pour son site sans vouloir gérer
+d'upload de documents). Le même besoin a été identifié indépendamment côté
+landing (catalogue, "Assistant sans documents" — item 21bis) : les deux
+sessions convergent sur le même problème.
+
+**Ce qui a été fait** :
+1. Nouvelle colonne `chatbots.use_documents` (booléen, défaut `true` —
+   comportement historique inchangé pour les chatbots existants).
+   Migration `0008_chatbot_no_document_mode.sql`.
+2. `buildSystemPrompt()` accepte un paramètre `useDocuments` : à `false`,
+   retourne le `system_prompt_template` tel quel, sans wrapper "documents
+   comme unique source de vérité" — le prompt devient la seule connaissance
+   du modèle.
+3. `app/api/chat/route.ts` et `app/api/public-chat/route.ts` : si
+   `chatbot.use_documents` est `false`, `rewriteQuery`/`embedText`/
+   `hybridSearch` sont entièrement sautés (gain de latence et de coût en
+   plus du fix fonctionnel — un appel LLM et un aller-retour Elasticsearch
+   en moins par message).
+4. Nouveau template par défaut **"Assistant simple (sans documents)"**
+   (`lib/prompts.ts`) : pas de langage "documents fournis", structure à
+   remplir directement (activité, horaires, contact, FAQ...) — pensé pour
+   être utilisé tel quel avec `use_documents=false`.
+5. UI : case à cocher "Ce chatbot se base sur des documents à uploader"
+   dans `CreateChatbotForm` (à la création) et `SystemPromptEditor` (sur un
+   chatbot existant, page `/dashboard/chatbots/[id]`) — décochée, un
+   avertissement apparaît dans la section Documents pour rappeler que les
+   documents uploadés ne seront pas utilisés tant que le mode est actif.
+
+**Limite connue** : pas de bascule automatique entre les deux modes selon
+le contenu réel (ex. passer en mode RAG dès qu'un premier document est
+indexé) — le choix reste manuel, pas de détection intelligente. Comportement
+jugé prévisible plutôt que "magique" pour l'instant.
+
+---
+
+## 12. Intégrations tierces
+
+### 33. Branchement sur des plateformes annexes (calendrier, email, etc.)
 
 **Idée (2026-09-08)** : au-delà du RAG documentaire, permettre à un chatbot
 d'agir — prendre un rendez-vous (Google Calendar/Cal.com), envoyer un email
 de suivi, créer une entrée dans un CRM léger — plutôt que seulement
-répondre à partir de documents/prompt. Complémentaire au mode "prompt seul"
-(item 23) : un artisan pourrait avoir un chatbot qui répond aux questions
-ET propose de réserver un créneau directement dans la conversation.
+répondre à partir de documents/prompt. Recoupe largement les items 21
+(agent de qualification de leads), 25 (standard téléphone/WhatsApp) et 26
+(agent de veille) du catalogue produit — plusieurs pistes nées séparément
+convergent vers le même besoin : une vraie boucle agentique (tool calling),
+pas juste du RAG.
 
 **Pas chiffré** : gros morceau — implique function calling côté LLM
 (OpenAI supporte les tool calls), la gestion d'OAuth par intégration et par
