@@ -21,7 +21,7 @@ fixe — sert de mémoire centralisée plutôt que de planning strict.
 | 12 | Compte | Changement d'email | Faible (code) | SMTP externe |
 | 13 | Compte | Invitation par email (nouveaux comptes) | Faible (code) | SMTP externe |
 | 14 | Infra | Self-host Supabase (VPS) | Élevé | VPS provisionné |
-| 15 | Qualité | Tests automatisés | Élevé | — |
+| 15 | Qualité | Tests automatisés | Élevé | ✅ Fait (fondations) — 6 modules purs couverts, routes API/DB/services externes encore ouverts |
 | 16 | Qualité | Logs locaux (debug/incident) | Faible | ✅ Fait (voir note) |
 | 17 | Qualité | Suivi d'usage/coût par org | Moyen | Mesure + plan (étiquette) ✅ faits — facturation réelle (Stripe) dépend d'une intégration absente |
 | 18 | Premium | Indexation assistée par IA (doc bruts + URL) | Élevé | 6 (async), entitlement par plan — référencé sur la landing (catalogue, feuille de route) |
@@ -508,10 +508,56 @@ SQL pures) — le switch reste low-effort le jour où un VPS est provisionné.
 
 ## 6. Observabilité / qualité
 
-### 15. Tests automatisés
+### 15. Tests automatisés — ✅ Fait (fondations)
 
-**Problème** : aucun test unitaire ou d'intégration sur le projet à ce
-stade.
+**Problème** : aucun test unitaire ou d'intégration sur le projet, alors
+que la surface construite (ingestion, chat, embed, conversations, usage,
+contrôle d'accès) avait grossi au point que chaque vérification se faisait
+à la main (curl, scripts jetables) — pas de filet contre une régression
+silencieuse en touchant une zone partagée.
+
+**Solution implémentée** : Vitest, **épinglé en 2.1.9** — la 5.x (dernière
+au moment de l'install) exige Node ≥22, incompatible avec le Node 18 du
+projet ; installer la 5.x plantait au runtime (`Cannot find package 'vite'`)
+malgré un `npm install` silencieusement "réussi". `npm test` (une fois) /
+`npm run test:watch` (mode watch). `vitest.config.ts` reprend l'alias
+`@/*` de `tsconfig.json`.
+
+6 modules purs couverts, tous les fichiers de test co-localisés en
+`lib/*.test.ts` :
+- `lib/chunking.ts` — stratégie structurelle (headings) vs phrases, overlap,
+  repli sur section trop grosse.
+- `lib/rateLimit.ts` — fenêtre glissante, reset après expiration, blacklist
+  après 2 fenêtres consécutives, `unknown` jamais blacklisté (horloge
+  simulée via `vi.useFakeTimers`).
+- `lib/embedAccess.ts` — extraction d'origine (Origin puis Referer),
+  allowlist vide = pas de restriction, normalisation d'URL.
+- `lib/crypto.ts` — aller-retour chiffrement/déchiffrement, passthrough du
+  texte legacy en clair, erreurs claires si clé absente/invalide.
+- `lib/prompts.ts` — construction du system prompt (avec/sans documents,
+  contexte vide).
+- `lib/extract.ts` — détection de type de fichier, extraction txt/md/csv/xlsx
+  (mono et multi-feuilles), rejets (CSV vide/malformé, classeur vide).
+
+**Bug trouvé par les tests, corrigé dans la foulée** : `lib/crypto.ts`
+(construit sur l'autre machine) ne reconnaissait pas le chiffrement d'une
+chaîne vide comme du vrai ciphertext (le pattern de détection exigeait au
+moins un caractère dans le segment de données chiffrées) — un message vide
+chiffré se voyait renvoyé tel quel au lieu d'être déchiffré. Edge case
+étroit mais réel, corrigé en une ligne (le segment de données accepte
+maintenant zéro caractère).
+
+**Pas encore couvert** (documenté, pas de fausse promesse de couverture) :
+- `lib/extract.ts` pour `.docx`/`.pdf` — nécessite de vraies fixtures
+  binaires (mammoth/pdf-parse), pas construites ici.
+- Tout ce qui appelle Supabase/Elasticsearch/OpenAI en direct
+  (`lib/conversations.ts`, `lib/elasticsearch.ts`, `lib/openai.ts`,
+  `lib/ingest.ts`, `lib/usage.ts`) — tests unitaires avec mocks possibles,
+  mais la vraie valeur serait des tests d'intégration contre de vrais
+  services (proche de ce que `scripts/smoke-test.mts` fait déjà à la main) —
+  décision à prendre plus tard sur l'effort à y mettre.
+- Aucune route API (`app/api/**/route.ts`) ni composant React testés —
+  hors scope de cette passe "tests unitaires".
 
 ### 16. Logs locaux (debug/incident) — ✅ fait
 

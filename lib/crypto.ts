@@ -31,7 +31,10 @@ function getKey(): Buffer {
 // never matches this shape, so it doubles as a cheap legacy-row detector:
 // rows written before this feature existed stay readable as plaintext
 // instead of throwing, without a data migration.
-const CIPHERTEXT_PATTERN = /^[A-Za-z0-9+/]+=*:[A-Za-z0-9+/]+=*:[A-Za-z0-9+/]+=*$/;
+// Data segment allows zero base64 chars (not `+`) — encrypting an empty
+// string still produces a real iv/authTag pair with empty ciphertext data,
+// and that's a legitimate ciphertext blob, not legacy plaintext to skip.
+const CIPHERTEXT_PATTERN = /^[A-Za-z0-9+/]+=*:[A-Za-z0-9+/]+=*:[A-Za-z0-9+/]*=*$/;
 
 export function encryptText(plaintext: string): string {
   const key = getKey();
