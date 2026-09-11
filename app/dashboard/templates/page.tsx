@@ -7,17 +7,24 @@ import { PROMPT_TEMPLATES } from '@/lib/prompts';
 import CreateTemplateForm from '@/components/CreateTemplateForm';
 import DeleteTemplateButton from '@/components/DeleteTemplateButton';
 import EditTemplateButton from '@/components/EditTemplateButton';
+import { logQueryError } from '@/lib/supabaseResult';
 
 export default async function TemplatesPage() {
   const org = await getCurrentOrg();
   if (!org) notFound();
 
   const supabase = createClient();
-  const { data: customTemplates } = await supabase
+  const { data: templatesData, error: templatesError } = await supabase
     .from('custom_templates')
     .select('id, label, template, created_at')
     .eq('organization_id', org.id)
     .order('created_at', { ascending: false });
+  const customTemplates = logQueryError(
+    'templates_page.templates_failed',
+    { orgId: org.id },
+    templatesData,
+    templatesError
+  );
 
   return (
     <div className="space-y-10">

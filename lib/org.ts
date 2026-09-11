@@ -1,5 +1,6 @@
 import { cookies } from 'next/headers';
 import { createClient } from '@/lib/supabase/server';
+import { logError } from '@/lib/logger';
 import type { OrgPlan } from '@/types/database';
 
 export const ACTIVE_ORG_COOKIE = 'active_org_id';
@@ -32,6 +33,12 @@ export async function getUserOrgs(): Promise<CurrentOrg[]> {
   // (like 0009_organization_plan.sql, adding the `plan` column this query
   // selects) hasn't been applied yet to this database.
   if (error) {
+    // A page that lets this throw uncaught relies on the nearest
+    // error.tsx boundary (see app/dashboard/error.tsx) to show a clean
+    // "réessayer" screen instead of crashing — but that boundary only
+    // gets the redacted digest, not this message, so it has to be logged
+    // here to be debuggable at all.
+    logError('org.get_user_orgs_failed', { userId: user.id, error: error.message });
     throw new Error(`getUserOrgs: ${error.message}`);
   }
 

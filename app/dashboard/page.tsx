@@ -8,6 +8,7 @@ import { Card } from '@/components/ui/Card';
 import { IconBadge, ICONS } from '@/components/icons';
 import { PROMPT_TEMPLATES } from '@/lib/prompts';
 import { getMonthlyMessageCount, PLAN_LABELS, PLAN_LIMITS } from '@/lib/usage';
+import { logQueryError } from '@/lib/supabaseResult';
 import type { DocumentStatus } from '@/types/database';
 
 export default async function DashboardPage() {
@@ -19,7 +20,7 @@ export default async function DashboardPage() {
 
   const supabase = createClient();
 
-  const [{ data: chatbots }, { data: documents }, { data: customTemplates }, messagesThisMonth] =
+  const [chatbotsResult, documentsResult, customTemplatesResult, messagesThisMonth] =
     await Promise.all([
       supabase
         .from('chatbots')
@@ -38,6 +39,24 @@ export default async function DashboardPage() {
         .order('created_at', { ascending: false }),
       getMonthlyMessageCount(supabase, org.id),
     ]);
+  const chatbots = logQueryError(
+    'dashboard_page.chatbots_failed',
+    { orgId: org.id },
+    chatbotsResult.data,
+    chatbotsResult.error
+  );
+  const documents = logQueryError(
+    'dashboard_page.documents_failed',
+    { orgId: org.id },
+    documentsResult.data,
+    documentsResult.error
+  );
+  const customTemplates = logQueryError(
+    'dashboard_page.templates_failed',
+    { orgId: org.id },
+    customTemplatesResult.data,
+    customTemplatesResult.error
+  );
 
   const allDocuments = documents ?? [];
   const recentChatbots = (chatbots ?? []).slice(0, 4);

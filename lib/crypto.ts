@@ -1,4 +1,5 @@
 import { randomBytes, createCipheriv, createDecipheriv } from 'crypto';
+import { logError } from '@/lib/logger';
 
 // Application-level encryption for stored chat messages (roadmap.md item
 // 20-C). Protects `content`/`sources` against anyone with direct DB access
@@ -45,18 +46,33 @@ export function encryptText(plaintext: string): string {
   return `${iv.toString('base64')}:${authTag.toString('base64')}:${encrypted.toString('base64')}`;
 }
 
-/** Decrypts a ciphertext blob produced by encryptText — returns legacy rows
- * (pre-dating this feature) unchanged, see CIPHERTEXT_PATTERN above. */
+export const UNREADABLE_PLACEHOLDER = '[message illisible]';
+
+/**
+ * Decrypts a ciphertext blob produced by encryptText — returns legacy rows
+ * (pre-dating this feature) unchanged, see CIPHERTEXT_PATTERN above.
+ *
+ * Never throws: a message a reader can't decrypt (missing/rotated
+ * CONVERSATION_ENCRYPTION_KEY, corrupted row) must not take down the whole
+ * page it's rendered on — one unreadable message becomes a placeholder,
+ * not a 500 for every conversation on the chatbot. The failure is still
+ * logged so a real key mismatch/corruption doesn't go unnoticed.
+ */
 export function decryptText(payload: string): string {
   if (!CIPHERTEXT_PATTERN.test(payload)) return payload;
 
-  const [ivB64, tagB64, dataB64] = payload.split(':');
-  const key = getKey();
-  const iv = Buffer.from(ivB64, 'base64');
-  const authTag = Buffer.from(tagB64, 'base64');
-  const data = Buffer.from(dataB64, 'base64');
-  const decipher = createDecipheriv(ALGORITHM, key, iv);
-  decipher.setAuthTag(authTag);
-  const decrypted = Buffer.concat([decipher.update(data), decipher.final()]);
-  return decrypted.toString('utf8');
+  try {
+    const [ivB64, tagB64, dataB64] = payload.split(':');
+    const key = getKey();
+    const iv = Buffer.from(ivB64, 'base64');
+    const authTag = Buffer.from(tagB64, 'base64');
+    const data = Buffer.from(dataB64, 'base64');
+    const decipher = createDecipheriv(ALGORITHM, key, iv);
+    decipher.setAuthTag(authTag);
+    const decrypted = Buffer.concat([decipher.update(data), decipher.final()]);
+    return decrypted.toString('utf8');
+  } catch (err) {
+    logError('crypto.decrypt_failed', { error: err instanceof Error ? err.message : String(err) });
+    return UNREADABLE_PLACEHOLDER;
+  }
 }

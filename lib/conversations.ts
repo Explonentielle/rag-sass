@@ -2,6 +2,7 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import type { Database, MessageRole } from '@/types/database';
 import type { ChatTurn } from '@/lib/openai';
 import { encryptText, decryptText } from '@/lib/crypto';
+import { logError } from '@/lib/logger';
 
 export interface StoredMessage {
   role: MessageRole;
@@ -44,6 +45,7 @@ export async function createConversation(
     .single();
 
   if (error || !data) {
+    logError('conversations.create_failed', { chatbotId, userId, visitorId, error: error?.message });
     throw new Error(`Impossible de créer la conversation: ${error?.message}`);
   }
   return data.id;
@@ -63,6 +65,7 @@ export async function listConversations(
 
   const { data, error } = await query.order('updated_at', { ascending: false });
   if (error) {
+    logError('conversations.list_failed', { chatbotId, userId, visitorId, error: error.message });
     throw new Error(`Impossible de lister les conversations: ${error.message}`);
   }
   const conversations = data ?? [];
@@ -83,6 +86,7 @@ export async function listConversations(
     .order('created_at', { ascending: true });
 
   if (msgError) {
+    logError('conversations.list_titles_failed', { chatbotId, error: msgError.message });
     throw new Error(`Impossible de charger les titres de conversation: ${msgError.message}`);
   }
 
@@ -120,6 +124,7 @@ export async function listAllConversationsForChatbot(
     .order('updated_at', { ascending: false });
 
   if (error) {
+    logError('conversations.list_all_failed', { chatbotId, error: error.message });
     throw new Error(`Impossible de lister les conversations: ${error.message}`);
   }
   const conversations = data ?? [];
@@ -136,6 +141,7 @@ export async function listAllConversationsForChatbot(
     .order('created_at', { ascending: true });
 
   if (msgError) {
+    logError('conversations.list_all_titles_failed', { chatbotId, error: msgError.message });
     throw new Error(`Impossible de charger les titres de conversation: ${msgError.message}`);
   }
 
@@ -175,6 +181,7 @@ export async function deleteConversationForChatbot(
     .eq('chatbot_id', chatbotId);
 
   if (error) {
+    logError('conversations.delete_failed', { conversationId, chatbotId, error: error.message });
     throw new Error(`Impossible de supprimer la conversation: ${error.message}`);
   }
 }
@@ -199,6 +206,7 @@ export async function getConversationForIdentity(
 
   const { data, error } = await query.maybeSingle();
   if (error) {
+    logError('conversations.verify_ownership_failed', { conversationId, chatbotId, error: error.message });
     throw new Error(`Impossible de vérifier la conversation: ${error.message}`);
   }
   return data;
@@ -210,10 +218,20 @@ export async function getConversationForIdentity(
  * needed for pre-existing data. */
 function decryptStoredMessage(row: { role: MessageRole; content: string; sources: unknown }): StoredMessage {
   const rawSources = row.sources;
-  const sources =
-    typeof rawSources === 'string'
-      ? (JSON.parse(decryptText(rawSources)) as string[])
-      : ((rawSources as string[] | null) ?? null);
+  let sources: string[] | null;
+  if (typeof rawSources === 'string') {
+    // decryptText never throws (see lib/crypto.ts) — but on a decrypt
+    // failure it returns a placeholder string, which isn't valid JSON.
+    // JSON.parse would throw on that, so this stays defensive too: no
+    // sources rather than crashing the whole conversation over one row.
+    try {
+      sources = JSON.parse(decryptText(rawSources)) as string[];
+    } catch {
+      sources = null;
+    }
+  } else {
+    sources = (rawSources as string[] | null) ?? null;
+  }
   return { role: row.role, content: decryptText(row.content), sources };
 }
 
@@ -228,6 +246,7 @@ export async function loadHistory(
     .order('created_at', { ascending: true });
 
   if (error) {
+    logError('conversations.load_history_failed', { conversationId, error: error.message });
     throw new Error(`Impossible de charger l'historique: ${error.message}`);
   }
   return (data ?? []).map(decryptStoredMessage);
@@ -253,6 +272,7 @@ export async function appendTurn(
   ]);
 
   if (error) {
+    logError('conversations.append_turn_failed', { conversationId, error: error.message });
     throw new Error(`Impossible d'enregistrer les messages: ${error.message}`);
   }
 

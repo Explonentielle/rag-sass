@@ -43,6 +43,8 @@ fixe — sert de mémoire centralisée plutôt que de planning strict.
 | 34 | Pricing | Plan gratuit | Moyen | Item 17 (plan), item 10 (rate limiting déjà en place) |
 | 35 | Pricing | Calcul réel de coût/rentabilité par message | Moyen | Item 17 (comptage déjà fait) — bloqué sur le $/token réel du modèle |
 | 36 | Pricing | Comportement du plan Solo à la limite atteinte | Faible (décision) | Item 17, item 34 (le palier gratuit a le même besoin) |
+| 37 | Qualité | Résilience du déchiffrement (item 20-C) | Faible | ✅ Fait |
+| 38 | Qualité | Aucune page dashboard n'a de gestion d'erreur (try/catch) | Moyen | ✅ Fait |
 
 ---
 
@@ -227,6 +229,26 @@ tout le monde, envisager de le regrouper avec l'item 18 (indexation assistée
 par IA) dans une offre premium payante — les deux ajoutent un coût réel par
 usage (LLM ou reranker), donc la même logique de facturation à l'usage
 s'applique aux deux.
+
+**Décision d'implémentation (2026-09-11)** : première version au LLM déjà
+branché (OpenAI, sortie structurée — même pattern que `rewriteQuery` dans
+`lib/openai.ts`), pas un service de reranking dédié (Cohere Rerank évalué
+et écarté : gratuit seulement en test, interdit en usage commercial selon
+leurs CGU, payant sinon — et ajouter un troisième fournisseur irait à
+l'encontre de la consolidation déjà décidée sur OpenAI seul). Cohere/Voyage
+AI (MongoDB) utilisent le même schéma d'architecture que ce projet
+(embeddings pour la récupération large + reranking en deuxième passe plus
+coûteuse sur un petit pool de candidats) — confirme que l'approche choisie
+est standard dans l'industrie, pas une improvisation.
+
+**À tester plus tard (idée retenue, pas implémentée)** : comparer contre un
+vrai **cross-encoder** dédié en auto-hébergé (ex. `bge-reranker` sur
+HuggingFace, gratuit, pas de fournisseur tiers à ajouter) — un cross-encoder
+encode la question ET le chunk ensemble en une seule passe (contrairement
+aux embeddings, encodés séparément puis comparés après coup), donc en
+théorie plus précis pour juger la pertinence, mais plus coûteux à faire
+tourner par paire. Voir si la différence de qualité/coût par rapport à la
+version LLM justifie de l'auto-héberger.
 
 ### 5. Chunking sémantique — ✅ fait
 
@@ -1103,3 +1125,141 @@ gardent le modèle plat déjà en place avant cet item (`0001_init.sql` :
 `member` peut toujours créer/modifier/supprimer des documents et modifier
 des chatbots, au même titre qu'un `owner`. Choix assumé, pas un oubli —
 à resserrer plus tard si ça pose un problème réel en usage d'équipe.
+
+---
+
+## 10. Résilience et gestion d'erreur
+
+### 37. Résilience du déchiffrement (item 20-C) — ✅ Fait
+
+**Déclencheur (2026-09-11)** : deux machines pointant vers la même base
+Supabase, chacune avec un `CONVERSATION_ENCRYPTION_KEY` différent — un
+message chiffré sur l'une devient illisible depuis l'autre.
+`decryptText` levait une exception dans ce cas, qui remontait jusqu'à
+`app/dashboard/chatbots/[id]/page.tsx` (Server Component, aucun
+`try/catch`) et faisait planter **toute la page** (500) au lieu de juste
+ne pas afficher le message concerné.
+
+**Solution implémentée** : `decryptText` (`lib/crypto.ts`) ne lève plus
+jamais d'exception — toute erreur (clé manquante, mauvaise clé, données
+corrompues) est attrapée, loggée (`crypto.decrypt_failed`), et remplacée
+par `UNREADABLE_PLACEHOLDER` ("[message illisible]"). Corrige aussi un
+effet de bord découvert au passage : `decryptStoredMessage`
+(`lib/conversations.ts`) faisait `JSON.parse(decryptText(...))` sur le
+champ `sources` — un texte de substitution n'est pas du JSON valide, ça
+aurait fait planter à nouveau plus loin. Protégé par son propre
+`try/catch`, repli sur `sources: null`.
+
+**`encryptText` n'a volontairement pas changé** : chiffrer un *nouveau*
+message sans clé valide doit rester bloquant — l'enregistrer en clair par
+défaut (faute de pouvoir le chiffrer) serait pire qu'une erreur visible.
+
+Testé : 59 tests passent (2 nouveaux, dont un qui reproduit exactement le
+scénario deux-clés-différentes). `tsc --noEmit` propre.
+
+### 38. Aucune page dashboard n'a de gestion d'erreur — ✅ Fait
+
+**Trouvé en auditant l'item 37**, pas spécifique au chiffrement : les 8
+pages de `app/dashboard/**/page.tsx` font toutes leurs requêtes Supabase
+directement dans le corps du Server Component, sans aucun `try/catch`.
+En creusant plus précisément : la vraie cause commune n'est pas "il
+manque un try/catch par-ci par-là", c'est que `getCurrentOrg()`
+(`lib/org.ts`), appelée par **les 8 pages sans exception**, lève une
+erreur volontairement en cas d'échec de requête (bon choix documenté dans
+le code : ne jamais confondre "la requête a échoué" avec "l'utilisateur
+n'a aucune organisation", ce qui l'enverrait à tort en onboarding et
+risquerait de lui faire créer une org en double). Même chose pour
+`getMonthlyMessageCount` (`lib/usage.ts`) et toutes les fonctions de
+`lib/conversations.ts`. Ces `throw` sont un choix correct, pas le bug —
+le vrai trou, c'était l'absence de toute limite pour les attraper
+proprement.
+
+**Solution implémentée** : deux couches, pas du `try/catch` répété dans
+chaque page (moins propre, plus dur à maintenir de façon cohérente) :
+
+1. **`app/dashboard/error.tsx`** — la limite d'erreur Next.js (mécanisme
+   natif prévu pour ça) : un seul fichier couvre automatiquement les 8
+   pages du dashboard. Affiche un écran propre ("Une erreur s'est
+   produite" + référence + bouton Réessayer) au lieu de l'écran de crash
+   brut de Next.js. `app/error.tsx` (racine, pour la landing/auth/embed)
+   et `app/global-error.tsx` (dernier recours si le layout racine
+   lui-même plante) complètent la couverture.
+2. **Logs au point d'origine** : aucune des fonctions qui lèvent une
+   erreur (`lib/org.ts`, `lib/usage.ts`, `lib/conversations.ts`) ne
+   loguait quoi que ce soit avant de `throw` — en production, Next.js
+   masque le vrai message d'erreur au client (seul un `digest` illisible
+   est transmis), donc sans log serveur, aucun moyen de savoir ce qui a
+   réellement cassé. Un `logError` ajouté juste avant chaque `throw`
+   (7 emplacements dans `lib/conversations.ts`, 1 dans `lib/org.ts`, 1
+   dans `lib/usage.ts`) — combiné à `error.tsx`, ça donne : la page ne
+   plante jamais pour l'utilisateur, et la vraie cause reste toujours
+   retrouvable dans les logs locaux.
+
+**Extension (2026-09-11)** : les appels Supabase bruts directement dans
+les pages (ex. `documents/page.tsx`) ne levaient jamais d'erreur — en cas
+d'échec ils renvoyaient silencieusement une liste vide plutôt qu'une
+erreur visible, un problème différent du risque de crash (une vraie panne
+se faisait passer pour "0 documents" sans le dire nulle part, pas même
+dans les logs). Corrigé avec `lib/supabaseResult.ts` (`logQueryError`) :
+un petit helper qui logue l'erreur si présente et renvoie `data` tel
+quel — le rendu de la page ne change pas (toujours "liste vide" en cas
+d'échec), mais la panne devient traçable dans les logs locaux au lieu de
+disparaître. Appliqué aux 8 appels Supabase bruts identifiés dans les
+pages du dashboard (`app/dashboard/page.tsx`, `chatbots/page.tsx`,
+`chatbots/[id]/page.tsx`, `chatbots/[id]/chat/page.tsx`,
+`documents/page.tsx`, `templates/page.tsx`).
+
+Point technique : passer le résultat Supabase (`{data, error}`) tel quel
+au helper cassait l'inférence de type générique (le type union discriminé
+de Supabase collapsait `T` en `never`) — corrigé en passant `data` et
+`error` comme deux arguments séparés plutôt qu'un seul objet.
+
+Testé : `tsc --noEmit` propre, 62 tests au vert (3 nouveaux pour
+`logQueryError` lui-même, désormais une fonction pure testée comme le
+reste de `lib/`).
+
+### 39. Analyseur français manquant sur l'index Elasticsearch — ✅ Fait
+
+**Déclencheur (2026-09-11)** : bug rencontré sur un autre projet (même
+stack ES) — la recherche BM25 ne matchait pas "vacances" avec "vacance"
+(singulier/pluriel) ni plus généralement les variantes d'un même mot,
+faute de stemming français sur le champ `content`. Vérifié en direct sur
+l'index local (`curl localhost:9201/documents_chunks/_mapping`) : le
+champ `content` n'avait effectivement aucun analyseur déclaré (analyseur
+`standard` par défaut — tokenisation + minuscule seulement, pas de
+stemming).
+
+**Solution implémentée** : un analyseur `french_content` explicite
+(`lib/elasticsearch.ts`), recette officielle ES déclarée à la main plutôt
+que le nom magique `"french"` intégré, pour que le comportement soit
+visible dans le code :
+- `french_elision` : "l'école" → "école", "d'hiver" → "hiver"...
+- `lowercase`
+- `french_stop` : retire les mots vides français (le, de, et...)
+- `french_stemmer` (variante `light_french`, moins agressive que le
+  Snowball complet qui sur-fusionne des mots différents) : "vacances" et
+  "vacance" stemment tous deux vers `vacanc`.
+
+**Contrainte ES** : impossible de changer l'analyseur d'un champ déjà
+mappé sur un index existant — obligé de créer un nouvel index avec le
+nouveau mapping et réindexer dedans. Pour ne plus jamais revivre ça au
+prochain changement de mapping, `documents_chunks` est passé d'un index
+simple à un **alias** (`CHUNKS_INDEX`) pointant vers un index physique
+versionné (`chunksPhysicalIndexName`, ex. `documents_chunks-000001`) — le
+reste du code (recherche, indexation, suppression) continue de cibler
+`CHUNKS_INDEX` sans rien savoir du changement.
+
+**Migration** : `scripts/migrate-french-analyzer.mts` (usage unique, pas
+partie de l'app) — crée le nouvel index avec le mapping français, `_reindex`
+les documents existants dedans (réanalyse `content` sous le nouvel
+analyseur, copie `embedding` tel quel donc **aucun appel OpenAI
+refait**), vérifie que le compte de documents correspond avant de
+supprimer l'ancien index, puis crée l'alias. Exécuté sur la base locale
+(29 chunks) : migration réussie, compte préservé, mapping vérifié
+(`content` → analyseur `french_content`), et testé en direct via
+`_analyze` : "vacances" et "vacance" produisent bien le même token.
+
+À faire en production le jour du déploiement : relancer ce script une
+fois contre l'index de prod (une seule fois, avant ou juste après le
+déploiement du nouveau code — l'app tolère les deux ordres grâce à
+l'alias).

@@ -2,15 +2,17 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
 import ChatWidget from '@/components/ChatWidget';
+import { logQueryError } from '@/lib/supabaseResult';
 
 export default async function ChatPage({ params }: { params: { id: string } }) {
   const supabase = createClient();
 
-  const { data: chatbot } = await supabase
+  const { data: chatbotData, error: chatbotError } = await supabase
     .from('chatbots')
     .select('id, name')
     .eq('id', params.id)
     .single();
+  const chatbot = logQueryError('chat_page.chatbot_failed', { chatbotId: params.id }, chatbotData, chatbotError);
 
   if (!chatbot) notFound();
 

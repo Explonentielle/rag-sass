@@ -4,6 +4,7 @@ import { getCurrentOrg } from '@/lib/org';
 import CreateChatbotForm from '@/components/CreateChatbotForm';
 import { Card } from '@/components/ui/Card';
 import { IconBadge, ICONS } from '@/components/icons';
+import { logQueryError } from '@/lib/supabaseResult';
 import { notFound } from 'next/navigation';
 
 export default async function ChatbotsPage() {
@@ -11,7 +12,7 @@ export default async function ChatbotsPage() {
   if (!org) notFound();
 
   const supabase = createClient();
-  const [{ data: chatbots }, { data: customTemplates }] = await Promise.all([
+  const [chatbotsResult, customTemplatesResult] = await Promise.all([
     supabase
       .from('chatbots')
       .select('id, name, created_at')
@@ -23,6 +24,18 @@ export default async function ChatbotsPage() {
       .eq('organization_id', org.id)
       .order('created_at', { ascending: false }),
   ]);
+  const chatbots = logQueryError(
+    'chatbots_page.chatbots_failed',
+    { orgId: org.id },
+    chatbotsResult.data,
+    chatbotsResult.error
+  );
+  const customTemplates = logQueryError(
+    'chatbots_page.templates_failed',
+    { orgId: org.id },
+    customTemplatesResult.data,
+    customTemplatesResult.error
+  );
 
   return (
     <div className="space-y-6">

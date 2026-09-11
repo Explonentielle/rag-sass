@@ -1,5 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { Database, OrgPlan } from '@/types/database';
+import { logError } from '@/lib/logger';
 
 /**
  * Message usage measurement (roadmap.md item 17). The landing page quotes
@@ -44,6 +45,9 @@ export async function getMonthlyMessageCount(
     .gte('created_at', startOfCurrentMonthUtc())
     .eq('conversations.chatbots.organization_id', organizationId);
 
-  if (error) throw error;
+  if (error) {
+    logError('usage.get_monthly_message_count_failed', { organizationId, error: error.message });
+    throw error;
+  }
   return count ?? 0;
 }

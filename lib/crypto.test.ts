@@ -1,9 +1,14 @@
 // Tests pour lib/crypto.ts — le chiffrement applicatif des messages de
 // conversation stockés en base (roadmap.md item 20-C).
 
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { randomBytes } from 'node:crypto';
-import { encryptText, decryptText } from './crypto';
+import { encryptText, decryptText, UNREADABLE_PLACEHOLDER } from './crypto';
+
+// decryptText logs (logError) instead of throwing on failure — mock the
+// logger so the test suite doesn't write real files to ./logs, same as
+// rateLimit.test.ts.
+vi.mock('@/lib/logger', () => ({ logError: vi.fn(), logWarn: vi.fn(), logInfo: vi.fn() }));
 
 // On génère une clé factice, jetable, juste pour ce run de tests — ce
 // fichier ne lit et ne touche JAMAIS le vrai .env / la vraie variable
@@ -73,25 +78,43 @@ describe('encryptText / decryptText', () => {
     expect(decryptText(clearlyPlaintext)).toBe(clearlyPlaintext);
   });
 
-  it('known limitation: plaintext that happens to look like 3 base64 segments is misdetected as ciphertext and throws', () => {
+  it('returns the placeholder instead of throwing for plaintext that happens to look like 3 base64 segments', () => {
     // CIPHERTEXT_PATTERN (dans lib/crypto.ts) est une heuristique : il
     // reconnaît un ciphertext à sa FORME (3 segments façon base64 séparés
     // par ":"), pas à un marqueur explicite. Un texte en clair qui, par
     // pur hasard, a exactement cette forme ("mot:mot:mot" en alphabet
-    // base64) sera donc À TORT considéré comme du ciphertext, et
-    // decryptText plantera en essayant de le déchiffrer. En pratique un
-    // vrai message de chat n'a presque aucune chance d'avoir cette forme
-    // précise — on documente juste ce cas limite ici plutôt que de
-    // prétendre qu'il n'existe pas.
+    // base64) sera donc À TORT considéré comme du ciphertext — mais
+    // decryptText ne plante plus dans ce cas (voir les deux tests
+    // suivants : AUCUN appel ne doit faire planter toute une page), il
+    // renvoie le texte de substitution comme pour tout autre échec.
     const coincidentallyShaped = 'pas:du:chiffrement';
-    // `expect(() => ...).toThrow()` : on donne une FONCTION (pas le
-    // résultat direct) car on veut vérifier qu'un appel lève une erreur —
-    // si on appelait decryptText directement ici, l'erreur interromprait
-    // le test avant même d'atteindre l'assertion.
-    expect(() => decryptText(coincidentallyShaped)).toThrow();
+    expect(decryptText(coincidentallyShaped)).toBe(UNREADABLE_PLACEHOLDER);
   });
 
-  it('throws a clear error when the encryption key env var is missing', () => {
+  it('never throws on a decrypt failure — returns a placeholder instead (one bad message must not crash a whole page)', () => {
+    // Cas réel qui a fait planter la page d'un chatbot en production :
+    // deux machines pointant sur la même base Supabase, mais avec des
+    // CONVERSATION_ENCRYPTION_KEY différentes — un message chiffré avec
+    // une clé ne peut pas être déchiffré avec l'autre. decryptText doit
+    // absorber cet échec, pas le laisser remonter et planter toute la page.
+    const ciphertext = encryptText('Message chiffré avec la bonne clé.');
+    process.env[ENV_VAR] = randomBytes(32).toString('base64'); // une autre clé, valide mais différente
+    expect(decryptText(ciphertext)).toBe(UNREADABLE_PLACEHOLDER);
+  });
+
+  it('returns the placeholder instead of throwing when the encryption key env var is missing', () => {
+    // getKey() lève toujours une erreur en interne ("CONVERSATION_ENCRYPTION_KEY
+    // manquante") — mais decryptText l'attrape désormais, comme n'importe
+    // quel autre échec de déchiffrement.
+    const ciphertext = encryptText('Un message.');
+    delete process.env[ENV_VAR];
+    expect(decryptText(ciphertext)).toBe(UNREADABLE_PLACEHOLDER);
+  });
+
+  it('encryptText still throws a clear error when the key env var is missing (encrypting a NEW message must stay blocking)', () => {
+    // Différent de decryptText : chiffrer un nouveau message sans clé doit
+    // rester bloquant — l'enregistrer silencieusement en clair (faute de
+    // pouvoir le chiffrer) serait pire que planter.
     delete process.env[ENV_VAR];
     // Le deuxième argument de `.toThrow(...)` peut être une regex : le
     // test vérifie que le message d'erreur contient bien ce texte, pas

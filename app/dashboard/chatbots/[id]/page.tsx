@@ -10,20 +10,22 @@ import DeleteDocumentButton from '@/components/DeleteDocumentButton';
 import ConversationsPanel from '@/components/ConversationsPanel';
 import EmbedSettingsForm from '@/components/EmbedSettingsForm';
 import { listAllConversationsForChatbot } from '@/lib/conversations';
+import { logQueryError } from '@/lib/supabaseResult';
 import { Icon, IconBadge, ICONS } from '@/components/icons';
 
 export default async function ChatbotPage({ params }: { params: { id: string } }) {
   const supabase = createClient();
 
-  const { data: chatbot } = await supabase
+  const { data: chatbotData, error: chatbotError } = await supabase
     .from('chatbots')
     .select('id, name, system_prompt_template, organization_id, is_public, allowed_origins, use_documents')
     .eq('id', params.id)
     .single();
+  const chatbot = logQueryError('chatbot_page.chatbot_failed', { chatbotId: params.id }, chatbotData, chatbotError);
 
   if (!chatbot) notFound();
 
-  const [{ data: documents }, { data: customTemplates }, conversations] = await Promise.all([
+  const [documentsResult, customTemplatesResult, conversations] = await Promise.all([
     supabase
       .from('documents')
       .select('id, filename, status, error_message, chunk_count, uploaded_at')
@@ -34,8 +36,23 @@ export default async function ChatbotPage({ params }: { params: { id: string } }
       .select('id, label, template')
       .eq('organization_id', chatbot.organization_id)
       .order('created_at', { ascending: false }),
+    // listAllConversationsForChatbot throws (and logs) on failure instead
+    // of returning a {data,error} pair — it goes through app/dashboard/
+    // error.tsx (see roadmap.md item 38), not logQueryError below.
     listAllConversationsForChatbot(supabase, chatbot.id),
   ]);
+  const documents = logQueryError(
+    'chatbot_page.documents_failed',
+    { chatbotId: chatbot.id },
+    documentsResult.data,
+    documentsResult.error
+  );
+  const customTemplates = logQueryError(
+    'chatbot_page.templates_failed',
+    { organizationId: chatbot.organization_id },
+    customTemplatesResult.data,
+    customTemplatesResult.error
+  );
 
   return (
     <div className="space-y-10">

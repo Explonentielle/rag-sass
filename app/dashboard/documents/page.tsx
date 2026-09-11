@@ -5,6 +5,7 @@ import { getCurrentOrg } from '@/lib/org';
 import { DocumentStatusBadge } from '@/components/DocumentStatusBadge';
 import DeleteDocumentButton from '@/components/DeleteDocumentButton';
 import { Card } from '@/components/ui/Card';
+import { logQueryError } from '@/lib/supabaseResult';
 import type { DocumentStatus } from '@/types/database';
 
 export default async function DocumentsPage() {
@@ -12,13 +13,19 @@ export default async function DocumentsPage() {
   if (!org) notFound();
 
   const supabase = createClient();
-  const { data: documents } = await supabase
+  const { data: documentsData, error: documentsError } = await supabase
     .from('documents')
     .select(
       'id, filename, status, error_message, chunk_count, uploaded_at, chatbot_id, chatbots!inner(id, name, organization_id)'
     )
     .eq('chatbots.organization_id', org.id)
     .order('uploaded_at', { ascending: false });
+  const documents = logQueryError(
+    'documents_page.documents_failed',
+    { orgId: org.id },
+    documentsData,
+    documentsError
+  );
 
   const allDocuments = documents ?? [];
 
