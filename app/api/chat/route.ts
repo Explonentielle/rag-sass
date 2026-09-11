@@ -1,5 +1,5 @@
 import { createClient } from '@/lib/supabase/server';
-import { embedText, streamAnswer, rewriteQuery } from '@/lib/openai';
+import { embedText, streamAnswer, rewriteQuery, rerankChunks } from '@/lib/openai';
 import { hybridSearch } from '@/lib/elasticsearch';
 import { buildSystemPrompt } from '@/lib/prompts';
 import { logInfo, logWarn, logError } from '@/lib/logger';
@@ -186,6 +186,7 @@ export async function POST(request: Request) {
             queryText: keywordQuery,
             queryEmbedding,
           });
+          chunks = await rerankChunks(question, chunks);
         }
 
         const sources = Array.from(

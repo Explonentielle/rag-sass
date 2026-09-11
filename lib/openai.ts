@@ -154,3 +154,112 @@ export async function rewriteQuery(question: string): Promise<RewrittenQuery> {
     return fallback;
   }
 }
+
+// ---------------------------------------------------------------------------
+// Reranking (docs/roadmap.md item 4). RRF fusion (BM25 + kNN) ranks purely
+// by retrieval signal, which can surface chunks that are topically close
+// but don't actually answer the question. One extra LLM call after
+// retrieval, judging each candidate chunk's real relevance to the raw
+// question, structured output, same pattern as rewriteQuery above. First
+// version deliberately reuses the already-connected chat LLM instead of a
+// dedicated reranking service/cross-encoder (see roadmap for why). Never
+// blocks the pipeline: any failure falls back to the pre-rerank order,
+// capped to RERANK_MAX_CHUNKS.
+// ---------------------------------------------------------------------------
+
+const RERANK_MAX_CHUNKS = 5;
+
+const RERANK_SYSTEM_PROMPT = `Tu évalues la pertinence d'extraits de documents par rapport à une question, dans le cadre d'un système de question-réponse : les extraits que tu juges pertinents seront transmis tels quels à un autre modèle pour rédiger la réponse finale. Ne garde que ceux qui apportent une information réellement utilisable pour répondre — même partiellement.
+
+On te donne une question et une liste numérotée d'extraits (numérotation à partir de 0). Renvoie les index des extraits pertinents, du plus utile au moins utile pour répondre à la question :
+- Si la question comporte plusieurs volets, garde les extraits utiles à chaque volet, pas seulement au premier.
+- Un extrait qui répond partiellement, ou qui apporte un contexte nécessaire sans répondre entièrement, compte comme pertinent — la pertinence n'exige pas une réponse complète et autonome.
+- Exclus uniquement les extraits réellement hors sujet, qui n'apportent aucune information utilisable pour cette question précise.
+- En cas de doute entre garder et exclure un extrait, garde-le : un extrait de trop est sans conséquence, une information manquante empêche de répondre correctement.
+- Renvoie une liste vide seulement si AUCUN extrait n'apporte quoi que ce soit d'utile.
+- Ne renvoie jamais un index qui n'existe pas dans la liste fournie.`;
+
+export interface RerankableChunk {
+  content: string;
+  document_filename: string;
+}
+
+/**
+ * Reorders (and can drop) retrieval candidates by actual relevance to the
+ * raw question, judged by the chat LLM via structured output. Falls back to
+ * the pre-rerank order, capped to RERANK_MAX_CHUNKS, if the call fails or
+ * returns something unusable — reranking is a quality refinement on top of
+ * retrieval, not something the pipeline should ever be blocked by.
+ */
+export async function rerankChunks<T extends RerankableChunk>(
+  question: string,
+  chunks: T[]
+): Promise<T[]> {
+  if (chunks.length === 0) return chunks;
+
+  const fallback = chunks.slice(0, RERANK_MAX_CHUNKS);
+
+  try {
+    const openai = getOpenAiClient();
+    const numbered = chunks
+      .map((c, i) => `[${i}] (${c.document_filename})\n${c.content}`)
+      .join('\n\n');
+
+    const response = await openai.chat.completions.create({
+      model: DEFAULT_CHAT_MODEL,
+      max_completion_tokens: 300,
+      response_format: {
+        type: 'json_schema',
+        json_schema: {
+          name: 'chunk_rerank',
+          strict: true,
+          schema: {
+            type: 'object',
+            properties: {
+              relevantIndices: { type: 'array', items: { type: 'integer' } },
+            },
+            required: ['relevantIndices'],
+            additionalProperties: false,
+          },
+        },
+      },
+      messages: [
+        { role: 'system', content: RERANK_SYSTEM_PROMPT },
+        { role: 'user', content: `Question : ${question}\n\nExtraits :\n\n${numbered}` },
+      ],
+    });
+
+    const raw = response.choices[0]?.message?.content;
+    if (!raw) throw new Error('Réponse vide');
+
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed.relevantIndices)) {
+      throw new Error('Champ relevantIndices manquant ou invalide');
+    }
+
+    const seen = new Set<number>();
+    const reranked: T[] = [];
+    for (const index of parsed.relevantIndices) {
+      if (
+        typeof index === 'number' &&
+        Number.isInteger(index) &&
+        index >= 0 &&
+        index < chunks.length &&
+        !seen.has(index)
+      ) {
+        seen.add(index);
+        reranked.push(chunks[index]);
+        if (reranked.length >= RERANK_MAX_CHUNKS) break;
+      }
+    }
+
+    return reranked;
+  } catch (err) {
+    logWarn('rerank.failed', {
+      questionLength: question.length,
+      chunkCount: chunks.length,
+      error: err instanceof Error ? err.message : String(err),
+    });
+    return fallback;
+  }
+}

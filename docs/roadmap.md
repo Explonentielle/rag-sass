@@ -214,7 +214,7 @@ message → latence quasi doublée avant même que la réponse commence à
 streamer. À ne construire que si les items 1 et 2, moins coûteux, s'avèrent
 insuffisants une fois mesurés sur de vrais usages.
 
-### 4. Reranking post-récupération
+### 4. Reranking post-récupération — ✅ Fait
 
 **Proposition** : passer les chunks candidats par un reranker (cross-encoder)
 avant de les envoyer au LLM, pour affiner au-delà de ce que la fusion RRF
@@ -249,6 +249,23 @@ aux embeddings, encodés séparément puis comparés après coup), donc en
 théorie plus précis pour juger la pertinence, mais plus coûteux à faire
 tourner par paire. Voir si la différence de qualité/coût par rapport à la
 version LLM justifie de l'auto-héberger.
+
+**Implémenté (2026-09-11)** : `rerankChunks` (`lib/openai.ts`), même
+pattern que `rewriteQuery` — un appel LLM avec sortie structurée
+(`relevantIndices`), numérote les chunks candidats issus de `hybridSearch`
+et demande au modèle lesquels aident réellement à répondre à la question
+brute, du plus au moins pertinent. Branché juste après `hybridSearch` dans
+`app/api/chat/route.ts` et `app/api/public-chat/route.ts` (les deux
+endpoints de chat, authentifié et public). Plafonné à 5 chunks
+(`RERANK_MAX_CHUNKS`) ; peut aussi renvoyer une liste vide si aucun chunk
+n'est jugé pertinent (`buildSystemPrompt` gère déjà ce cas : "Aucun
+document pertinent trouvé"). Ne bloque jamais le pipeline : en cas
+d'échec/réponse inexploitable, repli sur l'ordre RRF d'origine (plafonné à
+5), même logique de tolérance aux pannes que `rewriteQuery`.
+
+Testé : `lib/openai.test.ts` (6 tests — réordonnancement, liste vide,
+index invalides/dupliqués ignorés, repli sur échec API, repli sur sortie
+inexploitable). 68 tests au vert au total, `tsc --noEmit` propre.
 
 ### 5. Chunking sémantique — ✅ fait
 
