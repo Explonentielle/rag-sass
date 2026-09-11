@@ -2,7 +2,72 @@ import { Client } from '@elastic/elasticsearch';
 
 const EMBEDDING_DIMS = 1536;
 
+// CHUNKS_INDEX is an ALIAS, not a raw index name — every query/index/delete
+// call in this file targets it exactly like a plain index name (ES treats
+// the two interchangeably for search/index/delete), but an alias can be
+// repointed to a new physical index later without touching a single line
+// of app code. That's what a mapping/analyzer change needs: ES never lets
+// you alter the analyzer of an already-mapped field on a live index — the
+// only way is to create a new index with the new mapping and reindex into
+// it (see docs/roadmap.md item 39 and scripts/migrate-french-analyzer.mts,
+// the one-time script that did this the first time, going from a plain
+// `documents_chunks` index to this alias scheme).
 export const CHUNKS_INDEX = process.env.ELASTICSEARCH_INDEX || 'documents_chunks';
+
+/** Physical index name behind the CHUNKS_INDEX alias, versioned so a future
+ * mapping change has somewhere new to reindex into. */
+export function chunksPhysicalIndexName(version: number): string {
+  return `${CHUNKS_INDEX}-${String(version).padStart(6, '0')}`;
+}
+
+// French analysis for the `content` field (docs/roadmap.md item 39): the
+// default "standard" analyzer does plain tokenizing + lowercasing only —
+// no stemming, so "vacances" and "vacance" are unrelated tokens to BM25,
+// even though they mean the same thing. Recipe is ES's own documented
+// French analyzer, just declared explicitly (rather than the opaque
+// built-in `"french"` analyzer name) so the behavior is visible here
+// instead of hidden behind a magic string:
+// - french_elision: folds "d'hiver" -> "hiver", "l'école" -> "école", etc.
+// - french_stop: removes common French stopwords ("le", "de", "et"...).
+// - french_stemmer (light_french): folds singular/plural and common
+//   inflections ("vacances"/"vacance" both stem to the same token) — the
+//   "light" variant is less aggressive than the full Snowball stemmer,
+//   which over-stems and merges unrelated words together.
+const CHUNKS_ANALYSIS_SETTINGS = {
+  analysis: {
+    filter: {
+      french_elision: {
+        type: 'elision' as const,
+        articles_case: true,
+        articles: ['l', 'm', 't', 'qu', 'n', 's', 'j', 'd', 'c', 'jusqu', 'quoiqu', 'lorsqu', 'puisqu'],
+      },
+      french_stop: { type: 'stop' as const, stopwords: '_french_' as const },
+      french_stemmer: { type: 'stemmer' as const, language: 'light_french' },
+    },
+    analyzer: {
+      french_content: {
+        type: 'custom' as const,
+        tokenizer: 'standard',
+        filter: ['french_elision', 'lowercase', 'french_stop', 'french_stemmer'],
+      },
+    },
+  },
+};
+
+export const CHUNKS_MAPPING_PROPERTIES = {
+  content: { type: 'text' as const, analyzer: 'french_content' },
+  embedding: {
+    type: 'dense_vector' as const,
+    dims: EMBEDDING_DIMS,
+    index: true,
+    similarity: 'cosine' as const,
+  },
+  organization_id: { type: 'keyword' as const },
+  chatbot_id: { type: 'keyword' as const },
+  document_id: { type: 'keyword' as const },
+  document_filename: { type: 'keyword' as const },
+  chunk_index: { type: 'integer' as const },
+};
 
 let client: Client | null = null;
 
@@ -42,32 +107,22 @@ export interface ChunkDoc {
 }
 
 /**
- * Creates the chunks index with its mapping if it doesn't exist yet.
- * Safe to call on every server start: it's a no-op if the index is present.
+ * Creates the CHUNKS_INDEX alias (pointing at a fresh physical index) if it
+ * doesn't exist yet. Safe to call on every server start: a no-op once the
+ * alias is present. Only handles a from-scratch environment — migrating an
+ * already-existing plain index (no alias) to this scheme is a one-time,
+ * manual step, see scripts/migrate-french-analyzer.mts.
  */
 export async function ensureChunksIndex(): Promise<void> {
   const es = getEsClient();
-  const exists = await es.indices.exists({ index: CHUNKS_INDEX });
-  if (exists) return;
+  const aliasExists = await es.indices.existsAlias({ name: CHUNKS_INDEX });
+  if (aliasExists) return;
 
   await es.indices.create({
-    index: CHUNKS_INDEX,
-    mappings: {
-      properties: {
-        content: { type: 'text' },
-        embedding: {
-          type: 'dense_vector',
-          dims: EMBEDDING_DIMS,
-          index: true,
-          similarity: 'cosine',
-        },
-        organization_id: { type: 'keyword' },
-        chatbot_id: { type: 'keyword' },
-        document_id: { type: 'keyword' },
-        document_filename: { type: 'keyword' },
-        chunk_index: { type: 'integer' },
-      },
-    },
+    index: chunksPhysicalIndexName(1),
+    settings: CHUNKS_ANALYSIS_SETTINGS,
+    mappings: { properties: CHUNKS_MAPPING_PROPERTIES },
+    aliases: { [CHUNKS_INDEX]: {} },
   });
 }
 
