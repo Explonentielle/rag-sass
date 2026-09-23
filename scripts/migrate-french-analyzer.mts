@@ -13,9 +13,17 @@
 // the app; safe to delete after use.
 import { readFileSync } from 'node:fs';
 
-for (const line of readFileSync('.env', 'utf-8').split(/\r?\n/)) {
-  const match = line.match(/^([A-Z_]+)=(.*)$/);
-  if (match) process.env[match[1]] = match[2];
+// The project has no plain `.env` — Next.js convention here is
+// `.env.local` (see .env.example). Tolerate it being absent entirely:
+// local docker-compose ES needs no auth vars, only the ELASTICSEARCH_URL
+// hardcoded below.
+try {
+  for (const line of readFileSync('.env.local', 'utf-8').split(/\r?\n/)) {
+    const match = line.match(/^([A-Z_]+)=(.*)$/);
+    if (match) process.env[match[1]] = match[2];
+  }
+} catch {
+  // No .env.local — fine, proceed with just the hardcoded URL below.
 }
 process.env.ELASTICSEARCH_URL = 'http://localhost:9201';
 

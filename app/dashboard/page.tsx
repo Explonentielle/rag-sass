@@ -7,7 +7,8 @@ import { DocumentStatusBadge } from '@/components/DocumentStatusBadge';
 import { Card } from '@/components/ui/Card';
 import { IconBadge, ICONS } from '@/components/icons';
 import { PROMPT_TEMPLATES } from '@/lib/prompts';
-import { getMonthlyMessageCount, PLAN_LABELS, PLAN_LIMITS } from '@/lib/usage';
+import { getMonthlyMessageCount } from '@/lib/usage';
+import { PLAN_LABELS, PLAN_LIMITS } from '@/lib/plans';
 import { logQueryError } from '@/lib/supabaseResult';
 import type { DocumentStatus } from '@/types/database';
 

@@ -1,28 +1,14 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
-import type { Database, OrgPlan } from '@/types/database';
+import type { Database } from '@/types/database';
 import { logError } from '@/lib/logger';
 
 /**
- * Message usage measurement (roadmap.md item 17). The landing page quotes
- * precise quotas (Solo 300, PME 1 500, Métier "sur devis") — this makes
- * that number real instead of decorative. `organizations.plan` is a label
- * an org admin sets manually (Paramètres > Organisation), not something a
- * payment enforces — there's no billing integration behind it. Treat
- * `PLAN_LIMITS` as informational (dashboard display), not a hard gate:
- * nothing here blocks a message once an org is over its limit.
+ * Message usage measurement (roadmap.md item 17). Server-only (pulls in
+ * lib/logger.ts, which touches the filesystem) — plan constants
+ * (PLAN_LIMITS/PLAN_LABELS) live in lib/plans.ts instead, so a client
+ * component can use them without dragging this module's Node-only
+ * dependency into the browser bundle.
  */
-
-export const PLAN_LIMITS: Record<OrgPlan, number | null> = {
-  solo: 300,
-  pme: 1500,
-  metier: null, // "sur devis" — no fixed quota to compare against
-};
-
-export const PLAN_LABELS: Record<OrgPlan, string> = {
-  solo: 'Solo',
-  pme: 'PME',
-  metier: 'Métier',
-};
 
 function startOfCurrentMonthUtc(): string {
   const now = new Date();

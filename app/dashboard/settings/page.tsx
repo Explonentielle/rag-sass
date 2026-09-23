@@ -6,7 +6,7 @@ import ChangePasswordForm from '@/components/ChangePasswordForm';
 import TeamMembers from '@/components/TeamMembers';
 import DeleteOrgSection from '@/components/DeleteOrgSection';
 import { Badge, Card } from '@/components/ui/Card';
-import { PLAN_LABELS } from '@/lib/usage';
+import { PLAN_LABELS } from '@/lib/plans';
 
 export default async function SettingsPage() {
   const org = await getCurrentOrg();

@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { Button } from '@/components/ui/Button';
 import { Input, Label } from '@/components/ui/Card';
-import { PLAN_LABELS, PLAN_LIMITS } from '@/lib/usage';
+import { PLAN_LABELS, PLAN_LIMITS } from '@/lib/plans';
 import type { OrgPlan } from '@/types/database';
 
 const PLAN_OPTIONS: OrgPlan[] = ['solo', 'pme', 'metier'];
