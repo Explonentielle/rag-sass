@@ -2,7 +2,13 @@
  * Corpus.ai embeddable chat widget loader.
  *
  * Usage (paste once on the host page, anywhere before </body>):
- *   <script src="https://YOUR-CORPUS-DOMAIN/widget.js" data-chatbot-id="YOUR_CHATBOT_ID"></script>
+ *   <script src="https://YOUR-CORPUS-DOMAIN/widget.js" data-chatbot-id="YOUR_CHATBOT_ID" data-primary-color="#ff5a1f"></script>
+ *
+ * data-primary-color (optional): hex color (#rgb/#rrggbb/#rrggbbaa) applied
+ * to the bubble button, the send button and the visitor's message bubbles
+ * inside the embed, so it can match the host site's brand — pseudo white
+ * label, no per-client build/deploy needed. Invalid/missing values fall
+ * back to Corpus.ai's default brand color (see app/embed/[chatbotId]).
  *
  * Creates a floating bubble in the bottom-right corner that opens into a
  * chat panel. The iframe it creates points at /embed/[chatbotId]?widget=1,
@@ -22,9 +28,15 @@
   }
 
   var origin = new URL(script.src, window.location.href).origin;
+  var color = script.getAttribute('data-primary-color');
 
   var iframe = document.createElement('iframe');
-  iframe.src = origin + '/embed/' + encodeURIComponent(chatbotId) + '?widget=1';
+  iframe.src =
+    origin +
+    '/embed/' +
+    encodeURIComponent(chatbotId) +
+    '?widget=1' +
+    (color ? '&color=' + encodeURIComponent(color) : '');
   iframe.title = 'Assistant Corpus.ai';
   iframe.setAttribute('scrolling', 'no');
   iframe.style.position = 'fixed';

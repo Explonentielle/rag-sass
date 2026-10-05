@@ -8,12 +8,25 @@ contrôle il veut sur l'apparence.
 Une seule ligne à coller avant `</body>` :
 
 ```html
-<script src="https://VOTRE-DOMAINE-CORPUS/widget.js" data-chatbot-id="ID_DU_CHATBOT"></script>
+<script
+  src="https://VOTRE-DOMAINE-CORPUS/widget.js"
+  data-chatbot-id="ID_DU_CHATBOT"
+  data-primary-color="#ff5a1f"
+></script>
 ```
 
 Ça affiche une bulle en bas à droite qui s'ouvre sur le chat au clic —
 identique au widget flottant utilisé sur le site de Corpus.ai lui-même,
 mais distribuable sur n'importe quel site externe.
+
+`data-primary-color` (optionnel) : couleur hex (`#rgb`/`#rrggbb`/`#rrggbbaa`)
+appliquée au bouton bulle, au bouton d'envoi et aux bulles de message du
+visiteur — pseudo marque blanche pour matcher la charte du site client, sans
+build ni déploiement dédié. Propagée en `?color=` sur l'URL de l'iframe,
+validée côté `/embed/[chatbotId]` (`app/embed/[chatbotId]/page.tsx`) : toute
+valeur qui n'est pas un hex valide est ignorée et retombe sur la couleur de
+marque par défaut. Fonctionne aussi sur l'option iframe brute ci-dessous en
+ajoutant `?color=#rrggbb` directement à l'URL.
 
 **Comment ça marche** : `public/widget.js` crée une `<iframe>` qui pointe
 vers `/embed/[chatbotId]?widget=1` (chrome bulle+toggle intégré, voir
@@ -92,7 +105,8 @@ session**. Utilisé par le widget flottant interne, `/embed/[chatbotId]` et
 
 ## Idées pour la suite (non fait)
 
-- Personnalisation visuelle du widget embed (couleurs, position) par client
-  — aujourd'hui `widget.js` a une seule apparence, non paramétrable.
+- Personnalisation visuelle plus poussée (position, logo, police) —
+  aujourd'hui seule la couleur d'accent est paramétrable
+  (`data-primary-color`, voir plus haut).
 - Rôles/permissions différents par domaine autorisé (aujourd'hui
   `allowed_origins` est une liste plate, tout domaine listé a le même accès).

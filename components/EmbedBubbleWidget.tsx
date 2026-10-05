@@ -15,7 +15,13 @@ import { Icon, ICONS } from '@/components/icons';
  * ({ source: 'corpus-widget', open: boolean }) and on sizing staying in
  * sync with public/widget.js's CLOSED/OPEN dimensions (72px / 380x580).
  */
-export default function EmbedBubbleWidget({ chatbotId }: { chatbotId: string }) {
+export default function EmbedBubbleWidget({
+  chatbotId,
+  accentColor,
+}: {
+  chatbotId: string;
+  accentColor?: string;
+}) {
   const [open, setOpen] = useState(false);
 
   useEffect(() => {
@@ -41,13 +47,17 @@ export default function EmbedBubbleWidget({ chatbotId }: { chatbotId: string }) 
             apiEndpoint="/api/public-chat"
             placeholder="Posez votre question..."
             className="h-full rounded-xl border border-slate-200 shadow-2xl"
+            accentColor={accentColor}
           />
         </div>
       )}
       <button
         onClick={() => setOpen((v) => !v)}
         aria-label={open ? 'Fermer le chat' : 'Ouvrir le chat'}
-        className="ml-auto flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-full bg-brand-800 text-white shadow-lg transition-transform hover:scale-105"
+        style={accentColor ? { backgroundColor: accentColor } : undefined}
+        className={`ml-auto flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-full text-white shadow-lg transition-transform hover:scale-105 ${
+          accentColor ? '' : 'bg-brand-800'
+        }`}
       >
         <Icon className="h-5 w-5">{open ? ICONS.close : ICONS.chat}</Icon>
       </button>
