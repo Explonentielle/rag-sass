@@ -31,6 +31,7 @@ fixe — sert de mémoire centralisée plutôt que de planning strict.
 | 40 | Ingestion | Traitement de plusieurs fichiers en simultané | Moyen | ✅ Fait |
 | 41 | Chat | Chaîne longue sans espace casse l'affichage dans l'iframe | Faible | ✅ Fait |
 | 42 | Infra | Déploiement VPS (ES sécurisé) + Vercel + migrations | Élevé | ✅ Fait (docs + config) — exécution réelle (VPS/DNS/migrations prod) à faire par l'utilisateur |
+| 43 | Compte | Suppression d'un chatbot | Moyen | ✅ Fait |
 | 21 | Catalogue | Agent de qualification de leads | Élevé | Item 3 (agent) |
 | 22 | Catalogue | Brouillon de réponse email | Moyen | — |
 | 23 | Catalogue | Analyseur de contrats (extraction de clauses) | Moyen | — |
@@ -1361,6 +1362,37 @@ déploiement, rien ne documentait l'application des migrations en prod.
 création effective du VPS, du DNS, et l'exécution réelle des migrations
 sur le projet Supabase de production — ces trois étapes restent à faire
 par l'utilisateur en suivant `docs/deployment.md`.
+
+### 43. Aucun moyen de supprimer un chatbot — ✅ Fait
+
+**Signalé (2026-10-05)** : seules les conversations et les documents
+indexés d'un chatbot pouvaient être supprimés individuellement — pas le
+chatbot lui-même.
+
+**Solution implémentée**, même schéma que la suppression d'organisation
+(item 30) : `DELETE /api/chatbots/[id]` (`app/api/chatbots/[id]/route.ts`)
+nettoie d'abord ce que la cascade DB n'atteint pas (chunks Elasticsearch
+via la nouvelle `deleteChatbotChunks` dans `lib/elasticsearch.ts`, fichiers
+Supabase Storage des documents du chatbot), puis supprime la ligne
+`chatbots` — documents/conversations/messages suivent automatiquement
+(`on delete cascade`, migrations 0001/0004). `custom_templates` sont
+org-level, pas chatbot-level : jamais touchés par cette suppression.
+
+**Autorisation** : repose uniquement sur la policy RLS `chatbots_delete`
+(`is_org_admin`) — contrairement à la suppression d'organisation, pas de
+vérification applicative plus stricte en plus : supprimer un seul chatbot
+est proportionné au niveau admin déjà exigé par la RLS, pas besoin du
+même niveau de prudence que supprimer tout un org.
+
+**UI** : `components/DeleteChatbotSection.tsx`, nouvelle "Zone de danger"
+sur la page du chatbot (`app/dashboard/chatbots/[id]/page.tsx`) — même
+pattern de confirmation que `DeleteOrgSection.tsx` (taper le nom exact du
+chatbot pour confirmer), redirige vers `/dashboard/chatbots` après
+suppression.
+
+Testé : `tsc --noEmit` propre, 68 tests au vert (pas de nouveau test
+dédié — fonction symétrique à `deleteOrganizationChunks`, déjà couverte
+par le même type de vérification manuelle que cette dernière à l'époque).
 
 
 https://cocohop.com/theya   

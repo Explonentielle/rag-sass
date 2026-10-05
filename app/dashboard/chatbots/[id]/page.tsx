@@ -9,6 +9,7 @@ import { DocumentStatusBadge } from '@/components/DocumentStatusBadge';
 import DeleteDocumentButton from '@/components/DeleteDocumentButton';
 import ConversationsPanel from '@/components/ConversationsPanel';
 import EmbedSettingsForm from '@/components/EmbedSettingsForm';
+import DeleteChatbotSection from '@/components/DeleteChatbotSection';
 import { listAllConversationsForChatbot } from '@/lib/conversations';
 import { logQueryError } from '@/lib/supabaseResult';
 import { Icon, IconBadge, ICONS } from '@/components/icons';
@@ -154,6 +155,14 @@ export default async function ChatbotPage({ params }: { params: { id: string } }
           </p>
         </div>
         <ConversationsPanel chatbotId={chatbot.id} initialConversations={conversations} />
+      </section>
+
+      <section className="space-y-3">
+        <h2 className="flex items-center gap-2 font-semibold text-slate-900">
+          <Icon className="h-4 w-4 text-red-600">{ICONS.alert}</Icon>
+          Zone de danger
+        </h2>
+        <DeleteChatbotSection chatbotId={chatbot.id} chatbotName={chatbot.name} />
       </section>
     </div>
   );

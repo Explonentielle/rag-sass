@@ -136,6 +136,18 @@ export async function deleteDocumentChunks(documentId: string): Promise<void> {
   });
 }
 
+/** Deletes every chunk belonging to one chatbot in one query — used when
+ * deleting a chatbot, instead of looping `deleteDocumentChunks` per
+ * document. */
+export async function deleteChatbotChunks(chatbotId: string): Promise<void> {
+  const es = getEsClient();
+  await es.deleteByQuery({
+    index: CHUNKS_INDEX,
+    query: { term: { chatbot_id: chatbotId } },
+    refresh: true,
+  });
+}
+
 /** Deletes every chunk belonging to an organization in one query — used
  * when deleting an org, instead of looping `deleteDocumentChunks` per
  * document. */
