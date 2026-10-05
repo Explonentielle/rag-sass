@@ -28,8 +28,8 @@ fixe — sert de mémoire centralisée plutôt que de planning strict.
 | 19 | Templates | Clarifier dans le front que les templates ne sont pas liés en live aux chatbots | Faible | À activer seulement si ça pose problème en usage réel |
 | 20 | RGPD | Plan d'action : rétention/purge, suppression à la demande, chiffrement, logs | Moyen (plan) | A+B+C+D ✅ faits (migrations 0004-0006 à appliquer) — E/F ✅ brouillon fait (`docs/rgpd-conformite.md`), relecture juridique pro encore à faire |
 | 39 | RAG | Analyseur français manquant sur l'index Elasticsearch | Moyen | ✅ Fait |
-| 40 | Ingestion | Traitement de plusieurs fichiers en simultané | Moyen | Noté, pas implémenté |
-| 41 | Chat | Chaîne longue sans espace casse l'affichage dans l'iframe | Faible | Noté, pas implémenté |
+| 40 | Ingestion | Traitement de plusieurs fichiers en simultané | Moyen | ✅ Fait |
+| 41 | Chat | Chaîne longue sans espace casse l'affichage dans l'iframe | Faible | ✅ Fait |
 | 42 | Infra | Déploiement VPS (ES sécurisé) + Vercel + migrations | Élevé | ✅ Fait (docs + config) — exécution réelle (VPS/DNS/migrations prod) à faire par l'utilisateur |
 | 21 | Catalogue | Agent de qualification de leads | Élevé | Item 3 (agent) |
 | 22 | Catalogue | Brouillon de réponse email | Moyen | — |
@@ -372,21 +372,35 @@ adapté à une synchro en masse, pas à un upload interactif où le client
 attend de pouvoir discuter avec son document tout de suite) plutôt que cet
 endpoint d'upload.
 
-### 40. Traitement de plusieurs fichiers en simultané
+### 40. Traitement de plusieurs fichiers en simultané — ✅ Fait
 
 **Signalé (2026-10-05)** : l'upload ne traite qu'un fichier à la fois —
-lent dès qu'un client a plusieurs documents à charger d'un coup (chaque
-fichier attend que le précédent finisse extraction → chunk → embeddings →
-indexation avant de démarrer).
+lent dès qu'un client a plusieurs documents à charger d'un coup. En
+creusant : le vrai goulot n'était pas le pipeline d'ingestion (déjà
+asynchrone par fichier depuis l'item 6, `waitUntil`) mais l'interface —
+`<input type="file">` sans `multiple`, un seul fichier sélectionnable à la
+fois, obligeant à rouvrir le sélecteur pour chaque document.
 
-**Noté pour plus tard, pas implémenté.** À creuser : l'ingestion est déjà
-asynchrone par fichier (item 6, `waitUntil`) — paralléliser consisterait à
-lancer plusieurs `processDocument` en même temps au lieu de les mettre en
-file, ce qui touche surtout `app/api/documents/upload/route.ts` et
-`DocumentUploader.tsx` (accepter une sélection multiple, afficher une
-progression par fichier). Point d'attention : le rate limit OpenAI
-(embeddings) et le volume de bulk ES si plusieurs fichiers embedent en
-parallèle.
+**Solution implémentée** : `DocumentUploader.tsx` — `multiple` sur
+l'input, tous les fichiers sélectionnés envoyés en parallèle
+(`Promise.allSettled`, pas de file d'attente séquentielle) plutôt qu'un
+à la fois. Chaque upload est indépendant : un échec sur un fichier
+n'affecte pas les autres (erreurs listées individuellement par nom de
+fichier). `router.refresh()` appelé dès que chaque fichier est sauvegardé
+(pas d'attente de la fin du batch entier) pour faire apparaître sa ligne
+dans le tableau au fur et à mesure ; la progression par fichier
+(pending/processing/indexed/error) reste visible via le
+`DocumentStatusBadge` déjà existant dans ce tableau plutôt que dupliquée
+dans le composant d'upload. Aucun changement côté serveur
+(`app/api/documents/upload/route.ts`) : chaque requête traitait déjà un
+seul fichier de façon asynchrone, paralléliser côté client suffit à
+paralléliser le traitement.
+
+**Limite connue acceptée** : aucun plafond de concurrence — uploader 20
+fichiers d'un coup lance 20 appels d'embeddings OpenAI en parallèle. Pas
+de souci pour un usage pilote (quelques fichiers à la fois) ; à revoir
+avec une file à concurrence limitée si des clients uploadent de gros lots
+régulièrement.
 
 ---
 
@@ -527,17 +541,26 @@ par l'utilisateur en testant l'intégration sur un vrai site externe.
 connaissant un `chatbotId` peut l'embarquer aujourd'hui, documenté dans
 `docs/integration.md`.
 
-### 41. Chaîne longue sans espace casse l'affichage dans l'iframe du chat
+### 41. Chaîne longue sans espace casse l'affichage dans l'iframe du chat — ✅ Fait
 
 **Signalé (2026-10-05)** : une adresse email (ou plus généralement une
 chaîne longue sans espace — URL, référence...) affichée dans une bulle du
 chat ne se coupe pas et casse la mise en page de l'iframe (dépasse la
 largeur du panneau au lieu de passer à la ligne).
 
-**Noté pour plus tard, pas implémenté.** Probablement un simple oubli de
-`overflow-wrap`/`word-break` sur le conteneur des messages (CSS, à
-localiser dans le composant de rendu des bulles de chat/`EmbedBubbleWidget`
-ou son CSS module) — pas un problème de contenu ou de rendu Markdown.
+**Cause** : le conteneur de bulle (`ChatWidget.tsx`, partagé par le chat
+authentifié ET l'embed public — `/embed/[chatbotId]` l'importe) avait
+`max-w-[80%]` mais rien qui autorise la coupure d'un mot/token sans espace
+— ni `whitespace-pre-wrap` (messages utilisateur) ni le rendu Markdown
+(réponses, via `ReactMarkdown`) ne forcent la coupure d'une chaîne
+ininterrompue. Un item de flexbox sans `overflow-wrap` tend par défaut à
+s'élargir à la taille de son contenu même avec un `max-width`.
+
+**Solution implémentée** : `break-words` (Tailwind, `overflow-wrap:
+break-word`) ajouté sur le conteneur de bulle lui-même plutôt que sur
+chaque élément de contenu séparément (`<p>`, liens Markdown, `<code>`...)
+— un seul point de correction couvre les deux rôles (`user`/`assistant`)
+et tous les types de contenu rendus dans la bulle.
 
 ---
 

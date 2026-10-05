@@ -440,7 +440,7 @@ export default function ChatWidget({
         {messages.map((m, i) => (
           <div key={i} className={m.role === 'user' ? 'flex justify-end' : 'flex justify-start'}>
             <div
-              className={`max-w-[80%] rounded-lg px-4 py-2.5 text-sm leading-relaxed ${
+              className={`max-w-[80%] break-words rounded-lg px-4 py-2.5 text-sm leading-relaxed ${
                 m.role === 'user' ? 'bg-brand-800 text-white' : 'bg-slate-100 text-slate-900'
               }`}
             >
