@@ -368,6 +368,22 @@ adapté à une synchro en masse, pas à un upload interactif où le client
 attend de pouvoir discuter avec son document tout de suite) plutôt que cet
 endpoint d'upload.
 
+### 40. Traitement de plusieurs fichiers en simultané
+
+**Signalé (2026-10-05)** : l'upload ne traite qu'un fichier à la fois —
+lent dès qu'un client a plusieurs documents à charger d'un coup (chaque
+fichier attend que le précédent finisse extraction → chunk → embeddings →
+indexation avant de démarrer).
+
+**Noté pour plus tard, pas implémenté.** À creuser : l'ingestion est déjà
+asynchrone par fichier (item 6, `waitUntil`) — paralléliser consisterait à
+lancer plusieurs `processDocument` en même temps au lieu de les mettre en
+file, ce qui touche surtout `app/api/documents/upload/route.ts` et
+`DocumentUploader.tsx` (accepter une sélection multiple, afficher une
+progression par fichier). Point d'attention : le rate limit OpenAI
+(embeddings) et le volume de bulk ES si plusieurs fichiers embedent en
+parallèle.
+
 ---
 
 ## 3. Chat
@@ -506,6 +522,18 @@ par l'utilisateur en testant l'intégration sur un vrai site externe.
 **Limite connue** : pas d'allowlist de domaines — n'importe quel site
 connaissant un `chatbotId` peut l'embarquer aujourd'hui, documenté dans
 `docs/integration.md`.
+
+### 41. Chaîne longue sans espace casse l'affichage dans l'iframe du chat
+
+**Signalé (2026-10-05)** : une adresse email (ou plus généralement une
+chaîne longue sans espace — URL, référence...) affichée dans une bulle du
+chat ne se coupe pas et casse la mise en page de l'iframe (dépasse la
+largeur du panneau au lieu de passer à la ligne).
+
+**Noté pour plus tard, pas implémenté.** Probablement un simple oubli de
+`overflow-wrap`/`word-break` sur le conteneur des messages (CSS, à
+localiser dans le composant de rendu des bulles de chat/`EmbedBubbleWidget`
+ou son CSS module) — pas un problème de contenu ou de rendu Markdown.
 
 ---
 
