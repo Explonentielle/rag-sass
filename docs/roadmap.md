@@ -18,12 +18,12 @@ fixe — sert de mémoire centralisée plutôt que de planning strict.
 | 9 | Chat | Historique de conversation persistant | Moyen | ✅ Fait (migration à appliquer) |
 | 10 | Chat | Rate limiting (surtout `/api/public-chat`) | Faible | ✅ Fait |
 | 11 | LLM | Bascule génération vers OpenAI | Faible | ✅ Fait |
-| 12 | Compte | Changement d'email | Faible (code) | SMTP externe |
-| 13 | Compte | Invitation par email (nouveaux comptes) | Faible (code) | SMTP externe |
+| 12 | Compte | Changement d'email | Faible (code) | ✅ Fait (code) — SMTP externe à configurer pour un vrai débit en prod |
+| 13 | Compte | Invitation par email (nouveaux comptes) | Faible (code) | ✅ Fait (code) — SMTP externe à configurer pour un vrai débit en prod |
 | 14 | Infra | Self-host Supabase (VPS) | Élevé | VPS provisionné |
 | 15 | Qualité | Tests automatisés | Élevé | ✅ Fait (fondations) — 6 modules purs couverts, routes API/DB/services externes encore ouverts |
 | 16 | Qualité | Logs locaux (debug/incident) | Faible | ✅ Fait (voir note) |
-| 17 | Qualité | Suivi d'usage/coût par org | Moyen | Mesure + plan (étiquette) ✅ faits — facturation réelle (Stripe) dépend d'une intégration absente |
+| 17 | Qualité | Suivi d'usage/coût par org | Moyen | Mesure + plan (étiquette) ✅ faits — Stripe ✅ terrain préparé (webhook + schéma), compte/produits/Payment Links à créer (hors code, `docs/deployment.md` §4) |
 | 18 | Premium | Indexation assistée par IA (doc bruts + URL) | Élevé | 6 (async), entitlement par plan — référencé sur la landing (catalogue, feuille de route) |
 | 19 | Templates | Clarifier dans le front que les templates ne sont pas liés en live aux chatbots | Faible | À activer seulement si ça pose problème en usage réel |
 | 20 | RGPD | Plan d'action : rétention/purge, suppression à la demande, chiffrement, logs | Moyen (plan) | A+B+C+D ✅ faits (migrations 0004-0006 à appliquer) — E/F ✅ brouillon fait (`docs/rgpd-conformite.md`), relecture juridique pro encore à faire |
@@ -584,14 +584,42 @@ Décision business (simplicité de facturation) plutôt que technique.
 
 ## 5. Compte / multi-tenant
 
-### 12. Changement d'email · 13. Invitation par email (nouveaux comptes)
+### 12. Changement d'email · 13. Invitation par email (nouveaux comptes) — ✅ Fait
 
 **Problème commun** : bloqués par le quota d'envoi d'email de Supabase en
-free tier (2 emails/heure).
+free tier (2 emails/heure) — code applicatif simple une fois un SMTP
+externe branché sur Supabase Auth (ex. Resend, voir `docs/deployment.md`
+section 3 pour la config, hors code — Supabase Auth envoie ces emails
+lui-même, notre code ne fait qu'appeler son API).
 
-**Proposition** : brancher un fournisseur SMTP externe (ex. Resend) sur
-Supabase Auth. Une fois ça fait, le code applicatif des deux features est
-simple (peu d'effort une fois le SMTP en place).
+**Solution implémentée** :
+- **13 — Invitation** : `app/api/organizations/[id]/members/route.ts`
+  (POST) — si aucun compte n'existe pour l'email donné, appelle
+  `admin.auth.admin.inviteUserByEmail` (au lieu de renvoyer une 404 comme
+  avant) : crée le compte et envoie l'email d'invitation, puis insère
+  directement la ligne `users_organizations` (le membre est prêt dès
+  qu'il accepte). `TeamMembers.tsx` distingue "Membre ajouté" (compte déjà
+  existant) de "Invitation envoyée par email" (nouveau compte).
+- **Flux d'acceptation** : un compte invité n'a pas encore de mot de
+  passe — seulement cette session unique issue du lien d'invitation. Sans
+  rien de plus, la personne atterrirait dans le dashboard sans jamais
+  pouvoir se reconnecter ensuite. `app/auth/callback/route.ts` détecte
+  `type=invite` dans l'URL de redirection Supabase et renvoie vers la
+  nouvelle page `app/(auth)/set-password/page.tsx` (au lieu du dashboard
+  directement) pour choisir un mot de passe avant de continuer.
+- **12 — Changement d'email** : `components/ChangeEmailForm.tsx` (nouveau,
+  même pattern que `ChangePasswordForm.tsx`), intégré dans Paramètres →
+  Compte. Appelle `supabase.auth.updateUser({ email })` — Supabase envoie
+  une confirmation à la nouvelle adresse (le changement ne prend effet
+  qu'après le clic, comportement par défaut "Secure email change").
+
+**Limite connue** : sans SMTP configuré, ces deux features restent
+utilisables mais butent sur le quota free tier de Supabase — fonctionnel
+pour tester seul, pas pour un vrai pilote avec plusieurs invitations.
+
+Testé : `tsc --noEmit` propre, 68 tests au vert (pas de nouveau test —
+logique dépendante de l'API Auth de Supabase, déjà non testée côté
+`ChangePasswordForm`/`TeamMembers` existants, même catégorie).
 
 ### 14. Self-host Supabase (VPS)
 
@@ -697,11 +725,40 @@ bloqué** : c'est un affichage informatif, pas un garde-fou technique. Le
 plan n'est relié à aucun paiement réel — n'importe quel admin peut se
 mettre "Métier" sans que rien ne se passe derrière.
 
-**Vraie facturation — pas fait** : nécessite une intégration Stripe (ou
-équivalent) qui rendrait `organizations.plan` réellement contraignant
-(paiement récurrent, upgrade/downgrade, blocage ou surfacturation en cas de
-dépassement) plutôt qu'une étiquette libre. Prématuré tant que la landing
-reste en phase pilote.
+**Vraie facturation — ✅ terrain préparé (2026-10-05), intégration réelle pas
+encore branchée.** Décision explicite : préparer l'infra (schéma +
+webhook) sans créer de session de paiement dans l'app — les plans se
+vendent via des **Stripe Payment Links** (dashboard Stripe, aucun code),
+le webhook se contente de garder `organizations.plan` synchronisé avec ce
+qui se passe côté Stripe quelle que soit la façon dont l'abonnement a été
+créé.
+
+- Migration `0011_organization_billing.sql` : `organizations.stripe_customer_id`
+  / `stripe_subscription_id` / `stripe_subscription_status`.
+- `lib/stripe.ts` : client Stripe paresseux (même pattern que
+  `getEsClient`/`getOpenAiClient`) + `planForPriceId`, mapping price→plan
+  piloté par env vars (`STRIPE_PRICE_SOLO`/`_PME`/`_METIER`) plutôt que
+  codé en dur — créer les produits/prix dans Stripe suffira, pas besoin de
+  retoucher le code.
+- `app/api/webhooks/stripe/route.ts` : vérifie la signature
+  (`STRIPE_WEBHOOK_SECRET`), gère `checkout.session.completed` (lit
+  `client_reference_id` sur la session — c'est comme ça qu'on sait quel
+  org vient de payer, via un paramètre ajouté à la main sur l'URL du
+  Payment Link donné à chaque client, sans session de paiement créée par
+  notre code), `customer.subscription.updated` (renouvellement,
+  changement de palier) et `customer.subscription.deleted` (repli sur le
+  plan `solo`, pas de palier gratuit encore — item 34).
+
+**Reste à faire, hors code** : créer le compte Stripe, les
+produits/prix, les Payment Links, et le webhook endpoint côté Stripe —
+voir `docs/deployment.md` section 4 pour le détail pas à pas. Rien de
+tout ça n'est bloquant pour facturer 2-3 clients pilotes à la main en
+attendant.
+
+Testé : `tsc --noEmit` propre, 71 tests au vert (3 nouveaux pour
+`planForPriceId` — dont un qui a trouvé un vrai bug avant de pousser :
+un price_id vide matchait à tort le premier plan dont la variable d'env
+n'était pas encore configurée, corrigé).
 
 **Coût réel (pas chiffré)** : le modèle de chat (`gpt-5.6-luna`, configurable
 via `OPENAI_CHAT_MODEL`) est trop récent pour qu'une estimation $/token

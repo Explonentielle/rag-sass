@@ -71,8 +71,9 @@ export default function TeamMembers({
       return;
     }
 
+    const body = await res.json().catch(() => ({}));
     setEmail('');
-    setSuccess('Membre ajouté.');
+    setSuccess(body.invited ? 'Invitation envoyée par email.' : 'Membre ajouté.');
     loadMembers();
   }
 
@@ -205,8 +206,8 @@ export default function TeamMembers({
       )}
       {canManage && (
         <p className="px-6 py-3 text-xs text-slate-400">
-          Fonctionne uniquement pour une personne ayant déjà un compte Corpus.ai (aucun email
-          d'invitation n'est envoyé pour l'instant).
+          Si la personne a déjà un compte Corpus.ai, elle est ajoutée immédiatement. Sinon, un
+          email d'invitation lui est envoyé pour créer son compte.
         </p>
       )}
     </Card>

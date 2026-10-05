@@ -4,8 +4,11 @@ Objectif : passer de "tourne en local sur ma machine" à "accessible
 publiquement, testable par de vrais utilisateurs". Voir `docs/architecture.md`
 pour la topologie complète.
 
-Trois briques à déployer, dans cet ordre (chacune dépend de la précédente) :
-**VPS (Elasticsearch)** → **Supabase (migrations)** → **Vercel (l'app)**.
+Briques à déployer, dans cet ordre (chacune dépend de la précédente) :
+**VPS (Elasticsearch)** → **Supabase (migrations + SMTP)** → **Stripe (optionnel)** → **Vercel (l'app)**.
+Le SMTP (étape 3) n'est nécessaire que pour les invitations d'équipe /
+changement d'email, et Stripe (étape 4) que pour la facturation
+automatique — sans ça, passe directement à l'étape 5 (Vercel).
 
 ---
 
@@ -93,7 +96,74 @@ voir le README pour le détail.
 
 ---
 
-## 3. Vercel — déployer l'app
+## 3. Supabase — SMTP (invitations d'équipe, changement d'email)
+
+Sans ça : les emails d'invitation (item 13) et de confirmation de
+changement d'email (item 12) passent par l'expéditeur intégré de
+Supabase, limité à quelques emails/heure sur le plan gratuit — suffisant
+pour tester, pas pour un vrai pilote.
+
+**Important** : ce n'est **pas** notre code applicatif qui envoie ces
+emails — c'est Supabase Auth lui-même (`supabase.auth.admin.inviteUserByEmail`,
+`supabase.auth.updateUser({ email })` dans le code appellent l'API Auth de
+Supabase, qui envoie l'email de son côté). La configuration se fait donc
+entièrement dans le **dashboard Supabase**, pas dans les variables
+d'environnement Vercel.
+
+**Avec Resend** : leur API REST (le SDK `resend` npm) ne convient pas
+ici — Supabase Auth ne sait parler que SMTP pour son expéditeur
+personnalisé, pas appeler une API tierce. Resend fournit justement un
+**relai SMTP** pour ce genre de cas (`smtp.resend.com`) :
+
+1. Créer un compte Resend, vérifier un domaine d'envoi (DNS).
+2. Récupérer une clé API Resend (sert de mot de passe SMTP).
+3. Dans **Supabase Dashboard → Project Settings → Auth → SMTP Settings** :
+   - Host : `smtp.resend.com`
+   - Port : `465` (SSL) ou `587` (STARTTLS)
+   - Username : `resend`
+   - Password : la clé API Resend
+   - Sender email : une adresse du domaine vérifié (ex. `no-reply@corpus-ai.fr`)
+4. Tester : inviter un membre depuis **Paramètres → Membres** dans l'app, vérifier que l'email arrive.
+
+Aucun changement de code nécessaire une fois ça configuré.
+
+---
+
+## 4. Stripe — facturation (optionnel pour un pilote facturé à la main)
+
+Groundwork seulement (docs/roadmap.md item 17) : l'app ne crée aucune
+session de paiement elle-même — le webhook (`app/api/webhooks/stripe/route.ts`)
+se contente de garder `organizations.plan` synchronisé avec ce qui se
+passe côté Stripe, quelle que soit la façon dont l'abonnement a été créé.
+Pas bloquant pour 2-3 clients pilotes facturés manuellement — à faire
+avant d'ouvrir plus largement.
+
+1. Créer un compte Stripe (mode test d'abord), un produit par plan
+   (Solo/PME/Métier) avec un prix récurrent chacun.
+2. Pour chaque prix, créer un **Payment Link** (Stripe Dashboard →
+   Payment Links, aucun code requis) — c'est le lien à donner au client
+   pour payer. **Important** : en partageant le lien avec un client
+   précis, ajouter `?client_reference_id=<organization_id>` à l'URL (l'id
+   de son organisation, visible dans l'URL du dashboard Corpus.ai) — c'est
+   ce qui permet au webhook de savoir quel org vient de payer, sans aucun
+   code de notre côté.
+3. Récupérer les ids de prix (`price_...`, pas les ids de produit
+   `prod_...`) et les mettre dans les variables d'environnement Vercel :
+   `STRIPE_PRICE_SOLO`, `STRIPE_PRICE_PME`, `STRIPE_PRICE_METIER`.
+4. Récupérer la clé secrète (Dashboard → Developers → API keys) →
+   `STRIPE_SECRET_KEY`.
+5. Créer le webhook (Dashboard → Developers → Webhooks → Add endpoint) :
+   URL `https://TON-DOMAINE-VERCEL/api/webhooks/stripe`, événements à
+   écouter : `checkout.session.completed`, `customer.subscription.updated`,
+   `customer.subscription.deleted`. Récupérer le "Signing secret" généré →
+   `STRIPE_WEBHOOK_SECRET`.
+6. Tester : payer via un Payment Link avec une carte de test Stripe
+   (`4242 4242 4242 4242`), vérifier dans Supabase que l'organisation a
+   bien `plan` et `stripe_customer_id` mis à jour.
+
+---
+
+## 5. Vercel — déployer l'app
 
 1. Importer le repo GitHub dans Vercel (Next.js détecté automatiquement,
    aucune config `vercel.json` nécessaire).
@@ -113,13 +183,16 @@ voir le README pour le détail.
 | `OPENAI_CHAT_MODEL` | `gpt-5.6-luna` (défaut, ou un modèle plus cher si besoin de qualité) |
 | `CONVERSATION_ENCRYPTION_KEY` | `openssl rand -base64 32` — **si plusieurs environnements partagent la même base Supabase, cette clé doit être strictement identique partout**, sinon les messages chiffrés sur l'un deviennent illisibles depuis l'autre |
 | `NEXT_PUBLIC_SUPPORT_CHATBOT_ID` | Optionnel — voir `docs/integration.md` |
+| `STRIPE_SECRET_KEY` | Optionnel (étape 4) — Stripe Dashboard → Developers → API keys |
+| `STRIPE_WEBHOOK_SECRET` | Optionnel (étape 4) — généré à la création du webhook |
+| `STRIPE_PRICE_SOLO` / `_PME` / `_METIER` | Optionnel (étape 4) — ids `price_...` de chaque plan |
 
 3. Déployer. Vercel gère `waitUntil`/`maxDuration` (déjà configurés dans
    le code pour l'ingestion async et le streaming de chat) nativement.
 
 ---
 
-## 4. Vérification post-déploiement
+## 6. Vérification post-déploiement
 
 1. Créer un compte, une organisation, un chatbot.
 2. Uploader un document, vérifier qu'il passe `pending` → `indexed`.
@@ -132,7 +205,7 @@ voir le README pour le détail.
    # doit montrer "content": { "analyzer": "french_content" }
    ```
 
-## 5. Avant d'onboarder un vrai client externe (pas juste toi en test)
+## 7. Avant d'onboarder un vrai client externe (pas juste toi en test)
 
 Voir `docs/rgpd-conformite.md` — mention à afficher aux visiteurs du
 widget + gabarit de DPA à faire signer. Pas strictement bloquant pour

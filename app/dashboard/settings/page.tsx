@@ -3,6 +3,7 @@ import { createClient } from '@/lib/supabase/server';
 import { getCurrentOrg } from '@/lib/org';
 import OrgSettingsForm from '@/components/OrgSettingsForm';
 import ChangePasswordForm from '@/components/ChangePasswordForm';
+import ChangeEmailForm from '@/components/ChangeEmailForm';
 import TeamMembers from '@/components/TeamMembers';
 import DeleteOrgSection from '@/components/DeleteOrgSection';
 import { Badge, Card } from '@/components/ui/Card';
@@ -72,6 +73,11 @@ export default async function SettingsPage() {
             <Badge tone="blue">{roleLabels[org.role]}</Badge>
           </div>
         </Card>
+      </section>
+
+      <section className="space-y-3">
+        <h2 className="font-semibold text-slate-900">Email</h2>
+        <Card className="p-6">{user?.email && <ChangeEmailForm currentEmail={user.email} />}</Card>
       </section>
 
       <section className="space-y-3">
