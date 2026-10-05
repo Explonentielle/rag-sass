@@ -1,0 +1,71 @@
+# Elasticsearch de PRODUCTION pour un VPS, à l'opposé de docker-compose.yml
+# (dev local, sécurité désactivée). Deux différences volontaires :
+#   1. xpack.security.enabled=true — authentification requise.
+#   2. Elasticsearch n'est PAS exposé directement sur Internet : seul Caddy
+#      l'est (ports 80/443), et sert de terminaison TLS. Le trajet
+#      Caddy -> Elasticsearch reste en HTTP simple, mais sur le réseau
+#      Docker interne uniquement (jamais exposé à l'extérieur du VPS) — pas
+#      besoin de certificats TLS côté Elasticsearch lui-même.
+#
+# Usage (voir docs/deployment.md pour le détail complet) :
+#   1. Copier .env.prod.example -> .env.prod, remplir ELASTIC_PASSWORD et
+#      ES_DOMAIN (le sous-domaine DNS pointant vers l'IP de ce VPS).
+#   2. docker compose -f docker-compose.prod.yml --env-file .env.prod up -d
+#   3. Dans les variables d'env Vercel : ELASTICSEARCH_URL=https://<ES_DOMAIN>,
+#      ELASTICSEARCH_USERNAME=elastic, ELASTICSEARCH_PASSWORD=<ELASTIC_PASSWORD>.
+services:
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.15.2
+    container_name: rag-saas-es-prod
+    restart: unless-stopped
+    environment:
+      - discovery.type=single-node
+      - xpack.security.enabled=true
+      - xpack.security.http.ssl.enabled=false
+      - ELASTIC_PASSWORD=${ELASTIC_PASSWORD}
+      - "ES_JAVA_OPTS=-Xms1g -Xmx1g"
+      - bootstrap.memory_lock=true
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+    # Pas de port publié vers l'hôte : seul Caddy (même réseau Docker) y
+    # accède, via le nom de service `elasticsearch` sur le port interne 9200.
+    expose:
+      - "9200"
+    volumes:
+      - esdata_prod:/usr/share/elasticsearch/data
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "curl -sf -u elastic:${ELASTIC_PASSWORD} http://localhost:9200/_cluster/health || exit 1",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  caddy:
+    image: caddy:2-alpine
+    container_name: rag-saas-caddy
+    restart: unless-stopped
+    depends_on:
+      elasticsearch:
+        condition: service_healthy
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      - ES_DOMAIN=${ES_DOMAIN}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+
+volumes:
+  esdata_prod:
+    driver: local
+  caddy_data:
+    driver: local
+  caddy_config:
+    driver: local

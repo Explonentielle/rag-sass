@@ -10,7 +10,7 @@ fixe — sert de mémoire centralisée plutôt que de planning strict.
 | 1 | RAG | Seuil de score dynamique (remplace `topK` fixe) | Faible | ✅ Fait |
 | 2 | RAG | Reformulation de requête (query rewriting) | Moyen | ✅ Fait |
 | 3 | RAG | Agent unique topK + reformulation | Moyen | 1, 2 (fallback si insuffisants) |
-| 4 | RAG | Reranking post-récupération | Moyen | Piste : à regrouper avec 18 en offre premium |
+| 4 | RAG | Reranking post-récupération | Moyen | ✅ Fait (LLM, voir `lib/openai.ts` `rerankChunks`) |
 | 5 | RAG | Chunking sémantique (par section) | Moyen | ✅ Fait |
 | 6 | Ingestion | Traitement asynchrone (queue) | Élevé | ✅ Fait (version légère) |
 | 7 | Ingestion | OCR pour PDF scannés | Élevé | — |
@@ -26,7 +26,11 @@ fixe — sert de mémoire centralisée plutôt que de planning strict.
 | 17 | Qualité | Suivi d'usage/coût par org | Moyen | Mesure + plan (étiquette) ✅ faits — facturation réelle (Stripe) dépend d'une intégration absente |
 | 18 | Premium | Indexation assistée par IA (doc bruts + URL) | Élevé | 6 (async), entitlement par plan — référencé sur la landing (catalogue, feuille de route) |
 | 19 | Templates | Clarifier dans le front que les templates ne sont pas liés en live aux chatbots | Faible | À activer seulement si ça pose problème en usage réel |
-| 20 | RGPD | Plan d'action : rétention/purge, suppression à la demande, chiffrement, logs | Moyen (plan) | A+B+C+D ✅ faits (migrations 0004-0006 à appliquer) — E/F ouverts |
+| 20 | RGPD | Plan d'action : rétention/purge, suppression à la demande, chiffrement, logs | Moyen (plan) | A+B+C+D ✅ faits (migrations 0004-0006 à appliquer) — E/F ✅ brouillon fait (`docs/rgpd-conformite.md`), relecture juridique pro encore à faire |
+| 39 | RAG | Analyseur français manquant sur l'index Elasticsearch | Moyen | ✅ Fait |
+| 40 | Ingestion | Traitement de plusieurs fichiers en simultané | Moyen | Noté, pas implémenté |
+| 41 | Chat | Chaîne longue sans espace casse l'affichage dans l'iframe | Faible | Noté, pas implémenté |
+| 42 | Infra | Déploiement VPS (ES sécurisé) + Vercel + migrations | Élevé | ✅ Fait (docs + config) — exécution réelle (VPS/DNS/migrations prod) à faire par l'utilisateur |
 | 21 | Catalogue | Agent de qualification de leads | Élevé | Item 3 (agent) |
 | 22 | Catalogue | Brouillon de réponse email | Moyen | — |
 | 23 | Catalogue | Analyseur de contrats (extraction de clauses) | Moyen | — |
@@ -775,24 +779,20 @@ alternative au retrait du contenu, mais retirer le contenu couvre déjà le
 risque principal (fuite de messages personnels). La rotation/purge des
 fichiers reste une amélioration possible, pas urgente maintenant.
 
-**E. Sous-traitants tiers à documenter** — hors code.
-Vérifier/documenter la région d'hébergement du projet Supabase (UE vs US),
-les conditions de traitement de l'API OpenAI (pas d'entraînement sur les
-données API par défaut, mais transfert hors UE à noter), Elasticsearch
-restant sous contrôle direct tant qu'il tourne en Docker sur l'infra
-propre.
-
-**F. Documentation** — hors code.
-Registre de traitement minimal (quoi, pourquoi, combien de temps, qui a
-accès), modèle de mention à afficher aux visiteurs du widget public
-(fourni par Corpus.ai, affiché par le client), modèle de DPA à faire
-signer par chaque client pilote (Corpus.ai = sous-traitant, le client =
-responsable de traitement).
+**E. Sous-traitants tiers à documenter** — ✅ brouillon fait (2026-10-05).
+**F. Documentation** — ✅ brouillon fait (2026-10-05).
+`docs/rgpd-conformite.md` : tableau des sous-traitants (Supabase, OpenAI,
+Elasticsearch, Vercel) avec région à vérifier/choisir, registre de
+traitement minimal, gabarit de mention pour les visiteurs du widget, et
+squelette de DPA client. **Pas un avis juridique** — à faire relire par un
+professionnel du droit avant tout usage avec un vrai client payant, mais
+débloque le pilote en attendant.
 
 **Ordre proposé** : A + D d'abord (rien n'est conforme sans ça, effort
 faible chacun) — ✅ fait le 2026-09-08, migration 0006 à appliquer. Puis B,
-puis C en renforcement (encore ouverts). E/F en parallèle, hors code, avant
-de signer un premier vrai client pilote (toujours ouverts).
+puis C en renforcement — tous ✅ faits. E/F : brouillon ✅ fait, relecture
+juridique professionnelle encore à faire avant signature d'un vrai client
+payant.
 
 ---
 
@@ -1308,3 +1308,36 @@ supprimer l'ancien index, puis crée l'alias. Exécuté sur la base locale
 fois contre l'index de prod (une seule fois, avant ou juste après le
 déploiement du nouveau code — l'app tolère les deux ordres grâce à
 l'alias).
+
+### 42. Infrastructure de déploiement (VPS + Vercel) — ✅ Fait
+
+**Déclencheur (2026-10-05)** : aucune infra de production n'existait —
+`docker-compose.yml` (sécurité désactivée) est dev-only, pas de doc de
+déploiement, rien ne documentait l'application des migrations en prod.
+
+**Solution implémentée** :
+- `docker-compose.prod.yml` + `Caddyfile` + `.env.prod.example` : Elasticsearch
+  avec authentification activée (`xpack.security.enabled=true`), exposé
+  uniquement via Caddy en reverse-proxy (TLS automatique Let's Encrypt) —
+  Elasticsearch lui-même n'est jamais exposé directement sur Internet.
+- `docs/deployment.md` : guide pas à pas (VPS → Supabase → Vercel), avec
+  une checklist migration par migration — aucune des 10 migrations SQL
+  n'a de garde anti-double-exécution automatique, mais la plupart sont
+  écrites de façon idempotente (`if not exists`/`if exists`) ; documenté
+  comment reconnaître sans risque qu'une migration est déjà appliquée
+  (erreur `policy already exists` sur 0001-0004 = déjà en place, aucun
+  effet si rejouée pour 0005-0010).
+- `docs/architecture.md` : schémas Mermaid (composants, flux d'ingestion,
+  flux de chat/retrieval, isolation multi-tenant) — vue d'ensemble pour
+  onboarder quelqu'un de nouveau sur le projet sans relire tout le code.
+- `docs/rgpd-conformite.md` : brouillon des items 20-E/F (sous-traitants,
+  registre de traitement, mention visiteur widget, gabarit DPA) — voir
+  item 20.
+
+**Pas fait par moi** (nécessite un accès dont je ne dispose pas) : la
+création effective du VPS, du DNS, et l'exécution réelle des migrations
+sur le projet Supabase de production — ces trois étapes restent à faire
+par l'utilisateur en suivant `docs/deployment.md`.
+
+
+https://cocohop.com/theya   

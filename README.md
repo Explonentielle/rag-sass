@@ -103,6 +103,14 @@ Rien à changer dans le code : renseigne `ELASTICSEARCH_URL` (et `ELASTICSEARCH_
 
 Note sur la RRF : l'API `retriever.rrf` native d'Elasticsearch nécessite une licence **Platinum** (vérifié en local, erreur `security_exception: current license is non-compliant for RRF` sous licence Basic). Comme la cible est un cluster potentiellement auto-hébergé en Basic, `hybridSearch()` (`lib/elasticsearch.ts`) fait deux requêtes séparées (BM25 sur `content`, kNN sur `embedding`) et fusionne les résultats en JS avec la même formule RRF qu'Elasticsearch utilise en interne (`score = Σ 1 / (60 + rang)`). Fonctionne sous licence Basic, testé en local. Si le cluster cible dispose d'une licence Platinum, on pourrait basculer sur `retriever.rrf` natif pour économiser un aller-retour réseau, pas nécessaire pour le MVP.
 
+## Documentation complémentaire
+
+- `docs/architecture.md` : schémas (composants, flux d'ingestion et de chat, bases de données).
+- `docs/deployment.md` : guide de mise en prod (VPS Elasticsearch, migrations Supabase, Vercel).
+- `docs/rgpd-conformite.md` : sous-traitants, registre de traitement, mention visiteur, gabarit DPA.
+- `docs/integration.md` : intégrer un chatbot sur un site tiers (widget, iframe).
+- `docs/roadmap.md` : backlog technique détaillé, décisions prises et pourquoi.
+
 ## Design / branding
 
 Identité visuelle provisoire "Corpus.ai" (bleu marine, Inter) posée sur la landing page et l'app pour donner un rendu professionnel présentable à des clients pilotes. Composants réutilisables dans `components/ui/`. Section "Avis" en placeholders explicites (John Doe / Jane Doe) à remplacer par de vrais retours clients avant lancement public. Pages `/legal/*` sont des coquilles vides : contenu juridique réel à rédiger (idéalement avec un professionnel du droit) avant toute ouverture publique.

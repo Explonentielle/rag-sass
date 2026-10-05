@@ -1,0 +1,6 @@
+{$ES_DOMAIN} {
+	# Caddy obtient/renouvelle automatiquement un certificat Let's Encrypt
+	# pour ce domaine — il doit déjà pointer (DNS A record) vers l'IP
+	# publique de ce VPS avant de démarrer, sinon la validation ACME échoue.
+	reverse_proxy elasticsearch:9200
+}
