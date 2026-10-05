@@ -11,9 +11,33 @@ export interface Database {
   public: {
     Tables: {
       organizations: {
-        Row: { id: string; name: string; plan: OrgPlan; created_at: string };
-        Insert: { id?: string; name: string; plan?: OrgPlan; created_at?: string };
-        Update: { id?: string; name?: string; plan?: OrgPlan; created_at?: string };
+        Row: {
+          id: string;
+          name: string;
+          plan: OrgPlan;
+          stripe_customer_id: string | null;
+          stripe_subscription_id: string | null;
+          stripe_subscription_status: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          name: string;
+          plan?: OrgPlan;
+          stripe_customer_id?: string | null;
+          stripe_subscription_id?: string | null;
+          stripe_subscription_status?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          name?: string;
+          plan?: OrgPlan;
+          stripe_customer_id?: string | null;
+          stripe_subscription_id?: string | null;
+          stripe_subscription_status?: string | null;
+          created_at?: string;
+        };
       };
       users_organizations: {
         Row: {
