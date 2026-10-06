@@ -60,14 +60,18 @@ export async function DELETE(_request: Request, { params }: { params: { id: stri
     });
   }
 
-  const { error: storageError } = await supabase.storage
-    .from('documents')
-    .remove([document.storage_path]);
-  if (storageError) {
-    logError('document.delete_storage_failed', {
-      documentId: document.id,
-      error: storageError.message,
-    });
+  // URL-sourced documents (docs/roadmap.md item 18, point 5) have no
+  // storage_path — nothing was ever uploaded to Storage for them.
+  if (document.storage_path) {
+    const { error: storageError } = await supabase.storage
+      .from('documents')
+      .remove([document.storage_path]);
+    if (storageError) {
+      logError('document.delete_storage_failed', {
+        documentId: document.id,
+        error: storageError.message,
+      });
+    }
   }
 
   const { error: deleteError } = await supabase.from('documents').delete().eq('id', document.id);

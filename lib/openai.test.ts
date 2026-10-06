@@ -1,8 +1,8 @@
-// Tests pour lib/openai.ts — uniquement rerankChunks (roadmap item 4), la
-// fonction de reranking post-récupération. rewriteQuery et streamAnswer/
-// embedTexts ne sont pas testés ici : ce fichier se concentre sur la
-// logique ajoutée (parsing de la sortie structurée, repli en cas d'échec),
-// pas sur un audit complet du module.
+// Tests pour lib/openai.ts — rerankChunks (roadmap item 4) et
+// structureChunksWithAI (item 18, indexation assistée par IA). rewriteQuery
+// et streamAnswer/embedTexts ne sont pas testés ici : ce fichier se
+// concentre sur la logique ajoutée (parsing de la sortie structurée, repli
+// en cas d'échec), pas sur un audit complet du module.
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
@@ -23,7 +23,7 @@ vi.mock('openai', () => ({
 // pendant les tests.
 vi.mock('@/lib/logger', () => ({ logWarn: vi.fn(), logInfo: vi.fn(), logError: vi.fn() }));
 
-const { rerankChunks } = await import('./openai');
+const { rerankChunks, structureChunksWithAI } = await import('./openai');
 
 // Fabrique une réponse OpenAI minimale contenant le JSON structuré attendu
 // par rerankChunks, à l'emplacement où le vrai SDK le met
@@ -98,5 +98,67 @@ describe('rerankChunks', () => {
     const result = await rerankChunks('question', chunks);
 
     expect(result).toEqual(chunks);
+  });
+});
+
+describe('structureChunksWithAI', () => {
+  it('returns the cleaned/segmented chunks on a single-batch document', async () => {
+    createMock.mockResolvedValueOnce(
+      fakeStructuredResponse({ chunks: ['Premier segment.', 'Deuxième segment.'] })
+    );
+
+    const result = await structureChunksWithAI('Un texte court tenant dans un seul lot.');
+
+    expect(result).toEqual(['Premier segment.', 'Deuxième segment.']);
+    expect(createMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('filters out empty/whitespace-only chunks from the model output', async () => {
+    createMock.mockResolvedValueOnce(fakeStructuredResponse({ chunks: ['Un vrai segment.', '   ', ''] }));
+
+    const result = await structureChunksWithAI('texte');
+
+    expect(result).toEqual(['Un vrai segment.']);
+  });
+
+  it('splits a long document into multiple batches and concatenates the results', async () => {
+    // Un texte de 120 000 caractères tient en 3 lots de 50 000 (le dernier
+    // partiel) — un appel LLM par lot, résultats concatenés dans l'ordre.
+    createMock
+      .mockResolvedValueOnce(fakeStructuredResponse({ chunks: ['lot 1'] }))
+      .mockResolvedValueOnce(fakeStructuredResponse({ chunks: ['lot 2'] }))
+      .mockResolvedValueOnce(fakeStructuredResponse({ chunks: ['lot 3'] }));
+
+    const longText = 'a'.repeat(120_000);
+    const result = await structureChunksWithAI(longText);
+
+    expect(createMock).toHaveBeenCalledTimes(3);
+    expect(result).toEqual(['lot 1', 'lot 2', 'lot 3']);
+  });
+
+  it('returns null (triggering a fallback to the mechanical chunker) if any batch fails', async () => {
+    createMock
+      .mockResolvedValueOnce(fakeStructuredResponse({ chunks: ['lot 1'] }))
+      .mockRejectedValueOnce(new Error('API down'));
+
+    const result = await structureChunksWithAI('a'.repeat(120_000));
+
+    expect(result).toBeNull();
+  });
+
+  it('returns null when the model finds nothing usable (e.g. a blank page)', async () => {
+    createMock.mockResolvedValueOnce(fakeStructuredResponse({ chunks: [] }));
+
+    const result = await structureChunksWithAI('   \n\n   ');
+
+    expect(result).toBeNull();
+  });
+
+  it('returns null on an unparseable/truncated response instead of throwing', async () => {
+    createMock.mockResolvedValueOnce({ choices: [{ message: { content: '{"chunks": [' } }] });
+
+    const result = await structureChunksWithAI('texte');
+
+    expect(result).toBeNull();
   });
 });

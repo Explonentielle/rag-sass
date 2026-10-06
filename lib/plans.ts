@@ -21,3 +21,12 @@ export const PLAN_LABELS: Record<OrgPlan, string> = {
   pme: 'PME',
   metier: 'Métier',
 };
+
+/**
+ * Plans entitled to AI-assisted indexing (docs/roadmap.md item 18) — a
+ * premium feature with a real per-document LLM cost, unlike the rest of
+ * the pipeline. Enforced in app/api/chatbots/[id]/route.ts; soft-gated
+ * like everything else plan-related (item 17: the plan label itself
+ * isn't billing-enforced yet).
+ */
+export const AI_INDEXING_ALLOWED_PLANS: OrgPlan[] = ['pme', 'metier'];

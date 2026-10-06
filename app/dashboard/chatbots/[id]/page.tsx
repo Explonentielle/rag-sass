@@ -3,6 +3,7 @@ import { notFound } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
 import SystemPromptEditor from '@/components/SystemPromptEditor';
 import DocumentUploader from '@/components/DocumentUploader';
+import UrlUploader from '@/components/UrlUploader';
 import { ButtonLink } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { DocumentStatusBadge } from '@/components/DocumentStatusBadge';
@@ -10,8 +11,10 @@ import DeleteDocumentButton from '@/components/DeleteDocumentButton';
 import ConversationsPanel from '@/components/ConversationsPanel';
 import EmbedSettingsForm from '@/components/EmbedSettingsForm';
 import DeleteChatbotSection from '@/components/DeleteChatbotSection';
+import AiIndexingToggle from '@/components/AiIndexingToggle';
 import { listAllConversationsForChatbot } from '@/lib/conversations';
 import { logQueryError } from '@/lib/supabaseResult';
+import { AI_INDEXING_ALLOWED_PLANS } from '@/lib/plans';
 import { Icon, IconBadge, ICONS } from '@/components/icons';
 
 export default async function ChatbotPage({ params }: { params: { id: string } }) {
@@ -19,14 +22,16 @@ export default async function ChatbotPage({ params }: { params: { id: string } }
 
   const { data: chatbotData, error: chatbotError } = await supabase
     .from('chatbots')
-    .select('id, name, system_prompt_template, organization_id, is_public, allowed_origins, use_documents')
+    .select(
+      'id, name, system_prompt_template, organization_id, is_public, allowed_origins, use_documents, use_ai_indexing'
+    )
     .eq('id', params.id)
     .single();
   const chatbot = logQueryError('chatbot_page.chatbot_failed', { chatbotId: params.id }, chatbotData, chatbotError);
 
   if (!chatbot) notFound();
 
-  const [documentsResult, customTemplatesResult, conversations] = await Promise.all([
+  const [documentsResult, customTemplatesResult, orgResult, conversations] = await Promise.all([
     supabase
       .from('documents')
       .select('id, filename, status, error_message, chunk_count, uploaded_at')
@@ -37,6 +42,10 @@ export default async function ChatbotPage({ params }: { params: { id: string } }
       .select('id, label, template')
       .eq('organization_id', chatbot.organization_id)
       .order('created_at', { ascending: false }),
+    // Not necessarily the "current active org" cookie (getCurrentOrg) —
+    // this chatbot's own organization_id, in case a multi-org user landed
+    // here via a direct link to a chatbot outside their active org.
+    supabase.from('organizations').select('plan').eq('id', chatbot.organization_id).single(),
     // listAllConversationsForChatbot throws (and logs) on failure instead
     // of returning a {data,error} pair — it goes through app/dashboard/
     // error.tsx (see roadmap.md item 38), not logQueryError below.
@@ -53,6 +62,12 @@ export default async function ChatbotPage({ params }: { params: { id: string } }
     { organizationId: chatbot.organization_id },
     customTemplatesResult.data,
     customTemplatesResult.error
+  );
+  const org = logQueryError(
+    'chatbot_page.organization_failed',
+    { organizationId: chatbot.organization_id },
+    orgResult.data,
+    orgResult.error
   );
 
   return (
@@ -90,12 +105,15 @@ export default async function ChatbotPage({ params }: { params: { id: string } }
       </section>
 
       <section className="space-y-3">
-        <div className="flex items-center justify-between">
+        <div className="flex flex-wrap items-start justify-between gap-3">
           <h2 className="flex items-center gap-2 font-semibold text-slate-900">
             <Icon className="h-4 w-4 text-brand-600">{ICONS.document}</Icon>
             Documents
           </h2>
-          <DocumentUploader chatbotId={chatbot.id} />
+          <div className="flex flex-wrap items-start gap-3">
+            <UrlUploader chatbotId={chatbot.id} />
+            <DocumentUploader chatbotId={chatbot.id} />
+          </div>
         </div>
         {!chatbot.use_documents && (
           <p className="text-xs text-amber-600">
@@ -103,6 +121,12 @@ export default async function ChatbotPage({ params }: { params: { id: string } }
             ci-dessus) — les documents ajoutés ici ne seront pas utilisés tant que ce mode est actif.
           </p>
         )}
+
+        <AiIndexingToggle
+          chatbotId={chatbot.id}
+          initialValue={chatbot.use_ai_indexing}
+          allowed={!!org && AI_INDEXING_ALLOWED_PLANS.includes(org.plan)}
+        />
 
         <Card className="divide-y divide-slate-100">
           {(documents ?? []).map((doc) => (

@@ -68,6 +68,7 @@ export interface Database {
           is_public: boolean;
           allowed_origins: string[];
           use_documents: boolean;
+          use_ai_indexing: boolean;
           created_at: string;
         };
         Insert: {
@@ -78,6 +79,7 @@ export interface Database {
           is_public?: boolean;
           allowed_origins?: string[];
           use_documents?: boolean;
+          use_ai_indexing?: boolean;
           created_at?: string;
         };
         Update: {
@@ -88,6 +90,7 @@ export interface Database {
           is_public?: boolean;
           allowed_origins?: string[];
           use_documents?: boolean;
+          use_ai_indexing?: boolean;
           created_at?: string;
         };
       };
@@ -120,7 +123,8 @@ export interface Database {
           chatbot_id: string;
           filename: string;
           file_type: string;
-          storage_path: string;
+          storage_path: string | null;
+          source_url: string | null;
           status: DocumentStatus;
           error_message: string | null;
           chunk_count: number | null;
@@ -132,7 +136,8 @@ export interface Database {
           chatbot_id: string;
           filename: string;
           file_type: string;
-          storage_path: string;
+          storage_path?: string | null;
+          source_url?: string | null;
           status?: DocumentStatus;
           error_message?: string | null;
           chunk_count?: number | null;
@@ -144,7 +149,8 @@ export interface Database {
           chatbot_id?: string;
           filename?: string;
           file_type?: string;
-          storage_path?: string;
+          storage_path?: string | null;
+          source_url?: string | null;
           status?: DocumentStatus;
           error_message?: string | null;
           chunk_count?: number | null;

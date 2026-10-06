@@ -1,13 +1,32 @@
 // Tests pour lib/extract.ts — détection du type de fichier et extraction
-// du texte à partir des différents formats supportés (txt, md, csv, xlsx).
+// du texte à partir des différents formats supportés (txt, md, csv, xlsx),
+// plus extractFromUrl (ingestion par URL, roadmap.md item 18 point 5).
 //
 // .docx et .pdf (mammoth / pdf-parse) ne sont PAS testés ici : il leur
 // faudrait de vrais fichiers binaires d'exemple (impossible à écrire "en
 // dur" dans le code comme une simple chaîne de texte) — voir la note dans
 // docs/roadmap.md item 15 sur ce qui reste à couvrir.
 
-import { describe, it, expect } from 'vitest';
-import { detectFileType, extractText, UnsupportedDocumentError } from './extract';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { detectFileType, extractText, extractFromUrl, UnsupportedDocumentError } from './extract';
+
+// `dns.lookup` est mocké pour contrôler quelle IP un hostname "résout" à,
+// sans dépendre d'une vraie résolution DNS (lente, non déterministe en
+// test) — c'est ce que le garde-fou SSRF d'extractFromUrl interroge avant
+// tout fetch.
+const dnsLookupMock = vi.fn();
+vi.mock('node:dns/promises', () => ({ default: { lookup: (...args: unknown[]) => dnsLookupMock(...args) } }));
+
+const fetchMock = vi.fn();
+
+function htmlResponse(html: string, status = 200, contentType = 'text/html; charset=utf-8') {
+  return {
+    ok: status >= 200 && status < 300,
+    status,
+    headers: new Map([['content-type', contentType]]),
+    text: async () => html,
+  } as unknown as Response;
+}
 
 describe('detectFileType', () => {
   // `it.each([...])(...)` : au lieu d'écrire 7 fois un `it('détecte X', ...)`
@@ -141,5 +160,87 @@ describe('extractText: xlsx', () => {
     const buffer = XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' }) as Buffer;
 
     await expect(extractText(buffer, 'xlsx')).rejects.toThrow(UnsupportedDocumentError);
+  });
+});
+
+describe('extractFromUrl', () => {
+  beforeEach(() => {
+    dnsLookupMock.mockReset();
+    fetchMock.mockReset();
+    vi.stubGlobal('fetch', fetchMock);
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it('rejects an invalid URL before any network call', async () => {
+    await expect(extractFromUrl('pas une url')).rejects.toThrow(UnsupportedDocumentError);
+    expect(dnsLookupMock).not.toHaveBeenCalled();
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('rejects a non-http(s) protocol', async () => {
+    await expect(extractFromUrl('file:///etc/passwd')).rejects.toThrow(UnsupportedDocumentError);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('rejects localhost without attempting a fetch (SSRF guard)', async () => {
+    await expect(extractFromUrl('http://localhost:9201/')).rejects.toThrow(UnsupportedDocumentError);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('rejects a hostname that resolves to a private IP (SSRF guard)', async () => {
+    dnsLookupMock.mockResolvedValueOnce([{ address: '10.0.0.5', family: 4 }]);
+
+    await expect(extractFromUrl('http://interne.exemple.com/')).rejects.toThrow(UnsupportedDocumentError);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('rejects a direct link-local IP literal, e.g. the cloud metadata endpoint', async () => {
+    // Cas réel connu de SSRF : 169.254.169.254 sert les credentials cloud
+    // (AWS/GCP/Azure) sur la plupart des VPS/instances cloud.
+    await expect(extractFromUrl('http://169.254.169.254/latest/meta-data/')).rejects.toThrow(
+      UnsupportedDocumentError
+    );
+    expect(dnsLookupMock).not.toHaveBeenCalled(); // IP littérale : pas besoin de résolution DNS
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('extracts the main article content from a public page, stripping nav/boilerplate', async () => {
+    dnsLookupMock.mockResolvedValueOnce([{ address: '93.184.216.34', family: 4 }]);
+    fetchMock.mockResolvedValueOnce(
+      htmlResponse(`<html><body>
+        <nav>Accueil | Contact | À propos</nav>
+        <article><h1>Titre de l'article</h1><p>${'Contenu principal utile et bien assez long pour que Readability le garde comme article. '.repeat(5)}</p></article>
+        <footer>© 2026 Exemple — Mentions légales</footer>
+      </body></html>`)
+    );
+
+    const text = await extractFromUrl('https://exemple.com/article');
+
+    expect(text).toContain('Contenu principal utile');
+    expect(text).not.toContain('Mentions légales');
+  });
+
+  it('rejects a non-HTML response', async () => {
+    dnsLookupMock.mockResolvedValueOnce([{ address: '93.184.216.34', family: 4 }]);
+    fetchMock.mockResolvedValueOnce(htmlResponse('{}', 200, 'application/json'));
+
+    await expect(extractFromUrl('https://exemple.com/api')).rejects.toThrow(UnsupportedDocumentError);
+  });
+
+  it('rejects an HTTP error response', async () => {
+    dnsLookupMock.mockResolvedValueOnce([{ address: '93.184.216.34', family: 4 }]);
+    fetchMock.mockResolvedValueOnce(htmlResponse('<html></html>', 404));
+
+    await expect(extractFromUrl('https://exemple.com/missing')).rejects.toThrow(UnsupportedDocumentError);
+  });
+
+  it('rejects a page with no extractable main content', async () => {
+    dnsLookupMock.mockResolvedValueOnce([{ address: '93.184.216.34', family: 4 }]);
+    fetchMock.mockResolvedValueOnce(htmlResponse('<html><body><nav>Menu</nav></body></html>'));
+
+    await expect(extractFromUrl('https://exemple.com/blank')).rejects.toThrow(UnsupportedDocumentError);
   });
 });

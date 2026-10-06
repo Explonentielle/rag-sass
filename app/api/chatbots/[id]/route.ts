@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { normalizeOrigin } from '@/lib/embedAccess';
 import { deleteChatbotChunks } from '@/lib/elasticsearch';
+import { AI_INDEXING_ALLOWED_PLANS } from '@/lib/plans';
 import { logInfo, logError } from '@/lib/logger';
 
 export async function PATCH(request: Request, { params }: { params: { id: string } }) {
@@ -19,6 +20,7 @@ export async function PATCH(request: Request, { params }: { params: { id: string
   const isPublic: boolean | undefined = body?.isPublic;
   const allowedOriginsInput: unknown = body?.allowedOrigins;
   const useDocuments: boolean | undefined = body?.useDocuments;
+  const useAiIndexing: boolean | undefined = body?.useAiIndexing;
 
   let allowedOrigins: string[] | undefined;
   if (allowedOriginsInput !== undefined) {
@@ -40,9 +42,38 @@ export async function PATCH(request: Request, { params }: { params: { id: string
     !name &&
     isPublic === undefined &&
     allowedOrigins === undefined &&
-    useDocuments === undefined
+    useDocuments === undefined &&
+    useAiIndexing === undefined
   ) {
     return NextResponse.json({ error: 'Rien à mettre à jour.' }, { status: 400 });
+  }
+
+  // Premium entitlement (docs/roadmap.md item 18) — only check when
+  // actually turning it on, not when leaving/turning it off, so a
+  // downgraded org isn't blocked from disabling what it can no longer use.
+  if (useAiIndexing) {
+    const { data: chatbot } = await supabase
+      .from('chatbots')
+      .select('organization_id')
+      .eq('id', params.id)
+      .single();
+
+    if (!chatbot) {
+      return NextResponse.json({ error: 'Chatbot introuvable.' }, { status: 404 });
+    }
+
+    const { data: org } = await supabase
+      .from('organizations')
+      .select('plan')
+      .eq('id', chatbot.organization_id)
+      .single();
+
+    if (!org || !AI_INDEXING_ALLOWED_PLANS.includes(org.plan)) {
+      return NextResponse.json(
+        { error: "L'indexation assistée par IA nécessite le plan PME ou Métier." },
+        { status: 403 }
+      );
+    }
   }
 
   // RLS (chatbots_update: is_org_member) enforces tenant scoping.
@@ -54,6 +85,7 @@ export async function PATCH(request: Request, { params }: { params: { id: string
       ...(isPublic !== undefined ? { is_public: isPublic } : {}),
       ...(allowedOrigins !== undefined ? { allowed_origins: allowedOrigins } : {}),
       ...(useDocuments !== undefined ? { use_documents: useDocuments } : {}),
+      ...(useAiIndexing !== undefined ? { use_ai_indexing: useAiIndexing } : {}),
     })
     .eq('id', params.id);
 

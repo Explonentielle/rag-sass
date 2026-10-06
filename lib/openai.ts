@@ -263,3 +263,106 @@ export async function rerankChunks<T extends RerankableChunk>(
     return fallback;
   }
 }
+
+// ---------------------------------------------------------------------------
+// AI-assisted indexing (docs/roadmap.md item 18, section 0 — premium,
+// gated by chatbots.use_ai_indexing + the org's plan). Replaces the
+// mechanical chunker (lib/chunking.ts) with an LLM pass that cleans noise
+// (repeated headers/footers, nav boilerplate from scraped content) and
+// segments text along logical boundaries (a FAQ or table stays in one
+// chunk) instead of blind character-count splitting. Scope deliberately
+// limited to this: URL ingestion and a "review before indexing" mode are
+// both called out in the roadmap as separate pieces of work, not included
+// here.
+// ---------------------------------------------------------------------------
+
+// Roughly the batch size the roadmap's own cost estimate assumes — large
+// enough to keep logical sections together, small enough to stay well
+// within the model's context window even for a long document split into
+// several batches.
+const AI_INDEXING_BATCH_CHARS = 50_000;
+
+const AI_INDEXING_SYSTEM_PROMPT = `Tu nettoies et segmentes un texte brut extrait d'un document (PDF, page web...) pour l'indexer dans une base de connaissances.
+
+- Retire le bruit qui n'apporte aucune information (en-têtes/pieds de page répétés, numéros de page, menus de navigation, mentions publicitaires).
+- Découpe le texte en segments qui respectent les frontières logiques du contenu : une question/réponse de FAQ reste dans un seul segment, un tableau reste intact, une section cohérente n'est jamais coupée en plein milieu.
+- Ne résume jamais et ne reformule jamais le contenu : conserve le texte original tel quel, tu ne fais que le nettoyer et le découper.
+- Si le texte ne contient rien d'exploitable (page vide, uniquement du bruit), renvoie une liste vide.`;
+
+function splitIntoCharBatches(text: string, maxChars: number): string[] {
+  if (text.length <= maxChars) return [text];
+  const batches: string[] = [];
+  for (let i = 0; i < text.length; i += maxChars) {
+    batches.push(text.slice(i, i + maxChars));
+  }
+  return batches;
+}
+
+async function structureOneBatch(text: string): Promise<string[] | null> {
+  try {
+    const openai = getOpenAiClient();
+    const response = await openai.chat.completions.create({
+      model: DEFAULT_CHAT_MODEL,
+      response_format: {
+        type: 'json_schema',
+        json_schema: {
+          name: 'ai_indexing',
+          strict: true,
+          schema: {
+            type: 'object',
+            properties: {
+              chunks: { type: 'array', items: { type: 'string' } },
+            },
+            required: ['chunks'],
+            additionalProperties: false,
+          },
+        },
+      },
+      messages: [
+        { role: 'system', content: AI_INDEXING_SYSTEM_PROMPT },
+        { role: 'user', content: text },
+      ],
+    });
+
+    const raw = response.choices[0]?.message?.content;
+    if (!raw) throw new Error('Réponse vide');
+
+    // A response cut off mid-generation (hit the model's own output
+    // ceiling on a long batch) produces truncated, unparseable JSON —
+    // JSON.parse throwing here is exactly how that case gets caught and
+    // turned into a fallback below, no separate truncation check needed.
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed.chunks) || !parsed.chunks.every((c: unknown) => typeof c === 'string')) {
+      throw new Error('Champ chunks manquant ou invalide');
+    }
+
+    return parsed.chunks.filter((c: string) => c.trim().length > 0);
+  } catch (err) {
+    logWarn('ai_indexing.batch_failed', {
+      textLength: text.length,
+      error: err instanceof Error ? err.message : String(err),
+    });
+    return null;
+  }
+}
+
+/**
+ * Structures raw extracted text into chunks via an LLM pass instead of
+ * the mechanical chunker. Returns null on any failure (API error,
+ * unusable structured output, a long document split into batches where
+ * even one batch fails) so the caller (lib/ingest.ts) falls back to
+ * chunkText — this is a quality upgrade on top of the pipeline, never a
+ * hard dependency ingestion can be blocked by.
+ */
+export async function structureChunksWithAI(rawText: string): Promise<string[] | null> {
+  const batches = splitIntoCharBatches(rawText, AI_INDEXING_BATCH_CHARS);
+  const allChunks: string[] = [];
+
+  for (const batch of batches) {
+    const chunks = await structureOneBatch(batch);
+    if (chunks === null) return null;
+    allChunks.push(...chunks);
+  }
+
+  return allChunks.length > 0 ? allChunks : null;
+}

@@ -36,7 +36,7 @@ export async function POST(request: Request) {
     // from another tenant simply won't be found.
     const { data: chatbot, error: chatbotError } = await supabase
       .from('chatbots')
-      .select('id, organization_id')
+      .select('id, organization_id, use_ai_indexing')
       .eq('id', chatbotId)
       .single();
 
@@ -116,6 +116,7 @@ export async function POST(request: Request) {
         storagePath,
         fileType,
         filename: file.name,
+        useAiIndexing: chatbot.use_ai_indexing,
       }).catch((err) => {
         logError('upload.background_processing_uncaught', {
           documentId: document.id,

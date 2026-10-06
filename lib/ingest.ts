@@ -1,53 +1,56 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { Database } from '@/types/database';
-import { extractText, UnsupportedDocumentError, type SupportedFileType } from '@/lib/extract';
+import { extractText, extractFromUrl, UnsupportedDocumentError, type SupportedFileType } from '@/lib/extract';
 import { chunkText } from '@/lib/chunking';
-import { embedTexts } from '@/lib/openai';
+import { embedTexts, structureChunksWithAI } from '@/lib/openai';
 import { ensureChunksIndex, getEsClient, CHUNKS_INDEX, type ChunkDoc } from '@/lib/elasticsearch';
 import { logInfo, logError } from '@/lib/logger';
 
 const EMBEDDING_BATCH_SIZE = 50;
 
-export interface ProcessDocumentParams {
+interface IngestionContext {
   documentId: string;
   chatbotId: string;
   organizationId: string;
-  storagePath: string;
-  fileType: SupportedFileType;
   filename: string;
 }
 
+interface ResolvedChunks {
+  chunks: string[];
+  usedAiIndexing: boolean;
+  aiIndexingRequested: boolean;
+}
+
 /**
- * Runs the full ingestion pipeline for one document, synchronously, updating
- * its status in Postgres at each step: pending -> processing -> indexed|error.
- *
- * Run inline in the upload request for this MVP (no job queue yet); fine
- * for the pilot's document sizes; move to a background worker if uploads
- * start timing out.
+ * Shared tail of the ingestion pipeline, common to a file upload and a URL
+ * scrape: both resolve down to "here's the raw extracted text, go chunk it
+ * (mechanically or via AI), embed it, index it in ES, and update the
+ * document's status." Everything specific to *how* the text was obtained
+ * lives in `getChunks` (download+extractText for a file, fetch+Readability
+ * for a URL) — this function owns the status transitions
+ * (pending -> processing -> indexed|error) and all the logging/error
+ * handling, so neither caller has to duplicate it.
  */
-export async function processDocument(
+async function runIngestion(
   supabase: SupabaseClient<Database>,
-  params: ProcessDocumentParams
+  ctx: IngestionContext,
+  getChunks: () => Promise<ResolvedChunks>
 ): Promise<{ status: 'indexed' | 'error'; errorMessage?: string; chunkCount?: number }> {
-  const { documentId, chatbotId, organizationId, storagePath, fileType, filename } = params;
-  const logCtx = { documentId, chatbotId, organizationId, filename, fileType };
+  const { documentId, chatbotId, organizationId, filename } = ctx;
+  const logCtx = { documentId, chatbotId, organizationId, filename };
 
   logInfo('ingest.start', logCtx);
 
   try {
     await supabase.from('documents').update({ status: 'processing' }).eq('id', documentId);
 
-    const { data: fileBlob, error: downloadError } = await supabase.storage
-      .from('documents')
-      .download(storagePath);
-    if (downloadError || !fileBlob) {
-      throw new Error(`Téléchargement du fichier échoué: ${downloadError?.message}`);
-    }
-    const buffer = Buffer.from(await fileBlob.arrayBuffer());
-
-    const text = await extractText(buffer, fileType);
-    const chunks = chunkText(text);
-    logInfo('ingest.chunked', { ...logCtx, chunkCount: chunks.length, textLength: text.length });
+    const { chunks, usedAiIndexing, aiIndexingRequested } = await getChunks();
+    logInfo('ingest.chunked', {
+      ...logCtx,
+      chunkCount: chunks.length,
+      usedAiIndexing,
+      aiIndexingRequested,
+    });
 
     if (chunks.length === 0) {
       throw new UnsupportedDocumentError('Aucun contenu exploitable trouvé dans ce document.');
@@ -104,4 +107,89 @@ export async function processDocument(
 
     return { status: 'error', errorMessage: message };
   }
+}
+
+// AI-assisted indexing never blocks ingestion: a failure (API error,
+// unusable output) silently falls back to the mechanical chunker rather
+// than failing the whole upload, same as every other best-effort LLM step
+// in this app (query rewriting, reranking).
+async function resolveChunks(text: string, useAiIndexing: boolean | undefined): Promise<ResolvedChunks> {
+  const aiChunks = useAiIndexing ? await structureChunksWithAI(text) : null;
+  return {
+    chunks: aiChunks ?? chunkText(text),
+    usedAiIndexing: aiChunks !== null,
+    aiIndexingRequested: !!useAiIndexing,
+  };
+}
+
+export interface ProcessDocumentParams {
+  documentId: string;
+  chatbotId: string;
+  organizationId: string;
+  storagePath: string;
+  fileType: SupportedFileType;
+  filename: string;
+  // Premium (docs/roadmap.md item 18) — LLM-cleaned/segmented chunks
+  // instead of the mechanical chunker. Caller (app/api/documents/upload/
+  // route.ts) resolves this from chatbots.use_ai_indexing; defaults to
+  // off so every other call site (scripts/smoke-test.mts) keeps working
+  // unchanged.
+  useAiIndexing?: boolean;
+}
+
+/**
+ * Runs the full ingestion pipeline for one uploaded file, updating its
+ * status in Postgres at each step: pending -> processing -> indexed|error.
+ *
+ * Run inline in the upload request for this MVP (no job queue yet); fine
+ * for the pilot's document sizes; move to a background worker if uploads
+ * start timing out.
+ */
+export async function processDocument(
+  supabase: SupabaseClient<Database>,
+  params: ProcessDocumentParams
+): Promise<{ status: 'indexed' | 'error'; errorMessage?: string; chunkCount?: number }> {
+  const { documentId, chatbotId, organizationId, storagePath, fileType, filename, useAiIndexing } = params;
+
+  return runIngestion(supabase, { documentId, chatbotId, organizationId, filename }, async () => {
+    const { data: fileBlob, error: downloadError } = await supabase.storage
+      .from('documents')
+      .download(storagePath);
+    if (downloadError || !fileBlob) {
+      throw new Error(`Téléchargement du fichier échoué: ${downloadError?.message}`);
+    }
+    const buffer = Buffer.from(await fileBlob.arrayBuffer());
+    const text = await extractText(buffer, fileType);
+    return resolveChunks(text, useAiIndexing);
+  });
+}
+
+export interface ProcessUrlDocumentParams {
+  documentId: string;
+  chatbotId: string;
+  organizationId: string;
+  url: string;
+  // Same premium flag as ProcessDocumentParams — see its comment.
+  useAiIndexing?: boolean;
+}
+
+/**
+ * Runs the full ingestion pipeline for one URL (docs/roadmap.md item 18,
+ * point 5): fetches it, extracts its main content (lib/extract.ts's
+ * extractFromUrl, Readability-based), then shares the exact same
+ * chunk/embed/index tail as processDocument. The URL itself is stored as
+ * the document's filename (see app/api/documents/upload-url/route.ts) —
+ * also what ends up as the cited source in chat answers, which is more
+ * useful here than a scraped page title.
+ */
+export async function processUrlDocument(
+  supabase: SupabaseClient<Database>,
+  params: ProcessUrlDocumentParams
+): Promise<{ status: 'indexed' | 'error'; errorMessage?: string; chunkCount?: number }> {
+  const { documentId, chatbotId, organizationId, url, useAiIndexing } = params;
+
+  return runIngestion(supabase, { documentId, chatbotId, organizationId, filename: url }, async () => {
+    const text = await extractFromUrl(url);
+    return resolveChunks(text, useAiIndexing);
+  });
 }
