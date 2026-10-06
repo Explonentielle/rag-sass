@@ -32,6 +32,7 @@ fixe — sert de mémoire centralisée plutôt que de planning strict.
 | 41 | Chat | Chaîne longue sans espace casse l'affichage dans l'iframe | Faible | ✅ Fait |
 | 42 | Infra | Déploiement VPS (ES sécurisé) + Vercel + migrations | Élevé | ✅ Fait (docs + config) — exécution réelle (VPS/DNS/migrations prod) à faire par l'utilisateur |
 | 43 | Compte | Suppression d'un chatbot | Moyen | ✅ Fait |
+| 44 | Sécurité | Durcir le garde-fou SSRF de l'ingestion par URL (DNS rebinding + redirection) | Moyen (redirection) / Élevé (DNS rebinding) | Noté, pas implémenté — risque limité tant que réservé aux membres authentifiés |
 | 21 | Catalogue | Agent de qualification de leads | Élevé | Item 3 (agent) |
 | 22 | Catalogue | Brouillon de réponse email | Moyen | — |
 | 23 | Catalogue | Analyseur de contrats (extraction de clauses) | Moyen | — |
@@ -1509,5 +1510,46 @@ Testé : `tsc --noEmit` propre, 68 tests au vert (pas de nouveau test
 dédié — fonction symétrique à `deleteOrganizationChunks`, déjà couverte
 par le même type de vérification manuelle que cette dernière à l'époque).
 
+### 44. Durcir le garde-fou SSRF de l'ingestion par URL (item 18)
+
+**Contexte (2026-10-06)** : `extractFromUrl` (`lib/extract.ts`) bloque déjà
+les hostnames qui résolvent vers une IP privée/réservée au moment du
+check, mais deux angles morts documentés dans le code restent ouverts —
+deux techniques connues pour contourner une protection SSRF par liste
+noire, pas des cas limites théoriques.
+
+**Point 2 — suivi de redirection (le plus facile à exploiter, pas encore
+corrigé)** : `fetch(..., redirect: 'follow')` suit automatiquement toute
+redirection HTTP sans revérifier la nouvelle destination. Une URL
+publique qui redirige vers une adresse interne (raccourcisseur de lien,
+`httpbin.org/redirect-to`, redirection ouverte sur un site quelconque)
+contourne le check initial. **Fix proposé, pas implémenté** : passer en
+`redirect: 'manual'`, et à chaque réponse 3xx, extraire `Location`,
+revérifier cette nouvelle adresse avec `assertPublicHostname` avant de la
+suivre — en boucle, avec une limite de sauts (ex. 5) pour éviter une
+redirection infinie. Changement contenu, pas très coûteux à faire.
+
+**Point 1 — DNS rebinding (plus difficile à exploiter, pas corrigé)** : le
+hostname est résolu deux fois séparément — une fois par
+`assertPublicHostname` (le check), une fois par `fetch()` lui-même (la
+vraie connexion). Un attaquant qui contrôle son propre domaine et son
+propre serveur DNS peut répondre une IP publique à la première résolution
+(passe le check) et une IP interne à la seconde (la vraie requête part en
+interne) — des outils publics existent pour automatiser ça (ex.
+`rbndr.us`), ce n'est pas qu'une attaque de laboratoire. **Fix proposé,
+pas implémenté** : résoudre le hostname **une seule fois**, vérifier que
+cette IP est publique, puis forcer la connexion réseau à utiliser
+exactement cette IP (ne pas laisser `fetch` re-résoudre tout seul) tout en
+gardant le vrai nom de domaine dans l'en-tête `Host` (et en SNI pour le
+TLS) pour que le serveur distant serve toujours le bon contenu. En Node,
+ça demande un "dispatcher" `undici` personnalisé (la lib sous le capot de
+`fetch`) plutôt qu'un appel `fetch()` standard — plus de code, plus de
+risque de mal faire le TLS au passage. Plus lourd que le point 2.
+
+**Pourquoi pas fait tout de suite** : les deux restent un risque limité
+tant que l'ingestion par URL est réservée à des membres d'organisation
+authentifiés (pas un endpoint public anonyme) — acceptable pour le
+pilote, mais à corriger avant d'ouvrir cette fonctionnalité plus
+largement ou à des comptes moins fiables.
 
 https://cocohop.com/theya   
