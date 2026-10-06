@@ -34,7 +34,7 @@ donne accès à :
 - **Templates** : les modèles de comportement disponibles (par défaut et les
   vôtres, voir section 5).
 - **Documentation** : la documentation technique du produit.
-- **Paramètres** : nom de l'organisation, membres, mot de passe.
+- **Paramètres** : organisation (nom, plan), membres, email, mot de passe.
 
 En haut de la barre latérale, le nom de votre organisation est cliquable :
 cela ouvre un sélecteur pour basculer entre plusieurs organisations, ou en
@@ -70,17 +70,26 @@ Templates, ou directement depuis l'éditeur de prompt d'un chatbot via
 
 ## 6. Ajouter des documents
 
-Sur la page d'un chatbot, cliquez sur **+ Ajouter un document**.
+Sur la page d'un chatbot, cliquez sur **+ Ajouter des documents**. Vous
+pouvez sélectionner plusieurs fichiers d'un coup — ils sont envoyés et
+traités en parallèle, pas besoin d'attendre qu'un document finisse avant
+d'ajouter le suivant.
 
 **Formats acceptés** : `.pdf` (avec texte natif, pas un scan), `.docx`,
-`.txt`, `.md`.
+`.txt`, `.md`, `.csv`, `.xlsx`, `.xls`.
 
-**Non pris en charge pour l'instant** : PDF scannés sans texte (pas d'OCR),
-`.csv`, `.xlsx`, images.
+**Non pris en charge pour l'instant** : PDF scannés sans texte (pas d'OCR).
 
-Après l'upload, le document passe par plusieurs statuts :
-`En attente` → `Traitement...` → `Indexé` (ou `Erreur` avec un message
-expliquant pourquoi, par exemple un PDF scanné).
+Après l'upload, chaque document passe par plusieurs statuts, visibles dans
+le tableau : `En attente` → `Traitement...` → `Indexé` (ou `Erreur` avec un
+message expliquant pourquoi, par exemple un PDF scanné).
+
+**Indexation assistée par IA (option Premium, plans PME/Métier)** : au lieu
+du découpage mécanique standard, un modèle nettoie le texte (en-têtes
+répétés, menus de navigation) et le segmente en respectant les sections
+logiques du document — utile pour des documents mal formatés. Case à
+cocher dans la section Documents de la page du chatbot ; grisée si votre
+plan ne l'inclut pas.
 
 ## 7. Utiliser le chat
 
@@ -93,11 +102,29 @@ plutôt que d'improviser une réponse.
 
 ## 8. Intégrer votre chatbot sur votre propre site web
 
-N'importe quel chatbot peut être intégré sur un site externe via une iframe.
+N'importe quel chatbot public peut être intégré sur un site externe, de
+deux façons.
+
+**Option recommandée : bulle flottante en une ligne**
 
 1. Récupérez l'identifiant de votre chatbot : il apparaît dans l'URL de sa
    page de gestion (`/dashboard/chatbots/VOTRE_ID`).
-2. Ajoutez ce code sur votre page web, en remplaçant `VOTRE_ID` :
+2. Ajoutez ce script sur votre page web, avant `</body>` :
+
+```html
+<script
+  src="https://votre-domaine.com/widget.js"
+  data-chatbot-id="VOTRE_ID"
+  data-primary-color="#ff5a1f"
+></script>
+```
+
+Une bulle apparaît en bas à droite et s'ouvre sur le chat au clic.
+`data-primary-color` est optionnel : une couleur hex pour adapter le bouton
+et les messages à votre charte graphique.
+
+**Option alternative : iframe brute**, pour garder le contrôle total du
+positionnement (panneau toujours visible dans une sidebar, par exemple) :
 
 ```html
 <iframe
@@ -108,24 +135,45 @@ N'importe quel chatbot peut être intégré sur un site externe via une iframe.
 ></iframe>
 ```
 
-3. Le chat s'affiche directement sur votre site, sans que vos visiteurs
-   aient besoin de compte ni de connexion.
+Dans les deux cas, le chat s'affiche directement sur votre site, sans que
+vos visiteurs aient besoin de compte ni de connexion.
 
-**À savoir** : cette intégration est accessible à toute personne connaissant
-l'identifiant du chatbot — il n'y a pas encore de restriction par domaine ni
-de limite de nombre de messages. Ne partagez donc l'identifiant que des
-chatbots que vous souhaitez rendre publics.
+**Contrôle d'accès** (section "Accès public / embed" de la page du
+chatbot) :
+- **Chatbot public/privé** : un interrupteur pour désactiver complètement
+  l'accès externe à tout moment.
+- **Restriction par domaine** : une liste optionnelle des sites autorisés
+  à intégrer ce chatbot — laissée vide, n'importe quel site le peut
+  (comportement par défaut).
 
 ## 9. Gérer votre équipe
 
-Dans **Paramètres → Membres**, vous pouvez ajouter une personne à votre
-organisation **si elle possède déjà un compte Corpus.ai** — il suffit de son
-email. L'invitation de nouvelles personnes qui n'ont pas encore de compte
-n'est pas disponible pour l'instant.
+Dans **Paramètres → Membres**, renseignez l'email de la personne à
+ajouter :
+- Si elle a déjà un compte Corpus.ai, elle est ajoutée immédiatement.
+- Sinon, un email d'invitation lui est envoyé pour créer son compte — à
+  l'ouverture du lien, elle choisit un mot de passe puis rejoint
+  automatiquement votre organisation.
+
+Un propriétaire/administrateur peut aussi changer le rôle d'un membre
+(Membre/Administrateur/Propriétaire) ou le retirer de l'organisation
+directement depuis cette page. Chacun peut aussi quitter une organisation
+lui-même.
 
 ## 10. Autres réglages
 
-- **Renommer votre organisation** : Paramètres → Organisation.
+- **Renommer votre organisation, changer de plan** : Paramètres →
+  Organisation.
+- **Changer d'email** : Paramètres → Email — un email de confirmation est
+  envoyé à la nouvelle adresse, le changement prend effet après avoir
+  cliqué sur le lien reçu.
 - **Changer de mot de passe** : Paramètres → Mot de passe.
 - **Plusieurs organisations** : utilisez le sélecteur en haut de la barre
   latérale pour basculer entre vos organisations ou en créer une nouvelle.
+- **Supprimer un chatbot** : sur la page du chatbot, section "Zone de
+  danger" en bas — supprime définitivement le chatbot, ses documents et
+  toutes ses conversations. Irréversible, demande de retaper le nom du
+  chatbot pour confirmer.
+- **Supprimer votre organisation** : Paramètres → section "Zone
+  dangereuse", réservé au propriétaire. Supprime tout (chatbots,
+  documents, conversations, membres) — irréversible.

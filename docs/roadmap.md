@@ -9,7 +9,7 @@ fixe — sert de mémoire centralisée plutôt que de planning strict.
 |---|---|---|---|---|
 | 1 | RAG | Seuil de score dynamique (remplace `topK` fixe) | Faible | ✅ Fait |
 | 2 | RAG | Reformulation de requête (query rewriting) | Moyen | ✅ Fait |
-| 3 | RAG | Agent unique topK + reformulation | Moyen | 1, 2 (fallback si insuffisants) |
+| 3 | RAG | Agent unique topK + reformulation | Moyen | ❌ Abandonné — rendu obsolète par le reranking (item 4) |
 | 4 | RAG | Reranking post-récupération | Moyen | ✅ Fait (LLM, voir `lib/openai.ts` `rerankChunks`) |
 | 5 | RAG | Chunking sémantique (par section) | Moyen | ✅ Fait |
 | 6 | Ingestion | Traitement asynchrone (queue) | Élevé | ✅ Fait (version légère) |
@@ -24,8 +24,8 @@ fixe — sert de mémoire centralisée plutôt que de planning strict.
 | 15 | Qualité | Tests automatisés | Élevé | ✅ Fait (fondations) — 6 modules purs couverts, routes API/DB/services externes encore ouverts |
 | 16 | Qualité | Logs locaux (debug/incident) | Faible | ✅ Fait (voir note) |
 | 17 | Qualité | Suivi d'usage/coût par org | Moyen | Mesure + plan (étiquette) ✅ faits — Stripe ✅ terrain préparé (webhook + schéma), compte/produits/Payment Links à créer (hors code, `docs/deployment.md` §4) |
-| 18 | Premium | Indexation assistée par IA (doc bruts + URL) | Élevé | 6 (async), entitlement par plan — référencé sur la landing (catalogue, feuille de route) |
-| 19 | Templates | Clarifier dans le front que les templates ne sont pas liés en live aux chatbots | Faible | À activer seulement si ça pose problème en usage réel |
+| 18 | Premium | Indexation assistée par IA (doc bruts + URL) | Élevé | ✅ Fait pour les docs uploadés (entitlement par plan inclus) — ingestion par URL et mode validation humaine explicitement hors scope, non faits |
+| 19 | Templates | Clarifier dans le front que les templates ne sont pas liés en live aux chatbots | Faible | ✅ Fait (déjà présent dans `SystemPromptEditor.tsx` depuis le 2026-09-09) |
 | 20 | RGPD | Plan d'action : rétention/purge, suppression à la demande, chiffrement, logs | Moyen (plan) | A+B+C+D ✅ faits (migrations 0004-0006 à appliquer) — E/F ✅ brouillon fait (`docs/rgpd-conformite.md`), relecture juridique pro encore à faire |
 | 39 | RAG | Analyseur français manquant sur l'index Elasticsearch | Moyen | ✅ Fait |
 | 40 | Ingestion | Traitement de plusieurs fichiers en simultané | Moyen | ✅ Fait |
@@ -53,7 +53,7 @@ fixe — sert de mémoire centralisée plutôt que de planning strict.
 
 ---
 
-## 0. Fonctionnalité premium : indexation assistée par IA (item 18)
+## 0. Fonctionnalité premium : indexation assistée par IA (item 18) — ✅ Fait (partiel, voir "Implémenté" en bas)
 
 Idée : remplacer (en option payante) le chunking mécanique par un passage
 LLM qui nettoie, structure et segmente intelligemment un document brut ou
@@ -142,6 +142,49 @@ les cas plus sensibles. Bonne piste produit, mais ajoute une UI de review
 (afficher les chunks proposés, accepter/modifier/rejeter) — à chiffrer
 séparément si retenu.
 
+### Implémenté (2026-10-06)
+
+Le cœur du pipeline (points 1 à 4 ci-dessus), à l'identique de la
+conception — **l'ingestion par URL (point 5) et le mode "avec/sans
+contrôle humain" restent non faits**, explicitement hors scope : le
+roadmap lui-même les qualifie de "fonctionnalité à part entière" et "à
+chiffrer séparément", pas une simple extension du chunking.
+
+- **Migration `0012_chatbot_ai_indexing.sql`** : `chatbots.use_ai_indexing`
+  (booléen, défaut `false`) — au niveau chatbot, pas organisation, pour
+  cohérence avec `use_documents`/`is_public` (granularité déjà choisie
+  ailleurs dans le schéma) et pour permettre de l'activer sur un seul
+  chatbot aux documents mal formatés sans l'imposer à tous ceux de l'org.
+- **`lib/openai.ts`** (`structureChunksWithAI`), pas un nouveau fichier
+  `lib/aiIndexing.ts` comme suggéré en brouillon — toutes les routes LLM du
+  projet vivent déjà dans ce seul fichier (`rewriteQuery`, `rerankChunks`),
+  pas de raison de déroger à la convention ici. Sortie structurée
+  (`json_schema`, `strict: true`), texte découpé en lots de ~50k
+  caractères (point 4) traités séquentiellement, résultats concatenés.
+  Retourne `null` (jamais une exception) si un lot échoue ou renvoie un
+  JSON inexploitable — y compris une réponse tronquée par la limite de
+  sortie du modèle, qui casse `JSON.parse` et se résout donc par le même
+  chemin de repli sans vérification de troncature séparée.
+- **`lib/ingest.ts`** : si `use_ai_indexing` est actif, tente
+  `structureChunksWithAI` avant d'utiliser le résultat ; `null` (échec) ou
+  flag désactivé → repli sur `chunkText` (`lib/chunking.ts`) comme avant —
+  point 3 (fallback obligatoire), jamais un upload en échec à cause de ça.
+- **Entitlement par plan** (`lib/plans.ts`
+  `AI_INDEXING_ALLOWED_PLANS = ['pme', 'metier']`) : vérifié dans
+  `app/api/chatbots/[id]/route.ts` seulement à l'activation (pas à la
+  désactivation, pour ne pas bloquer un org rétrogradé qui veut l'éteindre)
+  — même logique "étiquette souple, pas d'enforcement Stripe réel" que le
+  reste du système de plan (item 17).
+- **UI** : `components/AiIndexingToggle.tsx`, case à cocher dans la
+  section Documents de la page chatbot, désactivée + message explicatif si
+  le plan de l'org ne l'autorise pas (vérifié aussi côté serveur, pas
+  seulement visuel).
+
+Testé : `tsc --noEmit` propre, 77 tests au vert (6 nouveaux pour
+`structureChunksWithAI` — lot unique, filtrage des segments vides, lots
+multiples concatenés dans l'ordre, repli si un lot échoue, repli si rien
+d'exploitable, repli sur une réponse tronquée/non parseable).
+
 ---
 
 ## 1. RAG : récupération de contexte
@@ -204,7 +247,7 @@ mesuré précisément en usage réel — à observer via les logs
 et `keywordQuery`) si le gain de pertinence justifie le coût sur des
 questions simples qui n'en ont probablement pas besoin.
 
-### 3. Agent unique topK + reformulation (fallback)
+### 3. Agent unique topK + reformulation (fallback) — ❌ Abandonné (obsolète)
 
 **Idée d'origine** : un agent dédié qui, avant la recherche, détermine à la
 fois le nombre de chunks à récupérer (selon la longueur/profondeur de la
@@ -214,10 +257,19 @@ seul appel LLM avec une sortie structurée :
 { "topK": 8, "semanticQuery": "...", "keywordQueries": ["...", "..."] }
 ```
 
-**Pourquoi en dernier recours** : ajoute un appel LLM séquentiel sur *chaque*
-message → latence quasi doublée avant même que la réponse commence à
-streamer. À ne construire que si les items 1 et 2, moins coûteux, s'avèrent
-insuffisants une fois mesurés sur de vrais usages.
+**Pourquoi en dernier recours (raisonnement d'origine)** : ajoute un appel
+LLM séquentiel sur *chaque* message → latence quasi doublée avant même que
+la réponse commence à streamer. À ne construire que si les items 1 et 2,
+moins coûteux, s'avèrent insuffisants une fois mesurés sur de vrais usages.
+
+**Abandonné (2026-10-06)** : le reranking (item 4, `rerankChunks` dans
+`lib/openai.ts`) fait déjà ce travail de raffinage après coup — il juge la
+pertinence réelle des chunks candidats et peut en garder moins si la
+question est étroite, ce qui couvre l'essentiel du besoin "ajuster le
+volume de contexte à la question" sans ajouter un appel LLM *avant* la
+recherche en plus de celui d'après. Garder cet item n'apporterait qu'une
+optimisation marginale pour un coût de latence réel — pas rentable tant
+que rien ne montre que le reranking est insuffisant.
 
 ### 4. Reranking post-récupération — ✅ Fait
 
@@ -772,7 +824,7 @@ trafic réel accumulé, plutôt que d'extrapoler un tarif non vérifié.
 
 ## 7. Templates
 
-### 19. Clarifier dans le front que les templates ne sont pas liés en live
+### 19. Clarifier dans le front que les templates ne sont pas liés en live — ✅ Fait
 
 **Contexte** : un template (par défaut ou personnalisé) n'est qu'un point de
 départ copié dans le champ `system_prompt_template` propre à chaque chatbot
@@ -780,13 +832,19 @@ au moment où on l'applique. Modifier un template après coup (page Templates)
 ne met **pas** à jour les chatbots qui l'utilisaient déjà — chaque chatbot a
 sa propre copie indépendante, pas une référence live.
 
-**Décision actuelle** : comportement volontaire, pas un bug. Pas de UI
-spécifique pour l'expliquer pour l'instant.
+**Décision actuelle** : comportement volontaire, pas un bug — chaque
+chatbot doit pouvoir diverger librement de son template d'origine
+(personnaliser le nom de l'entreprise, le ton...) via
+`SystemPromptEditor.tsx`. Une vraie liaison live retirerait cette
+personnalisation par chatbot (ou exigerait de gérer un état "divergé du
+template", bien plus de complexité pour un problème jamais signalé en
+usage réel) — écarté pour cette raison (2026-10-06).
 
-**À faire si ça pose problème en usage réel** : ajouter une indication
-visuelle (ex. dans l'éditeur de prompt du chatbot ou sur la page Templates)
-précisant que la modification d'un template ne se propage pas
-automatiquement aux chatbots existants.
+**Fait** : la clarification visuelle existait déjà dans
+`SystemPromptEditor.tsx` ("Appliquer un template copie son contenu ici —
+modifier le template plus tard ne mettra pas à jour ce chatbot."),
+ajoutée le 2026-09-09 — jamais recroisée avec cette entrée du roadmap
+avant aujourd'hui. Rien à ajouter.
 
 ---
 

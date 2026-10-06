@@ -26,12 +26,19 @@ export default function DocsPage() {
               Une seule ligne à coller avant <code className="rounded bg-slate-100 px-1 py-0.5 text-xs">&lt;/body&gt;</code> :
             </p>
             <pre className="mt-3 overflow-x-auto rounded-md bg-slate-900 p-4 text-xs leading-relaxed text-slate-100">
-{`<script src="https://votre-domaine.com/widget.js" data-chatbot-id="{chatbotId}"></script>`}
+{`<script
+  src="https://votre-domaine.com/widget.js"
+  data-chatbot-id="{chatbotId}"
+  data-primary-color="#ff5a1f"
+></script>`}
             </pre>
             <p className="mt-3 text-sm leading-relaxed text-slate-600">
               Affiche une bulle en bas à droite qui s'ouvre sur le chat au clic. Le script crée
               lui-même son iframe (pointant vers <code className="rounded bg-slate-100 px-1 py-0.5 text-xs">/embed/[chatbotId]?widget=1</code>) et la
               redimensionne selon qu'elle est ouverte ou fermée — rien d'autre à écrire côté client.
+              <code className="rounded bg-slate-100 px-1 py-0.5 text-xs">data-primary-color</code> (optionnel) : couleur hex appliquée au
+              bouton bulle, au bouton d'envoi et aux bulles de message du visiteur — pseudo marque
+              blanche pour matcher la charte du site client.
             </p>
           </div>
           <div className="border-t border-slate-100 pt-4">
@@ -113,7 +120,11 @@ export default function DocsPage() {
         <h2 className="font-semibold text-slate-900">Idées pour la suite (non fait)</h2>
         <Card className="p-6">
           <ul className="list-inside list-disc space-y-1.5 text-sm text-slate-600">
-            <li>Personnalisation visuelle du widget embed (couleurs, position) par client.</li>
+            <li>
+              Personnalisation visuelle plus poussée (position, logo, police) — seule la couleur
+              d'accent est paramétrable pour l'instant (<code className="rounded bg-slate-100 px-1 py-0.5 text-xs">data-primary-color</code>, voir
+              plus haut).
+            </li>
           </ul>
         </Card>
       </section>
