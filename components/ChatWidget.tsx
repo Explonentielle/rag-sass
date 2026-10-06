@@ -221,11 +221,19 @@ export default function ChatWidget({
   apiEndpoint = '/api/chat',
   placeholder = 'Posez une question sur les documents de ce chatbot.',
   className = 'rounded-xl border border-slate-200 shadow-card',
+  accentColor,
 }: {
   chatbotId: string;
   apiEndpoint?: string;
   placeholder?: string;
   className?: string;
+  // Pseudo white-label for embeds (docs/integration.md's
+  // data-primary-color) — applied to the visitor's message bubbles and
+  // the send button, same inline-style-override pattern as
+  // EmbedBubbleWidget's bubble button. Already validated as a real hex
+  // color by the caller (app/embed/[chatbotId]/page.tsx); not re-validated
+  // here.
+  accentColor?: string;
 }) {
   const isPublic = apiEndpoint === '/api/public-chat';
 
@@ -440,8 +448,11 @@ export default function ChatWidget({
         {messages.map((m, i) => (
           <div key={i} className={m.role === 'user' ? 'flex justify-end' : 'flex justify-start'}>
             <div
+              style={m.role === 'user' && accentColor ? { backgroundColor: accentColor } : undefined}
               className={`max-w-[80%] break-words rounded-lg px-4 py-2.5 text-sm leading-relaxed ${
-                m.role === 'user' ? 'bg-brand-800 text-white' : 'bg-slate-100 text-slate-900'
+                m.role === 'user'
+                  ? `text-white ${accentColor ? '' : 'bg-brand-800'}`
+                  : 'bg-slate-100 text-slate-900'
               }`}
             >
               {m.role === 'assistant' ? (
@@ -482,7 +493,11 @@ export default function ChatWidget({
           placeholder="Posez votre question..."
           disabled={loading}
         />
-        <Button type="submit" disabled={loading || !input.trim()}>
+        <Button
+          type="submit"
+          disabled={loading || !input.trim()}
+          style={accentColor ? { backgroundColor: accentColor } : undefined}
+        >
           Envoyer
         </Button>
       </form>
