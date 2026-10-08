@@ -126,6 +126,30 @@ export async function ensureChunksIndex(): Promise<void> {
   });
 }
 
+const DOCUMENT_CHUNKS_MAX = 500; // generous ceiling for a single document's chunk count, not a real-world limit
+
+/** A document's chunks exactly as indexed, in order — for inspecting what
+ * was actually produced by ingestion (docs/roadmap.md item 45), especially
+ * useful with AI-assisted indexing (item 18) where the output isn't
+ * deterministic and worth double-checking. */
+export async function getDocumentChunks(
+  documentId: string
+): Promise<{ content: string; chunkIndex: number }[]> {
+  const es = getEsClient();
+  const result = await es.search({
+    index: CHUNKS_INDEX,
+    query: { term: { document_id: documentId } },
+    size: DOCUMENT_CHUNKS_MAX,
+    sort: [{ chunk_index: 'asc' }],
+    _source: ['content', 'chunk_index'],
+  });
+
+  return result.hits.hits.map((hit) => {
+    const source = hit._source as { content: string; chunk_index: number };
+    return { content: source.content, chunkIndex: source.chunk_index };
+  });
+}
+
 /** Deletes all chunks belonging to a document (used on re-upload or delete). */
 export async function deleteDocumentChunks(documentId: string): Promise<void> {
   const es = getEsClient();

@@ -8,6 +8,7 @@ import { ButtonLink } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { DocumentStatusBadge } from '@/components/DocumentStatusBadge';
 import DeleteDocumentButton from '@/components/DeleteDocumentButton';
+import ViewChunksButton from '@/components/ViewChunksButton';
 import ConversationsPanel from '@/components/ConversationsPanel';
 import EmbedSettingsForm from '@/components/EmbedSettingsForm';
 import DeleteChatbotSection from '@/components/DeleteChatbotSection';
@@ -142,6 +143,7 @@ export default async function ChatbotPage({ params }: { params: { id: string } }
               </div>
               <div className="flex items-center gap-3">
                 <DocumentStatusBadge status={doc.status} />
+                {doc.status === 'indexed' && <ViewChunksButton documentId={doc.id} />}
                 <DeleteDocumentButton documentId={doc.id} />
               </div>
             </div>

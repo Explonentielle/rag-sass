@@ -33,6 +33,7 @@ fixe — sert de mémoire centralisée plutôt que de planning strict.
 | 42 | Infra | Déploiement VPS (ES sécurisé) + Vercel + migrations | Élevé | ✅ Fait (docs + config) — exécution réelle (VPS/DNS/migrations prod) à faire par l'utilisateur |
 | 43 | Compte | Suppression d'un chatbot | Moyen | ✅ Fait |
 | 44 | Sécurité | Durcir le garde-fou SSRF de l'ingestion par URL (DNS rebinding + redirection) | Moyen (redirection) / Élevé (DNS rebinding) | Noté, pas implémenté — risque limité tant que réservé aux membres authentifiés |
+| 45 | Qualité | Voir le contenu indexé (chunks) depuis la page Documents | Moyen | ✅ Fait |
 | 21 | Catalogue | Agent de qualification de leads | Élevé | Item 3 (agent) |
 | 22 | Catalogue | Brouillon de réponse email | Moyen | — |
 | 23 | Catalogue | Analyseur de contrats (extraction de clauses) | Moyen | — |
@@ -594,6 +595,13 @@ par l'utilisateur en testant l'intégration sur un vrai site externe.
 **Limite connue** : pas d'allowlist de domaines — n'importe quel site
 connaissant un `chatbotId` peut l'embarquer aujourd'hui, documenté dans
 `docs/integration.md`.
+
+**Personnalisation visuelle (2026-10-05)** : `data-primary-color` permet
+de recolorer bouton bulle, bouton d'envoi et bulles de message visiteur
+(pseudo marque blanche, voir `docs/integration.md`). **Pas fait, idée pour
+plus tard** : personnalisation plus poussée (position du widget sur la
+page, logo, police) — pas de demande client concrète pour l'instant,
+juste noté pour ne pas l'oublier.
 
 ### 41. Chaîne longue sans espace casse l'affichage dans l'iframe du chat — ✅ Fait
 
@@ -1552,4 +1560,26 @@ authentifiés (pas un endpoint public anonyme) — acceptable pour le
 pilote, mais à corriger avant d'ouvrir cette fonctionnalité plus
 largement ou à des comptes moins fiables.
 
-https://cocohop.com/theya   
+### 45. Voir le contenu indexé (chunks) depuis la page Documents — ✅ Fait
+
+**Signalé (2026-10-07)** : après avoir testé l'ingestion par URL avec
+indexation IA, aucun moyen dans l'app de voir le texte réellement indexé
+dans Elasticsearch pour un document — seul `chunk_count` (un nombre) est
+affiché. Utile pour vérifier la qualité du découpage, surtout avec
+l'indexation IA (item 18, sortie non déterministe par nature) où on veut
+pouvoir contrôler ce que le modèle a effectivement produit.
+
+**Solution implémentée** : `getDocumentChunks` (`lib/elasticsearch.ts`) —
+même filtre `term: { document_id }` que `deleteDocumentChunks`, en
+lecture plutôt qu'en suppression, trié par `chunk_index`. Nouvelle route
+`GET /api/documents/[id]/chunks` (RLS via le `select` normal sur
+`documents` pour la portée multi-tenant, pas le client admin). Côté UI,
+`components/ViewChunksButton.tsx` : bouton "Voir le contenu indexé" sur
+chaque document indexé (page du chatbot), ouvre une modale chargeant les
+chunks à la demande (pas préchargés avec la liste des documents — la
+plupart ne sont jamais inspectés) et les affiche dans l'ordre avec leur
+numéro de segment.
+
+Testé : `tsc --noEmit` propre, 86 tests au vert (pas de nouveau test —
+`getDocumentChunks` est une requête ES simple, symétrique de fonctions
+déjà non testées unitairement comme `deleteDocumentChunks`).   

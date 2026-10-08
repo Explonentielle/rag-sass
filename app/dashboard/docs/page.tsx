@@ -115,19 +115,6 @@ export default function DocsPage() {
           Contrôle *combien* d'accès, orthogonal aux deux points ci-dessus qui contrôlent *qui* accède.
         </p>
       </section>
-
-      <section className="space-y-3">
-        <h2 className="font-semibold text-slate-900">Idées pour la suite (non fait)</h2>
-        <Card className="p-6">
-          <ul className="list-inside list-disc space-y-1.5 text-sm text-slate-600">
-            <li>
-              Personnalisation visuelle plus poussée (position, logo, police) — seule la couleur
-              d'accent est paramétrable pour l'instant (<code className="rounded bg-slate-100 px-1 py-0.5 text-xs">data-primary-color</code>, voir
-              plus haut).
-            </li>
-          </ul>
-        </Card>
-      </section>
     </div>
   );
 }
