@@ -24,7 +24,7 @@ fixe — sert de mémoire centralisée plutôt que de planning strict.
 | 15 | Qualité | Tests automatisés | Élevé | ✅ Fait (fondations) — 6 modules purs couverts, routes API/DB/services externes encore ouverts |
 | 16 | Qualité | Logs locaux (debug/incident) | Faible | ✅ Fait (voir note) |
 | 17 | Qualité | Suivi d'usage/coût par org | Moyen | Mesure + plan (étiquette) ✅ faits — Stripe ✅ terrain préparé (webhook + schéma), compte/produits/Payment Links à créer (hors code, `docs/deployment.md` §4) |
-| 18 | Premium | Indexation assistée par IA (doc bruts + URL) | Élevé | ✅ Fait pour les docs uploadés (entitlement par plan inclus) — ingestion par URL et mode validation humaine explicitement hors scope, non faits |
+| 18 | Premium | Indexation assistée par IA (doc bruts + URL) | Élevé | ✅ Fait (docs uploadés + URL, entitlement par plan inclus) — mode validation humaine avant indexation explicitement hors scope, non fait |
 | 19 | Templates | Clarifier dans le front que les templates ne sont pas liés en live aux chatbots | Faible | ✅ Fait (déjà présent dans `SystemPromptEditor.tsx` depuis le 2026-09-09) |
 | 20 | RGPD | Plan d'action : rétention/purge, suppression à la demande, chiffrement, logs | Moyen (plan) | A+B+C+D ✅ faits (migrations 0004-0006 à appliquer) — E/F ✅ brouillon fait (`docs/rgpd-conformite.md`), relecture juridique pro encore à faire |
 | 39 | RAG | Analyseur français manquant sur l'index Elasticsearch | Moyen | ✅ Fait |
