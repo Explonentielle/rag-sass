@@ -21,7 +21,7 @@ fixe — sert de mémoire centralisée plutôt que de planning strict.
 | 12 | Compte | Changement d'email | Faible (code) | ✅ Fait (code) — SMTP externe à configurer pour un vrai débit en prod |
 | 13 | Compte | Invitation par email (nouveaux comptes) | Faible (code) | ✅ Fait (code) — SMTP externe à configurer pour un vrai débit en prod |
 | 14 | Infra | Self-host Supabase (VPS) | Élevé | VPS provisionné |
-| 15 | Qualité | Tests automatisés | Élevé | ✅ Fait (fondations) — 6 modules purs couverts, routes API/DB/services externes encore ouverts |
+| 15 | Qualité | Tests automatisés | Élevé | ✅ Fait (fondations) — 10 modules purs couverts (dont `lib/ingest.ts`), routes API elles-mêmes encore ouvertes |
 | 16 | Qualité | Logs locaux (debug/incident) | Faible | ✅ Fait (voir note) |
 | 17 | Qualité | Suivi d'usage/coût par org | Moyen | Mesure + plan (étiquette) ✅ faits — Stripe ✅ terrain préparé (webhook + schéma), compte/produits/Payment Links à créer (hors code, `docs/deployment.md` §4) |
 | 18 | Premium | Indexation assistée par IA (doc bruts + URL) | Élevé | ✅ Fait (docs uploadés + URL, entitlement par plan inclus) — mode validation humaine avant indexation explicitement hors scope, non fait |
@@ -32,7 +32,7 @@ fixe — sert de mémoire centralisée plutôt que de planning strict.
 | 41 | Chat | Chaîne longue sans espace casse l'affichage dans l'iframe | Faible | ✅ Fait |
 | 42 | Infra | Déploiement VPS (ES sécurisé) + Vercel + migrations | Élevé | ✅ Fait (docs + config) — exécution réelle (VPS/DNS/migrations prod) à faire par l'utilisateur |
 | 43 | Compte | Suppression d'un chatbot | Moyen | ✅ Fait |
-| 44 | Sécurité | Durcir le garde-fou SSRF de l'ingestion par URL (DNS rebinding + redirection) | Moyen (redirection) / Élevé (DNS rebinding) | Noté, pas implémenté — risque limité tant que réservé aux membres authentifiés |
+| 44 | Sécurité | Durcir le garde-fou SSRF de l'ingestion par URL (DNS rebinding + redirection) | Moyen (redirection) / Élevé (DNS rebinding) | Redirection ✅ Fait — DNS rebinding noté, pas implémenté (risque limité tant que réservé aux membres authentifiés) |
 | 45 | Qualité | Voir le contenu indexé (chunks) depuis la page Documents | Moyen | ✅ Fait |
 | 21 | Catalogue | Agent de qualification de leads | Élevé | Item 3 (agent) |
 | 22 | Catalogue | Brouillon de réponse email | Moyen | — |
@@ -721,7 +721,17 @@ malgré un `npm install` silencieusement "réussi". `npm test` (une fois) /
 - `lib/prompts.ts` — construction du system prompt (avec/sans documents,
   contexte vide).
 - `lib/extract.ts` — détection de type de fichier, extraction txt/md/csv/xlsx
-  (mono et multi-feuilles), rejets (CSV vide/malformé, classeur vide).
+  (mono et multi-feuilles), rejets (CSV vide/malformé, classeur vide), plus
+  `extractFromUrl` (garde-fou SSRF, revalidation des redirections — item 44).
+
+Depuis complétés avec le même esprit "modules purs, dépendances externes
+mockées" : `lib/supabaseResult.ts`, `lib/openai.ts` (`rerankChunks`,
+`structureChunksWithAI`), `lib/stripe.ts`, et **`lib/ingest.ts`**
+(2026-10-09, `processDocument`/`processUrlDocument` — repli indexation IA
+→ chunking mécanique, transitions de statut pending/processing/indexed/
+error, Supabase + Elasticsearch + OpenAI tous mockés). Encore ouvert :
+les routes API elles-mêmes (auth, RLS, orchestration HTTP) et un vrai test
+d'intégration de bout en bout.
 
 **Bug trouvé par les tests, corrigé dans la foulée** : `lib/crypto.ts`
 (construit sur l'autre machine) ne reconnaissait pas le chiffrement d'une
@@ -1518,24 +1528,29 @@ Testé : `tsc --noEmit` propre, 68 tests au vert (pas de nouveau test
 dédié — fonction symétrique à `deleteOrganizationChunks`, déjà couverte
 par le même type de vérification manuelle que cette dernière à l'époque).
 
-### 44. Durcir le garde-fou SSRF de l'ingestion par URL (item 18)
+### 44. Durcir le garde-fou SSRF de l'ingestion par URL (item 18) — point 2 ✅ Fait, point 1 ouvert
 
 **Contexte (2026-10-06)** : `extractFromUrl` (`lib/extract.ts`) bloque déjà
 les hostnames qui résolvent vers une IP privée/réservée au moment du
-check, mais deux angles morts documentés dans le code restent ouverts —
+check, mais deux angles morts documentés dans le code restaient ouverts —
 deux techniques connues pour contourner une protection SSRF par liste
 noire, pas des cas limites théoriques.
 
-**Point 2 — suivi de redirection (le plus facile à exploiter, pas encore
-corrigé)** : `fetch(..., redirect: 'follow')` suit automatiquement toute
-redirection HTTP sans revérifier la nouvelle destination. Une URL
-publique qui redirige vers une adresse interne (raccourcisseur de lien,
-`httpbin.org/redirect-to`, redirection ouverte sur un site quelconque)
-contourne le check initial. **Fix proposé, pas implémenté** : passer en
-`redirect: 'manual'`, et à chaque réponse 3xx, extraire `Location`,
-revérifier cette nouvelle adresse avec `assertPublicHostname` avant de la
-suivre — en boucle, avec une limite de sauts (ex. 5) pour éviter une
-redirection infinie. Changement contenu, pas très coûteux à faire.
+**Point 2 — suivi de redirection — ✅ Fait (2026-10-09)** : `fetch`
+utilise maintenant `redirect: 'manual'` au lieu de `'follow'` — chaque
+réponse 3xx est interceptée, son `Location` extrait et résolu (gère aussi
+les redirections relatives, ex. `/nouvelle-page`), puis **revérifié par
+`assertPublicHostname` avant d'être suivi**, en boucle, plafonné à 5 sauts
+(`MAX_REDIRECTS`). Un `Location` manquant, une redirection vers un
+protocole non http/https, ou une chaîne trop longue sont tous rejetés
+explicitement plutôt que de planter silencieusement. 5 nouveaux tests
+prouvent le fix directement (dont un qui aurait réussi à tort avant —
+redirection vers `169.254.169.254` maintenant bloquée dès la validation
+du saut, sans même déclencher un deuxième `fetch`).
+
+Testé : `tsc --noEmit` propre, 91 tests au vert (31 dans
+`lib/extract.test.ts`, dont les 5 nouveaux de revalidation de
+redirection).
 
 **Point 1 — DNS rebinding (plus difficile à exploiter, pas corrigé)** : le
 hostname est résolu deux fois séparément — une fois par

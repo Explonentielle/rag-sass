@@ -201,6 +201,40 @@ function isPrivateOrReservedIp(ip: string): boolean {
   return false;
 }
 
+// How many redirect hops to follow before giving up (docs/roadmap.md item
+// 44, point 2) — each hop is re-validated against assertPublicHostname
+// before being followed, rather than letting fetch's own redirect:
+// 'follow' chase a redirect to a private address without rechecking it.
+const MAX_REDIRECTS = 5;
+
+function assertAllowedUrl(target: URL): void {
+  if (target.protocol !== 'http:' && target.protocol !== 'https:') {
+    throw new UnsupportedDocumentError('Seules les URL http/https sont autorisées.');
+  }
+}
+
+async function fetchOneHop(target: URL): Promise<Response> {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), URL_FETCH_TIMEOUT_MS);
+  try {
+    return await fetch(target.toString(), {
+      signal: controller.signal,
+      // Manual, not 'follow': a redirect target gets its own
+      // assertPublicHostname check in the caller's loop before being
+      // fetched — 'follow' would chase it straight to a private address
+      // without ever re-validating, defeating the SSRF guard entirely.
+      redirect: 'manual',
+      headers: { 'User-Agent': 'Mozilla/5.0 (compatible; CorpusAiBot/1.0; +ingestion)' },
+    });
+  } catch (err) {
+    throw new UnsupportedDocumentError(
+      `Impossible de récupérer cette URL : ${err instanceof Error ? err.message : 'erreur réseau'}.`
+    );
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
 /**
  * Fetches a URL and extracts its main textual content, stripping
  * navigation/ads/footers via Readability — the same extraction engine
@@ -214,28 +248,40 @@ export async function extractFromUrl(rawUrl: string): Promise<string> {
   } catch {
     throw new UnsupportedDocumentError('URL invalide.');
   }
-  if (url.protocol !== 'http:' && url.protocol !== 'https:') {
-    throw new UnsupportedDocumentError('Seules les URL http/https sont autorisées.');
-  }
-
-  await assertPublicHostname(url.hostname);
-
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), URL_FETCH_TIMEOUT_MS);
+  assertAllowedUrl(url);
 
   let response: Response;
-  try {
-    response = await fetch(url.toString(), {
-      signal: controller.signal,
-      redirect: 'follow',
-      headers: { 'User-Agent': 'Mozilla/5.0 (compatible; CorpusAiBot/1.0; +ingestion)' },
-    });
-  } catch (err) {
-    throw new UnsupportedDocumentError(
-      `Impossible de récupérer cette URL : ${err instanceof Error ? err.message : 'erreur réseau'}.`
-    );
-  } finally {
-    clearTimeout(timeout);
+  let redirectCount = 0;
+
+  // Each iteration re-validates the hostname before fetching — including
+  // every redirect target, not just the URL the user originally submitted.
+  while (true) {
+    await assertPublicHostname(url.hostname);
+    response = await fetchOneHop(url);
+
+    if (response.status >= 300 && response.status < 400) {
+      redirectCount += 1;
+      if (redirectCount > MAX_REDIRECTS) {
+        throw new UnsupportedDocumentError('Trop de redirections.');
+      }
+      const location = response.headers.get('location');
+      if (!location) {
+        throw new UnsupportedDocumentError('Cette URL redirige sans indiquer de destination.');
+      }
+      // Resolved against the current URL: a relative Location header
+      // (common, e.g. "/login") is otherwise not a valid URL on its own.
+      let nextUrl: URL;
+      try {
+        nextUrl = new URL(location, url);
+      } catch {
+        throw new UnsupportedDocumentError('Cette URL redirige vers une destination invalide.');
+      }
+      assertAllowedUrl(nextUrl);
+      url = nextUrl;
+      continue;
+    }
+
+    break;
   }
 
   if (!response.ok) {

@@ -28,6 +28,15 @@ function htmlResponse(html: string, status = 200, contentType = 'text/html; char
   } as unknown as Response;
 }
 
+function redirectResponse(location: string, status = 302) {
+  return {
+    ok: false,
+    status,
+    headers: new Map([['location', location]]),
+    text: async () => '',
+  } as unknown as Response;
+}
+
 describe('detectFileType', () => {
   // `it.each([...])(...)` : au lieu d'écrire 7 fois un `it('détecte X', ...)`
   // presque identique, on donne une LISTE de cas (ici des paires
@@ -242,5 +251,85 @@ describe('extractFromUrl', () => {
     fetchMock.mockResolvedValueOnce(htmlResponse('<html><body><nav>Menu</nav></body></html>'));
 
     await expect(extractFromUrl('https://exemple.com/blank')).rejects.toThrow(UnsupportedDocumentError);
+  });
+
+  // docs/roadmap.md item 44, point 2: a redirect must be re-validated by
+  // the SSRF guard, exactly like the original URL — these tests prove the
+  // fix (before it, redirect: 'follow' would have chased these straight
+  // through without ever re-checking the destination).
+  describe('redirect re-validation (item 44 point 2)', () => {
+    it('rejects a redirect to a private IP instead of following it blindly', async () => {
+      dnsLookupMock.mockResolvedValueOnce([{ address: '93.184.216.34', family: 4 }]); // public — the initial URL passes
+      fetchMock.mockResolvedValueOnce(redirectResponse('http://169.254.169.254/latest/meta-data/'));
+
+      await expect(extractFromUrl('https://exemple.com/redirect-to-internal')).rejects.toThrow(
+        UnsupportedDocumentError
+      );
+      // Only the first hop was fetched — the SSRF guard caught the
+      // redirect target before a second fetch was ever attempted.
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+    });
+
+    it('follows a redirect to another public URL and extracts its content', async () => {
+      dnsLookupMock
+        .mockResolvedValueOnce([{ address: '93.184.216.34', family: 4 }]) // original host
+        .mockResolvedValueOnce([{ address: '93.184.216.35', family: 4 }]); // redirect target host
+      fetchMock
+        .mockResolvedValueOnce(redirectResponse('https://exemple2.com/article'))
+        .mockResolvedValueOnce(
+          htmlResponse(
+            `<html><body><article><h1>Titre</h1><p>${'Contenu après redirection légitime, assez long pour Readability. '.repeat(5)}</p></article></body></html>`
+          )
+        );
+
+      const text = await extractFromUrl('https://exemple.com/old-url');
+
+      expect(text).toContain('Contenu après redirection');
+      expect(fetchMock).toHaveBeenCalledTimes(2);
+    });
+
+    it('resolves a relative Location header against the current URL', async () => {
+      dnsLookupMock
+        .mockResolvedValueOnce([{ address: '93.184.216.34', family: 4 }])
+        .mockResolvedValueOnce([{ address: '93.184.216.34', family: 4 }]);
+      fetchMock
+        .mockResolvedValueOnce(redirectResponse('/nouvelle-page')) // relative, no host
+        .mockResolvedValueOnce(
+          htmlResponse(
+            `<html><body><article><h1>Titre</h1><p>${'Page cible après redirection relative, contenu assez long. '.repeat(5)}</p></article></body></html>`
+          )
+        );
+
+      const text = await extractFromUrl('https://exemple.com/ancienne-page');
+
+      expect(text).toContain('Page cible après redirection relative');
+      // Resolved against the original host, not left dangling as "/nouvelle-page".
+      expect(fetchMock).toHaveBeenNthCalledWith(2, 'https://exemple.com/nouvelle-page', expect.anything());
+    });
+
+    it('rejects a redirect chain longer than the allowed maximum', async () => {
+      dnsLookupMock.mockResolvedValue([{ address: '93.184.216.34', family: 4 }]);
+      // 6 redirects in a row, one more than MAX_REDIRECTS (5) — always
+      // pointing somewhere new so it never "succeeds" by accident.
+      for (let i = 0; i < 6; i++) {
+        fetchMock.mockResolvedValueOnce(redirectResponse(`https://exemple.com/hop-${i}`));
+      }
+
+      await expect(extractFromUrl('https://exemple.com/start')).rejects.toThrow(UnsupportedDocumentError);
+    });
+
+    it('rejects a redirect with no Location header', async () => {
+      dnsLookupMock.mockResolvedValueOnce([{ address: '93.184.216.34', family: 4 }]);
+      fetchMock.mockResolvedValueOnce({
+        ok: false,
+        status: 302,
+        headers: new Map(),
+        text: async () => '',
+      } as unknown as Response);
+
+      await expect(extractFromUrl('https://exemple.com/broken-redirect')).rejects.toThrow(
+        UnsupportedDocumentError
+      );
+    });
   });
 });
