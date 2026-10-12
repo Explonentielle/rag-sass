@@ -48,13 +48,13 @@ export default function EmailToolToggle({
       <span className="flex-1">
         <span className="flex items-center gap-2">
           <span className="block text-sm font-medium text-slate-900">
-            Autoriser l'envoi d'email de suivi
+            Notifier par email quand un visiteur veut être recontacté
           </span>
           <Badge tone="blue">Agentique</Badge>
         </span>
         <span className="block text-xs text-slate-500">
-          Le chatbot peut envoyer un email de récapitulatif/suivi, uniquement à une adresse donnée
-          explicitement par la personne dans la conversation.
+          Le chatbot détecte quand un visiteur souhaite être recontacté et vous envoie un résumé par
+          email avec ses coordonnées si elles ont été données.
         </span>
         {error && <span className="mt-1 block text-xs text-red-600">{error}</span>}
       </span>

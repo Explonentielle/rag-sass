@@ -1,6 +1,6 @@
 import { getAdminClient } from '@/lib/supabase/admin';
 import { embedText, streamAnswer, rewriteQuery, rerankChunks } from '@/lib/openai';
-import { createSendFollowUpEmailTool, SEND_FOLLOW_UP_EMAIL_PROMPT_NOTE } from '@/lib/agenticTools';
+import { createNotifyOwnerOfLeadTool, NOTIFY_OWNER_PROMPT_NOTE } from '@/lib/agenticTools';
 import { hybridSearch } from '@/lib/elasticsearch';
 import { buildSystemPrompt } from '@/lib/prompts';
 import { logInfo, logWarn, logError } from '@/lib/logger';
@@ -244,14 +244,14 @@ export async function POST(request: Request) {
         controller.enqueue(encoder.encode(sseEvent('sources', { sources })));
 
         const tools = chatbot.allow_email_tool
-          ? [createSendFollowUpEmailTool({ ...logCtx, conversationId })]
+          ? [createNotifyOwnerOfLeadTool({ ...logCtx, conversationId })]
           : undefined;
 
         const systemPrompt = buildSystemPrompt({
           systemPromptTemplate: chatbot.system_prompt_template,
           contextChunks: chunks,
           useDocuments: chatbot.use_documents,
-          toolsNote: chatbot.allow_email_tool ? SEND_FOLLOW_UP_EMAIL_PROMPT_NOTE : undefined,
+          toolsNote: chatbot.allow_email_tool ? NOTIFY_OWNER_PROMPT_NOTE : undefined,
         });
 
         let answer = '';

@@ -339,39 +339,47 @@ describe('streamAnswer', () => {
   });
 });
 
-describe('createSendFollowUpEmailTool', () => {
+describe('createNotifyOwnerOfLeadTool', () => {
   const sendEmailMock = vi.fn();
   vi.doMock('@/lib/email', () => ({ sendEmail: (...args: unknown[]) => sendEmailMock(...args) }));
 
-  it('refuses to send to an invalid-looking email address', async () => {
-    const { createSendFollowUpEmailTool } = await import('./agenticTools');
-    const tool = createSendFollowUpEmailTool({ chatbotId: 'bot-1' });
+  it('notifies the (hardcoded) owner address, including the summary and visitor contact', async () => {
+    sendEmailMock.mockReset().mockResolvedValueOnce(undefined);
+    const { createNotifyOwnerOfLeadTool } = await import('./agenticTools');
+    const tool = createNotifyOwnerOfLeadTool({ chatbotId: 'bot-1' });
 
-    const result = await tool.execute({ to: 'pas-un-email', subject: 'Suivi', body: 'Bonjour' });
+    const result = await tool.execute({
+      visitor_contact: 'jean@exemple.com',
+      summary: 'Veut être rappelé pour un devis.',
+    });
 
-    expect(result).toContain('pas une adresse email valide');
-    expect(sendEmailMock).not.toHaveBeenCalled();
+    expect(sendEmailMock).toHaveBeenCalledTimes(1);
+    const sentEmail = sendEmailMock.mock.calls[0][0];
+    expect(sentEmail.to).toBe('alex59debonnieres@gmail.com'); // TODO item 33 : en dur pour l'instant
+    expect(sentEmail.body).toContain('Veut être rappelé pour un devis.');
+    expect(sentEmail.body).toContain('jean@exemple.com');
+    expect(result).toContain('a été notifié');
   });
 
-  it('sends the email and reports success for a valid address', async () => {
+  it('still notifies the owner even when the visitor gave no contact details', async () => {
     sendEmailMock.mockReset().mockResolvedValueOnce(undefined);
-    const { createSendFollowUpEmailTool } = await import('./agenticTools');
-    const tool = createSendFollowUpEmailTool({ chatbotId: 'bot-1' });
+    const { createNotifyOwnerOfLeadTool } = await import('./agenticTools');
+    const tool = createNotifyOwnerOfLeadTool({ chatbotId: 'bot-1' });
 
-    const result = await tool.execute({ to: 'jean@exemple.com', subject: 'Suivi', body: 'Bonjour' });
+    const result = await tool.execute({ visitor_contact: '', summary: 'Veut être rappelé.' });
 
-    expect(sendEmailMock).toHaveBeenCalledWith({ to: 'jean@exemple.com', subject: 'Suivi', body: 'Bonjour' });
-    expect(result).toContain('envoyé avec succès');
+    expect(sendEmailMock).toHaveBeenCalledTimes(1);
+    expect(result).toContain('a été notifié');
   });
 
   it('reports a clean failure message if sending fails (e.g. RESEND_API_KEY missing)', async () => {
     sendEmailMock.mockReset().mockRejectedValueOnce(new Error('RESEND_API_KEY manquante'));
-    const { createSendFollowUpEmailTool } = await import('./agenticTools');
-    const tool = createSendFollowUpEmailTool({ chatbotId: 'bot-1' });
+    const { createNotifyOwnerOfLeadTool } = await import('./agenticTools');
+    const tool = createNotifyOwnerOfLeadTool({ chatbotId: 'bot-1' });
 
-    const result = await tool.execute({ to: 'jean@exemple.com', subject: 'Suivi', body: 'Bonjour' });
+    const result = await tool.execute({ visitor_contact: '', summary: 'Veut être rappelé.' });
 
-    expect(result).toContain("Échec de l'envoi");
+    expect(result).toContain('Échec');
     expect(result).not.toContain('RESEND_API_KEY'); // pas de détail technique renvoyé au modèle/visiteur
   });
 });

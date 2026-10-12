@@ -1207,6 +1207,47 @@ tool calling dans `lib/openai.test.ts`, dont un faux stream OpenAI avec
 tool call fragmenté sur plusieurs chunks pour reproduire fidèlement le
 comportement réel de l'API ; validation/échec de l'outil email).
 
+**Deux bugs réels trouvés en testant en direct (pas par les tests
+unitaires seuls)** :
+- Le modèle refusait d'appeler l'outil même proposé : le prompt "réponds
+  STRICTEMENT à partir des documents" se lisait comme "aucune action
+  permise". Fix : `buildSystemPrompt` (`lib/prompts.ts`) prend un
+  `toolsNote` ajouté uniquement quand un outil est actif, qui dit
+  explicitement que l'utiliser n'est pas de la "connaissance externe"
+  interdite.
+- `gpt-5.6-luna` refuse les tool calls combinés à son reasoning effort par
+  défaut sur `/v1/chat/completions` ("set reasoning_effort to 'none'") —
+  maintenant fixé explicitement, uniquement quand `tools` est fourni.
+
+**Correction de cible (2026-10-12)** : le premier jet envoyait l'email **au
+visiteur** (sur demande explicite + adresse qu'il donnait) — peu utile en
+pratique, puisque ça ne génère rien d'actionnable pour le propriétaire du
+chatbot. Repensé : l'outil **notifie le propriétaire** qu'un visiteur veut
+être recontacté, pas l'inverse.
+
+- Renommé `createSendFollowUpEmailTool` → `createNotifyOwnerOfLeadTool`
+  (`notify_bot_owner`), `SEND_FOLLOW_UP_EMAIL_PROMPT_NOTE` →
+  `NOTIFY_OWNER_PROMPT_NOTE`. Nouveaux paramètres : `visitor_contact`
+  (coordonnées données par le visiteur si présentes, chaîne vide sinon)
+  et `summary` (ce qu'il recherche) — plus de `to` fourni par le modèle.
+- **Déclenchement** : laissé au jugement du modèle plutôt qu'une détection
+  par mot-clé en dur côté code — l'instruction du prompt lui dit
+  d'utiliser l'outil dès qu'un visiteur exprime vouloir être recontacté
+  (mention de vouloir être rappelé, du mot "email"/"contact"...), sans
+  exiger qu'il ait donné son adresse (contrairement à la version
+  précédente).
+- **Destinataire codé en dur** (`OWNER_NOTIFICATION_EMAIL` dans
+  `lib/agenticTools.ts`) sur décision explicite (2026-10-12), le temps de
+  valider que le déclenchement fonctionne bien en usage réel — **TODO** :
+  remplacer par un champ `chatbots.notification_email` configurable dans
+  les paramètres du chatbot une fois cette phase de validation terminée.
+  Noter que coder une vraie adresse email en dur la met dans l'historique
+  Git — acceptable pour cette phase de test jetable, pas pour la version
+  durable.
+
+Testé : `tsc --noEmit` propre, 114 tests au vert (3 adaptés aux nouveaux
+nom/paramètres de l'outil).
+
 **Reste à faire** : étape 2 (brancher un vrai serveur MCP, calendrier en
 priorité) et étape 3 (UI de configuration listant les actions autorisées
 par chatbot — aujourd'hui un seul outil possible, pas encore un vrai

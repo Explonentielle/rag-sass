@@ -6,7 +6,13 @@ import type { ChatTool } from '@/lib/openai';
 import { sendEmail } from '@/lib/email';
 import { logInfo, logWarn } from '@/lib/logger';
 
-const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+// TODO (docs/roadmap.md item 33): hardcoded on purpose for now, per
+// explicit decision (2026-10-12) — replace with a per-chatbot
+// notification_email field (configurable in the chatbot's settings page)
+// once the trigger logic below has been validated with real usage.
+// Hardcoding a real address here means it ends up in git history; fine
+// for this throwaway validation phase, not for the long-lived version.
+const OWNER_NOTIFICATION_EMAIL = 'alex59debonnieres@gmail.com';
 
 /**
  * Appended to the system prompt (lib/prompts.ts's `toolsNote`) whenever
@@ -16,56 +22,56 @@ const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
  * reads to the model as "never take any action", and it refuses to call
  * the tool even when it's technically offered via the API.
  */
-export const SEND_FOLLOW_UP_EMAIL_PROMPT_NOTE = `Tu as aussi accès à un outil, send_follow_up_email, pour envoyer un email de suivi/récapitulatif. Ce n'est PAS une connaissance externe interdite par la règle ci-dessus : c'est une action que tu es explicitement autorisé à réaliser en plus de répondre aux questions. Utilise cet outil quand la personne te demande de lui envoyer quelque chose par email, ou quand un récap par email serait clairement utile — uniquement si elle a donné son adresse email noir sur blanc dans la conversation, jamais une adresse que tu devines ou inventes.`;
+export const NOTIFY_OWNER_PROMPT_NOTE = `Tu as aussi accès à un outil, notify_bot_owner, pour prévenir le propriétaire de ce chatbot qu'un visiteur souhaite être recontacté. Ce n'est PAS une connaissance externe interdite par la règle ci-dessus : c'est une action que tu es explicitement autorisé à réaliser en plus de répondre aux questions. Utilise cet outil dès que le visiteur exprime l'envie d'être recontacté ou suivi par un humain — par exemple s'il mentionne vouloir être rappelé, demande qu'on le contacte par email, ou utilise simplement le mot "email"/"contact"/"rappeler" dans ce sens. Tu n'as pas besoin que le visiteur donne son adresse email pour utiliser cet outil : note simplement dans le résumé les coordonnées qu'il a données (email, téléphone, nom...), ou l'absence de coordonnées s'il n'en a donné aucune.`;
 
 /**
- * Sends a follow-up/recap email — chosen as the first agentic action
- * specifically because it needs no third-party OAuth per organization
- * (unlike a calendar), just RESEND_API_KEY (see lib/email.ts). The model
- * is instructed to only use an address the visitor explicitly gave in the
- * conversation, never to invent one; `to` is additionally validated as a
- * plausible email shape here before anything is sent — the instruction
- * alone isn't trusted.
+ * Notifies the chatbot's owner that a visitor wants to be followed up
+ * with — chosen over emailing the visitor directly (the first version of
+ * this tool) because that's what's actually actionable: the owner is the
+ * one who can call the lead back, not the visitor receiving their own
+ * recap. Destination is currently hardcoded (see OWNER_NOTIFICATION_EMAIL
+ * above) rather than visitor-supplied — nothing in this tool trusts an
+ * address the model might produce.
  */
-export function createSendFollowUpEmailTool(logCtx: Record<string, unknown>): ChatTool {
+export function createNotifyOwnerOfLeadTool(logCtx: Record<string, unknown>): ChatTool {
   return {
-    name: 'send_follow_up_email',
+    name: 'notify_bot_owner',
     description:
-      "Envoie un email de suivi/récapitulatif à une adresse que la personne a explicitement donnée dans la conversation. N'invente jamais d'adresse : n'utilise cet outil que si une adresse email a été fournie noir sur blanc.",
+      "Prévient le propriétaire du chatbot qu'un visiteur souhaite être recontacté, avec un résumé de sa demande et les coordonnées qu'il a données (s'il en a donné).",
     parameters: {
       type: 'object',
       properties: {
-        to: {
+        visitor_contact: {
           type: 'string',
-          description: "Adresse email du destinataire, telle que donnée par la personne dans la conversation.",
+          description:
+            "Coordonnées données par le visiteur dans la conversation (email, téléphone, nom...). Chaîne vide si aucune n'a été donnée.",
         },
-        subject: { type: 'string', description: "Objet de l'email." },
-        body: { type: 'string', description: "Corps de l'email, en texte simple." },
+        summary: {
+          type: 'string',
+          description: "Résumé court de ce que veut le visiteur, pour que le propriétaire sache pourquoi le rappeler.",
+        },
       },
-      required: ['to', 'subject', 'body'],
+      required: ['visitor_contact', 'summary'],
       additionalProperties: false,
     },
     async execute(args) {
-      const to = String(args.to ?? '').trim();
-      const subject = String(args.subject ?? '').trim();
-      const body = String(args.body ?? '').trim();
+      const visitorContact = String(args.visitor_contact ?? '').trim();
+      const summary = String(args.summary ?? '').trim();
 
-      if (!EMAIL_RE.test(to)) {
-        logWarn('agentic_tool.invalid_email', { ...logCtx, tool: 'send_follow_up_email' });
-        return "Échec : l'adresse fournie n'est pas une adresse email valide. Dis-le à la personne sans détail technique.";
-      }
+      const subject = 'Un visiteur de votre chatbot Corpus.ai souhaite être recontacté';
+      const body = `Résumé de la demande :\n${summary || '(non précisé)'}\n\nCoordonnées données par le visiteur :\n${visitorContact || '(aucune)'}`;
 
       try {
-        await sendEmail({ to, subject, body });
-        logInfo('agentic_tool.email_sent', { ...logCtx, tool: 'send_follow_up_email' });
-        return `Email envoyé avec succès à ${to}.`;
+        await sendEmail({ to: OWNER_NOTIFICATION_EMAIL, subject, body });
+        logInfo('agentic_tool.owner_notified', { ...logCtx, tool: 'notify_bot_owner' });
+        return "Le propriétaire a été notifié. Informe le visiteur qu'il sera recontacté, sans donner de détail technique sur comment.";
       } catch (err) {
-        logWarn('agentic_tool.email_failed', {
+        logWarn('agentic_tool.owner_notify_failed', {
           ...logCtx,
-          tool: 'send_follow_up_email',
+          tool: 'notify_bot_owner',
           error: err instanceof Error ? err.message : String(err),
         });
-        return "Échec de l'envoi de l'email. Informe la personne que ça n'a pas fonctionné, sans détail technique, et propose une alternative si pertinent.";
+        return "Échec de la notification. N'en fais pas mention au visiteur, réponds-lui normalement par ailleurs.";
       }
     },
   };
