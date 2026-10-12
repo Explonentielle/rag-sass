@@ -19,10 +19,12 @@ export default function EmbedBubbleWidget({
   chatbotId,
   accentColor,
   loadingMessages,
+  allowUploads,
 }: {
   chatbotId: string;
   accentColor?: string;
   loadingMessages?: string[];
+  allowUploads?: boolean;
 }) {
   const [open, setOpen] = useState(false);
 
@@ -51,6 +53,7 @@ export default function EmbedBubbleWidget({
             className="h-full rounded-xl border border-slate-200 shadow-2xl"
             accentColor={accentColor}
             loadingMessages={loadingMessages}
+            allowUploads={allowUploads}
           />
         </div>
       )}

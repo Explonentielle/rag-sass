@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { normalizeOrigin } from '@/lib/embedAccess';
 import { deleteChatbotChunks } from '@/lib/elasticsearch';
+import { removeConversationFiles } from '@/lib/conversationFiles';
 import { AI_INDEXING_ALLOWED_PLANS } from '@/lib/plans';
 import { logInfo, logError } from '@/lib/logger';
 
@@ -24,6 +25,7 @@ export async function PATCH(request: Request, { params }: { params: { id: string
   const useDocuments: boolean | undefined = body?.useDocuments;
   const useAiIndexing: boolean | undefined = body?.useAiIndexing;
   const allowEmailTool: boolean | undefined = body?.allowEmailTool;
+  const allowVisitorUploads: boolean | undefined = body?.allowVisitorUploads;
   const loadingMessagesInput: unknown = body?.loadingMessages;
   const notificationEmailInput: unknown = body?.notificationEmail;
 
@@ -89,6 +91,7 @@ export async function PATCH(request: Request, { params }: { params: { id: string
     useDocuments === undefined &&
     useAiIndexing === undefined &&
     allowEmailTool === undefined &&
+    allowVisitorUploads === undefined &&
     notificationEmail === undefined &&
     loadingMessages === undefined
   ) {
@@ -134,6 +137,7 @@ export async function PATCH(request: Request, { params }: { params: { id: string
       ...(useDocuments !== undefined ? { use_documents: useDocuments } : {}),
       ...(useAiIndexing !== undefined ? { use_ai_indexing: useAiIndexing } : {}),
       ...(allowEmailTool !== undefined ? { allow_email_tool: allowEmailTool } : {}),
+      ...(allowVisitorUploads !== undefined ? { allow_visitor_uploads: allowVisitorUploads } : {}),
       ...(notificationEmail !== undefined ? { notification_email: notificationEmail } : {}),
       ...(loadingMessages !== undefined ? { loading_messages: loadingMessages } : {}),
     })
@@ -207,6 +211,10 @@ export async function DELETE(_request: Request, { params }: { params: { id: stri
       });
     }
   }
+
+  // Files visitors sent in chats (roadmap item 48) live in their own bucket
+  // and their paths cascade away with the chatbot — remove them first.
+  await removeConversationFiles(supabase, { chatbotIds: [chatbot.id] });
 
   // RLS (chatbots_delete: is_org_admin) enforces that only an org
   // admin/owner can reach this — a plain member's request fails here.

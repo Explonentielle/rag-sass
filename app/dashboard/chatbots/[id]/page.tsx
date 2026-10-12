@@ -14,6 +14,7 @@ import EmbedSettingsForm from '@/components/EmbedSettingsForm';
 import DeleteChatbotSection from '@/components/DeleteChatbotSection';
 import AiIndexingToggle from '@/components/AiIndexingToggle';
 import EmailToolToggle from '@/components/EmailToolToggle';
+import VisitorUploadsToggle from '@/components/VisitorUploadsToggle';
 import LoadingMessagesForm from '@/components/LoadingMessagesForm';
 import { listAllConversationsForChatbot } from '@/lib/conversations';
 import { logQueryError } from '@/lib/supabaseResult';
@@ -26,7 +27,7 @@ export default async function ChatbotPage({ params }: { params: { id: string } }
   const { data: chatbotData, error: chatbotError } = await supabase
     .from('chatbots')
     .select(
-      'id, name, system_prompt_template, organization_id, is_public, allowed_origins, use_documents, use_ai_indexing, allow_email_tool, notification_email, loading_messages'
+      'id, name, system_prompt_template, organization_id, is_public, allowed_origins, use_documents, use_ai_indexing, allow_email_tool, notification_email, allow_visitor_uploads, loading_messages'
     )
     .eq('id', params.id)
     .single();
@@ -109,6 +110,11 @@ export default async function ChatbotPage({ params }: { params: { id: string } }
           chatbotId={chatbot.id}
           initialValue={chatbot.allow_email_tool}
           initialEmail={chatbot.notification_email}
+        />
+        <VisitorUploadsToggle
+          chatbotId={chatbot.id}
+          initialValue={chatbot.allow_visitor_uploads}
+          emailNotificationsReady={chatbot.allow_email_tool && !!chatbot.notification_email}
         />
         <LoadingMessagesForm chatbotId={chatbot.id} initialValue={chatbot.loading_messages} />
       </section>

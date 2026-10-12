@@ -372,6 +372,36 @@ describe('createNotifyOwnerOfLeadTool', () => {
     expect(result).toContain('a été notifié');
   });
 
+  it('attaches the conversation files to the email when a loader is provided', async () => {
+    // Envoi de fichiers par le visiteur (item 48) : les fichiers de la
+    // conversation voyagent avec la notification.
+    sendEmailMock.mockReset().mockResolvedValueOnce(undefined);
+    const { createNotifyOwnerOfLeadTool } = await import('./agenticTools');
+    const file = { filename: 'facture.pdf', content: Buffer.from('contenu') };
+    const tool = createNotifyOwnerOfLeadTool('proprio@exemple.com', { chatbotId: 'bot-1' }, async () => [file]);
+
+    await tool.execute({ visitor_contact: 'jean@exemple.com', summary: 'Devis.' });
+
+    const sentEmail = sendEmailMock.mock.calls[0][0];
+    expect(sentEmail.attachments).toEqual([file]);
+    expect(sentEmail.body).toContain('facture.pdf');
+  });
+
+  it('still sends the email, without attachments, if loading them fails', async () => {
+    // Un fichier illisible ne doit jamais bloquer la notification elle-même.
+    sendEmailMock.mockReset().mockResolvedValueOnce(undefined);
+    const { createNotifyOwnerOfLeadTool } = await import('./agenticTools');
+    const tool = createNotifyOwnerOfLeadTool('proprio@exemple.com', { chatbotId: 'bot-1' }, async () => {
+      throw new Error('storage indisponible');
+    });
+
+    const result = await tool.execute({ visitor_contact: '', summary: 'Devis.' });
+
+    expect(sendEmailMock).toHaveBeenCalledTimes(1);
+    expect(sendEmailMock.mock.calls[0][0].attachments).toEqual([]);
+    expect(result).toContain('a été notifié');
+  });
+
   it('reports a clean failure message if sending fails (e.g. RESEND_API_KEY missing)', async () => {
     sendEmailMock.mockReset().mockRejectedValueOnce(new Error('RESEND_API_KEY manquante'));
     const { createNotifyOwnerOfLeadTool } = await import('./agenticTools');

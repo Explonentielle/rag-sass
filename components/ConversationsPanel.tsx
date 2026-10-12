@@ -11,6 +11,7 @@ interface AdminConversationSummary {
   updatedAt: string;
   title: string | null;
   identity: { type: 'user'; userId: string } | { type: 'visitor'; visitorId: string };
+  files: { id: string; filename: string }[];
 }
 
 function formatDate(iso: string): string {
@@ -90,6 +91,20 @@ export default function ConversationsPanel({
                   </span>
                 )}
               </p>
+              {c.files.length > 0 && (
+                <ul className="mt-1.5 space-y-0.5">
+                  {c.files.map((f) => (
+                    <li key={f.id} className="truncate text-xs">
+                      <a
+                        href={`/api/chatbots/${chatbotId}/conversations/files/${f.id}`}
+                        className="text-brand-700 underline hover:text-brand-800"
+                      >
+                        {f.filename}
+                      </a>
+                    </li>
+                  ))}
+                </ul>
+              )}
             </div>
             <button
               onClick={() => handleDelete(c.id)}

@@ -37,10 +37,13 @@ export default async function EmbedPage({
   // any failure, including a chatbot that doesn't exist.
   const { data: chatbot } = await getAdminClient()
     .from('chatbots')
-    .select('loading_messages')
+    .select('loading_messages, allow_visitor_uploads')
     .eq('id', params.chatbotId)
     .single();
   const loadingMessages = chatbot?.loading_messages ?? undefined;
+  // Display only (shows the file button) — /api/public-chat/files enforces
+  // the setting server-side regardless of what the page says.
+  const allowUploads = chatbot?.allow_visitor_uploads ?? false;
 
   if (searchParams.widget === '1') {
     return (
@@ -48,6 +51,7 @@ export default async function EmbedPage({
         chatbotId={params.chatbotId}
         accentColor={accentColor}
         loadingMessages={loadingMessages}
+        allowUploads={allowUploads}
       />
     );
   }
@@ -60,6 +64,7 @@ export default async function EmbedPage({
         className="h-full border-0 shadow-none"
         accentColor={accentColor}
         loadingMessages={loadingMessages}
+        allowUploads={allowUploads}
       />
     </div>
   );

@@ -4,6 +4,24 @@ import { useState, useRef, useEffect } from 'react';
 import ReactMarkdown from 'react-markdown';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Card';
+import { validateVisitorFile, VISITOR_FILE_ACCEPT } from '@/lib/visitorFileRules';
+
+function PaperclipIcon({ className }: { className?: string }) {
+  return (
+    <svg
+      className={className}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <path d="M21.44 11.05l-9.19 9.19a6 6 0 01-8.49-8.49l9.19-9.19a4 4 0 015.66 5.66l-9.2 9.19a2 2 0 01-2.83-2.83l8.49-8.48" />
+    </svg>
+  );
+}
 import { resolveLoadingMessages } from '@/lib/loadingMessages';
 
 // How long each message stays on screen before rotating to the next
@@ -50,6 +68,8 @@ const MARKDOWN_COMPONENTS = {
 interface Message {
   role: 'user' | 'assistant';
   content: string;
+  /** Set when this user message is a file the visitor sent (item 48). */
+  attachment?: { id: string; filename: string } | null;
   sources?: string[] | null;
   error?: string;
   truncated?: boolean;
@@ -229,6 +249,7 @@ export default function ChatWidget({
   className = 'rounded-xl border border-slate-200 shadow-card',
   accentColor,
   loadingMessages,
+  allowUploads,
 }: {
   chatbotId: string;
   apiEndpoint?: string;
@@ -246,8 +267,13 @@ export default function ChatWidget({
   // empty, same resolution the caller already applied server-side, applied
   // again here defensively in case a caller passes the raw DB column.
   loadingMessages?: string[];
+  // Shows the file button (docs/roadmap.md item 48). Public widget only —
+  // the authenticated dashboard chat has no upload endpoint. Display only:
+  // /api/public-chat/files enforces the chatbot's setting server-side.
+  allowUploads?: boolean;
 }) {
   const isPublic = apiEndpoint === '/api/public-chat';
+  const canUpload = !!allowUploads && isPublic;
   const effectiveLoadingMessages = resolveLoadingMessages(loadingMessages);
 
   const [messages, setMessages] = useState<Message[]>([]);
@@ -260,7 +286,10 @@ export default function ChatWidget({
   // initializer also runs during server-side rendering, where localStorage
   // doesn't exist.
   const [visitorId, setVisitorId] = useState<string | null>(null);
+  const [uploading, setUploading] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (isPublic) setVisitorId(getOrCreateVisitorId());
@@ -355,6 +384,57 @@ export default function ChatWidget({
     if (id === activeConversationId) {
       setActiveConversationId(null);
       setMessages([]);
+    }
+  }
+
+  async function handleFileSelected(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    // Reset so picking the same file again still fires onChange.
+    e.target.value = '';
+    if (!file || loading || uploading || !visitorId) return;
+
+    setUploadError(null);
+    const validation = validateVisitorFile(file.name, file.size);
+    if (!validation.ok) {
+      setUploadError(validation.error);
+      return;
+    }
+
+    setUploading(true);
+    try {
+      const form = new FormData();
+      form.set('chatbotId', chatbotId);
+      form.set('visitorId', visitorId);
+      if (activeConversationId) form.set('conversationId', activeConversationId);
+      form.set('file', file);
+
+      const res = await fetch(`${apiEndpoint}/files`, { method: 'POST', body: form });
+      if (!res.ok) {
+        setUploadError((await res.text().catch(() => '')) || "Erreur lors de l'envoi du fichier.");
+        return;
+      }
+      const body = await res.json();
+
+      setMessages((prev) => [
+        ...prev,
+        { role: 'user', content: body.content, attachment: body.attachment },
+      ]);
+      if (body.conversationId !== activeConversationId) {
+        setConversations((prevList) => [
+          {
+            id: body.conversationId,
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+            title: body.content,
+          },
+          ...prevList.filter((c) => c.id !== body.conversationId),
+        ]);
+        setActiveConversationId(body.conversationId);
+      }
+    } catch {
+      setUploadError("Erreur lors de l'envoi du fichier.");
+    } finally {
+      setUploading(false);
     }
   }
 
@@ -493,6 +573,11 @@ export default function ChatWidget({
                     </p>
                   )
                 )
+              ) : m.attachment ? (
+                <p className="flex items-center gap-2">
+                  <PaperclipIcon className="h-4 w-4 flex-shrink-0" />
+                  <span className="min-w-0 break-all">{m.attachment.filename}</span>
+                </p>
               ) : (
                 <p className="whitespace-pre-wrap">{m.content}</p>
               )}
@@ -517,7 +602,36 @@ export default function ChatWidget({
         <div ref={bottomRef} />
       </div>
 
+      {uploadError && (
+        <p className="border-t border-slate-200 px-4 pt-2 text-xs text-red-600">{uploadError}</p>
+      )}
       <form onSubmit={handleSubmit} className="flex gap-2 border-t border-slate-200 p-4">
+        {canUpload && (
+          <>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept={VISITOR_FILE_ACCEPT}
+              onChange={handleFileSelected}
+              className="hidden"
+              tabIndex={-1}
+            />
+            <button
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={loading || uploading || !visitorId}
+              aria-label="Joindre un fichier"
+              title="Joindre un fichier"
+              className="flex-shrink-0 rounded-md border border-slate-300 px-3 text-slate-500 transition-colors hover:bg-slate-50 hover:text-slate-700 disabled:opacity-50"
+            >
+              {uploading ? (
+                <span className="text-xs">...</span>
+              ) : (
+                <PaperclipIcon className="h-4 w-4" />
+              )}
+            </button>
+          </>
+        )}
         <Input
           type="text"
           value={input}

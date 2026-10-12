@@ -3,7 +3,7 @@
 // adding MCP on top). Business logic for each tool lives here; lib/openai.ts
 // only knows how to run the generic tool-call loop.
 import type { ChatTool } from '@/lib/openai';
-import { sendEmail } from '@/lib/email';
+import { sendEmail, type EmailAttachment } from '@/lib/email';
 import { logInfo, logWarn } from '@/lib/logger';
 
 /**
@@ -28,10 +28,15 @@ Dès que le visiteur exprime l'envie d'être recontacté ou suivi par un humain 
  * recap. `ownerEmail` is the chatbot's own `notification_email` setting,
  * never visitor- or model-supplied — nothing in this tool trusts an
  * address the model might produce.
+ *
+ * `loadAttachments`, when given (visitor uploads enabled, roadmap item 48),
+ * supplies the files the visitor sent in this conversation so they travel
+ * with the notification. A failure there never blocks the email itself.
  */
 export function createNotifyOwnerOfLeadTool(
   ownerEmail: string,
-  logCtx: Record<string, unknown>
+  logCtx: Record<string, unknown>,
+  loadAttachments?: () => Promise<EmailAttachment[]>
 ): ChatTool {
   return {
     name: 'notify_bot_owner',
@@ -57,11 +62,27 @@ export function createNotifyOwnerOfLeadTool(
       const visitorContact = String(args.visitor_contact ?? '').trim();
       const summary = String(args.summary ?? '').trim();
 
+      let attachments: EmailAttachment[] = [];
+      if (loadAttachments) {
+        try {
+          attachments = await loadAttachments();
+        } catch (err) {
+          logWarn('agentic_tool.attachments_failed', {
+            ...logCtx,
+            tool: 'notify_bot_owner',
+            error: err instanceof Error ? err.message : String(err),
+          });
+        }
+      }
+
       const subject = 'Un visiteur de votre chatbot Corpus.ai souhaite être recontacté';
-      const body = `Résumé de la demande :\n${summary || '(non précisé)'}\n\nCoordonnées données par le visiteur :\n${visitorContact || '(aucune)'}`;
+      const filesNote = attachments.length
+        ? `\n\nFichiers envoyés par le visiteur (en pièces jointes) :\n${attachments.map((a) => `- ${a.filename}`).join('\n')}`
+        : '';
+      const body = `Résumé de la demande :\n${summary || '(non précisé)'}\n\nCoordonnées données par le visiteur :\n${visitorContact || '(aucune)'}${filesNote}`;
 
       try {
-        await sendEmail({ to: ownerEmail, subject, body });
+        await sendEmail({ to: ownerEmail, subject, body, attachments });
         logInfo('agentic_tool.owner_notified', { ...logCtx, tool: 'notify_bot_owner' });
         return "Le propriétaire a été notifié. Informe le visiteur qu'il sera recontacté, sans donner de détail technique sur comment.";
       } catch (err) {

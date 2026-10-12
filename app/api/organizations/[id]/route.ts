@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { deleteOrganizationChunks } from '@/lib/elasticsearch';
+import { removeConversationFiles } from '@/lib/conversationFiles';
 import { logInfo, logError } from '@/lib/logger';
 
 /**
@@ -78,6 +79,13 @@ export async function DELETE(_request: Request, { params }: { params: { id: stri
       });
     }
   }
+
+  // Files visitors sent in chats (roadmap item 48) live in their own bucket.
+  const { data: orgChatbots } = await supabase
+    .from('chatbots')
+    .select('id')
+    .eq('organization_id', params.id);
+  await removeConversationFiles(supabase, { chatbotIds: (orgChatbots ?? []).map((c) => c.id) });
 
   const { error: deleteError } = await supabase.from('organizations').delete().eq('id', params.id);
   if (deleteError) {

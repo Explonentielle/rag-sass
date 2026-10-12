@@ -71,6 +71,7 @@ export interface Database {
           use_ai_indexing: boolean;
           allow_email_tool: boolean;
           notification_email: string | null;
+          allow_visitor_uploads: boolean;
           loading_messages: string[] | null;
           created_at: string;
         };
@@ -85,6 +86,7 @@ export interface Database {
           use_ai_indexing?: boolean;
           allow_email_tool?: boolean;
           notification_email?: string | null;
+          allow_visitor_uploads?: boolean;
           loading_messages?: string[] | null;
           created_at?: string;
         };
@@ -99,6 +101,7 @@ export interface Database {
           use_ai_indexing?: boolean;
           allow_email_tool?: boolean;
           notification_email?: string | null;
+          allow_visitor_uploads?: boolean;
           loading_messages?: string[] | null;
           created_at?: string;
         };
@@ -216,6 +219,38 @@ export interface Database {
           role?: MessageRole;
           content?: string;
           sources?: string[] | null;
+          created_at?: string;
+        };
+      };
+      conversation_files: {
+        Row: {
+          id: string;
+          chatbot_id: string;
+          conversation_id: string;
+          message_id: string;
+          filename: string;
+          size_bytes: number;
+          storage_path: string;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          chatbot_id: string;
+          conversation_id: string;
+          message_id: string;
+          filename: string;
+          size_bytes: number;
+          storage_path: string;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          chatbot_id?: string;
+          conversation_id?: string;
+          message_id?: string;
+          filename?: string;
+          size_bytes?: number;
+          storage_path?: string;
           created_at?: string;
         };
       };

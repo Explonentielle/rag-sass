@@ -36,6 +36,8 @@ fixe — sert de mémoire centralisée plutôt que de planning strict.
 | 45 | Qualité | Voir le contenu indexé (chunks) depuis la page Documents | Moyen | ✅ Fait |
 | 46 | Chat | Chatbot vocal intégrable via iframe (STT/TTS) | Élevé | Noté, pas implémenté — distinct de l'item 25 (reste dans le widget web) |
 | 47 | Chat | Indicateur de chargement du chat trop statique (points fixes) | Faible-moyen | ✅ Fait (rotation animée + personnalisable par chatbot) |
+| 48 | Chat | Envoi de fichiers par le visiteur dans le widget (réglable par chatbot) | Moyen-élevé | ✅ Fait (stockage + téléchargement dashboard + pièce jointe de l'email) — purge de rétention des fichiers non faite |
+| 49 | Chat | Analyse IA du fichier envoyé (interpréter le contenu et répondre directement) | Élevé | Noté, pas implémenté — dépend de l'item 48 (et de l'OCR, item 7, pour scans/images) |
 | 21 | Catalogue | Agent de qualification de leads | Élevé | Item 3 (agent) |
 | 22 | Catalogue | Brouillon de réponse email | Moyen | — |
 | 23 | Catalogue | Analyseur de contrats (extraction de clauses) | Moyen | — |
@@ -1250,6 +1252,26 @@ chatbot. Repensé : l'outil **notifie le propriétaire** qu'un visiteur veut
 Testé : `tsc --noEmit` propre, 114 tests au vert (3 adaptés aux nouveaux
 nom/paramètres de l'outil).
 
+**Décision étape 2 (2026-10-12)** : premier serveur MCP = **Google Calendar**,
+via un **serveur MCP open source auto-hébergé** (option retenue parmi : serveur
+auto-hébergé / service MCP tiers hébergé / OAuth Google intégré à l'app).
+Conséquences à garder en tête : le serveur est branché sur **un seul compte
+Google** (un seul agenda — suffisant pour le pilote MonAcompagnateur ; plusieurs
+clients avec chacun leur agenda demanderaient une instance par agenda ou
+l'OAuth intégré à l'app). Manips côté propriétaire : projet Google Cloud + API
+Calendar + écran de consentement OAuth (compte en utilisateur de test) +
+identifiant OAuth "application de bureau" (JSON), puis lancer le serveur sur le
+VPS, l'exposer en HTTPS **avec un jeton d'accès** (comme Elasticsearch derrière
+Caddy), et fournir URL + jeton. Piège connu : en mode "Test", l'autorisation
+Google expire au bout de ~7 jours — passer l'application en "En production"
+(avertissement "non vérifiée" acceptable en usage perso). Le choix exact du
+serveur MCP reste à vérifier (le plus maintenu à ce jour) avant de commencer.
+Côté code, prévu : `@modelcontextprotocol/sdk` (ajout validé), `lib/mcpClient.ts`
+(outils MCP convertis en `ChatTool`), table des serveurs MCP par chatbot (token
+chiffré via `lib/crypto.ts`), garde SSRF de l'item 44 sur l'URL saisie, et revoir
+le plafond de 2 rounds de la boucle d'outils (un flux calendrier = chercher les
+créneaux puis réserver).
+
 **Reste à faire** : étape 2 (brancher un vrai serveur MCP, calendrier en
 priorité) et étape 3 (UI de configuration listant les actions autorisées
 par chatbot — aujourd'hui un seul outil possible, pas encore un vrai
@@ -1765,3 +1787,92 @@ Testé : `tsc --noEmit` propre, 114 tests au vert (4 nouveaux pour
 
 **Effort** : faible pour le clignotement seul ; moyen pour les messages
 alternés custom (nouveau champ de config + UI back-office).   
+---
+
+### 48. Envoi de fichiers par le visiteur dans le widget — ✅ Fait
+
+**Besoin (2026-10-12)** : un visiteur doit pouvoir joindre un fichier dans le
+chat (ex. une facture d'énergie pour MonAcompagnateur). Périmètre volontairement
+limité : le fichier est **enregistré avec la conversation** et, si la
+configuration le permet, **joint à l'email de notification du propriétaire**.
+Rien ne lit ni n'analyse son contenu (voir item 49).
+
+- **Réglable par chatbot, désactivé par défaut** (migration
+  `0017_visitor_file_uploads.sql`, `chatbots.allow_visitor_uploads`) — case à
+  cocher `components/VisitorUploadsToggle.tsx`, section "Comportement du
+  chatbot". La page d'embed lit le réglage pour afficher le bouton trombone
+  (`ChatWidget` prop `allowUploads`), mais l'application réelle est côté
+  serveur : `POST /api/public-chat/files` répond 403 si l'option est off.
+- **Route d'envoi** : `app/api/public-chat/files/route.ts` (multipart). Même
+  modèle de confiance que `/api/public-chat` (chatbotId + `is_public` +
+  `allowed_origins` + rate limiting + `visitorId`), la logique d'accès partagée
+  vit maintenant dans `lib/publicChatAccess.ts` (une route ne peut pas
+  exporter de helper). Si aucune conversation n'est ouverte, l'envoi en crée
+  une.
+- **Règles** (`lib/visitorFileRules.ts`, partagées widget/serveur) : 4 Mo max
+  (Vercel refuse les corps de requête au-delà de 4,5 Mo, l'upload transite par
+  notre route), 5 fichiers par conversation, liste blanche d'extensions (pdf,
+  png, jpg, jpeg, webp, docx, xlsx, csv, txt). Le `Content-Type` stocké est
+  déduit de l'extension, jamais de ce que le client déclare ; le nom de fichier
+  est assaini avant d'entrer dans le chemin de stockage.
+- **Stockage** : bucket privé `conversation-files`, chemin
+  `{organization_id}/{chatbot_id}/{conversation_id}/{id}-{nom}`
+  (`lib/conversationFiles.ts`). Chaque fichier crée un message utilisateur
+  "Fichier joint : nom" (chiffré comme les autres) + une ligne
+  `conversation_files` : l'ordre, l'historique rejoué et le contexte du LLM
+  suivent donc le mécanisme de conversation existant. Annulation propre si une
+  étape échoue après l'upload (pas d'objet orphelin).
+- **Côté propriétaire** : les fichiers apparaissent dans la liste des
+  conversations (`ConversationsPanel`), téléchargeables via
+  `/api/chatbots/[id]/conversations/files/[fileId]` (URL signée de 60 s ; RLS
+  org-membre = contrôle d'accès). Quand l'outil de notification email
+  (item 33) est actif **et** que l'option est cochée, les fichiers de la
+  conversation sont joints à l'email (`sendEmail` accepte `attachments`).
+- **Suppression** : les objets de Storage ne suivent pas le `on delete
+  cascade` — nettoyés explicitement avant suppression d'une conversation
+  (visiteur ou dashboard), d'un chatbot et d'une organisation
+  (`removeConversationFiles`). La suppression visiteur vérifie d'abord que la
+  conversation lui appartient.
+
+**Reste ouvert — rétention RGPD** : la purge quotidienne pg_cron (migration
+0006, 90 jours) supprime bien les conversations et les lignes
+`conversation_files` en cascade, mais **pas les objets de Storage** (le SQL ne
+les supprime pas réellement). Un fichier reste donc stocké au-delà de la
+rétention annoncée tant qu'un nettoyage n'est pas ajouté (route planifiée qui
+supprime les objets sans ligne correspondante, ou file de suppression).
+À traiter avant d'ouvrir cette option à un vrai client externe.
+
+**À tester en conditions réelles (pas encore fait)** — le code est écrit et
+type-checké, les règles de validation et l'outil email sont couverts par des
+tests unitaires, mais le parcours complet n'a pas été exécuté : appliquer les
+migrations 0014 à 0017, activer l'option, envoyer un fichier depuis le widget
+(MonAcompagnateur), le retrouver dans la liste des conversations et le
+télécharger, vérifier la pièce jointe de l'email quand le visiteur demande à
+être recontacté, et vérifier que la suppression de la conversation retire bien
+l'objet de Storage.
+
+**Effort** : moyen-élevé (nouvelle table + bucket + route publique + UI widget
++ dashboard + pièce jointe email).
+
+---
+
+### 49. Analyse IA du fichier envoyé — noté, pas à faire de suite
+
+**Idée (2026-10-12)** : au-delà du simple enregistrement (item 48), analyser le
+fichier du visiteur par IA pour l'interpréter et répondre directement (ex. lire
+une facture d'énergie, en extraire la consommation, et répondre en conséquence)
+plutôt que de seulement le transmettre au propriétaire.
+
+Pistes, pour mémoire :
+- Texte (pdf, docx, csv, xlsx, txt) : `lib/extract.ts` (`extractText`) sait déjà
+  extraire le contenu des documents de la base de connaissances ; le texte
+  pourrait être injecté dans le contexte de la réponse, **éphémère** (non
+  indexé dans la base de connaissances du chatbot — un visiteur anonyme ne doit
+  pas pouvoir la polluer).
+- Scans et images : bloqué par l'OCR (item 7) ou un modèle avec vision.
+- À cadrer avant de s'y engager : coût par message (item 35), RGPD (le contenu
+  du fichier serait envoyé à OpenAI — mention à ajouter dans
+  `docs/rgpd-conformite.md`), prompt injection via le contenu du fichier,
+  limite de taille du contexte.
+
+**Effort** : élevé. Dépend de l'item 48.

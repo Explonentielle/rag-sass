@@ -3,11 +3,19 @@ import type { Database, MessageRole } from '@/types/database';
 import type { ChatTurn } from '@/lib/openai';
 import { encryptText, decryptText } from '@/lib/crypto';
 import { logError } from '@/lib/logger';
+import {
+  loadAttachmentsByMessage,
+  listFilesByConversationForChatbot,
+  removeConversationFiles,
+  type ConversationAttachment,
+} from '@/lib/conversationFiles';
 
 export interface StoredMessage {
   role: MessageRole;
   content: string;
   sources: string[] | null;
+  /** Set when this user message is a file the visitor sent (roadmap item 48). */
+  attachment?: ConversationAttachment | null;
 }
 
 export interface ConversationSummary {
@@ -25,6 +33,8 @@ export interface AdminConversationSummary extends ConversationSummary {
    * or an anonymous widget visitor. Distinguishes the two in the admin list
    * since a chatbot mixes both. */
   identity: { type: 'user'; userId: string } | { type: 'visitor'; visitorId: string };
+  /** Files the visitor sent in this conversation, for the dashboard list. */
+  files: ConversationAttachment[];
 }
 
 interface ConversationIdentity {
@@ -152,6 +162,8 @@ export async function listAllConversationsForChatbot(
     }
   }
 
+  const filesByConversation = await listFilesByConversationForChatbot(supabase, chatbotId);
+
   return conversations.map((row) => ({
     id: row.id,
     createdAt: row.created_at,
@@ -160,6 +172,7 @@ export async function listAllConversationsForChatbot(
     identity: row.user_id
       ? { type: 'user' as const, userId: row.user_id }
       : { type: 'visitor' as const, visitorId: row.visitor_id! },
+    files: filesByConversation.get(row.id) ?? [],
   }));
 }
 
@@ -174,6 +187,11 @@ export async function deleteConversationForChatbot(
   conversationId: string,
   chatbotId: string
 ): Promise<void> {
+  // Before the delete: the conversation_files rows (and their storage paths)
+  // cascade away with the conversation. RLS scopes the lookup to the org, so
+  // a conversationId from another tenant finds nothing here.
+  await removeConversationFiles(supabase, { conversationId });
+
   const { error } = await supabase
     .from('conversations')
     .delete()
@@ -241,7 +259,7 @@ export async function loadHistory(
 ): Promise<StoredMessage[]> {
   const { data, error } = await supabase
     .from('messages')
-    .select('role, content, sources')
+    .select('id, role, content, sources')
     .eq('conversation_id', conversationId)
     .order('created_at', { ascending: true });
 
@@ -249,7 +267,11 @@ export async function loadHistory(
     logError('conversations.load_history_failed', { conversationId, error: error.message });
     throw new Error(`Impossible de charger l'historique: ${error.message}`);
   }
-  return (data ?? []).map(decryptStoredMessage);
+  const attachments = await loadAttachmentsByMessage(supabase, conversationId);
+  return (data ?? []).map((row) => ({
+    ...decryptStoredMessage(row),
+    attachment: attachments.get(row.id) ?? null,
+  }));
 }
 
 /** Maps stored history to the shape lib/openai.ts's streamAnswer expects. */

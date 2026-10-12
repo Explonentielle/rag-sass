@@ -5,7 +5,8 @@ import { hybridSearch } from '@/lib/elasticsearch';
 import { buildSystemPrompt } from '@/lib/prompts';
 import { logInfo, logWarn, logError } from '@/lib/logger';
 import { checkPublicChatRateLimit, getClientIp } from '@/lib/rateLimit';
-import { getRequestOrigin, isOriginAllowed } from '@/lib/embedAccess';
+import { getAccessibleChatbot, isValidVisitorId } from '@/lib/publicChatAccess';
+import { loadConversationAttachments, removeConversationFiles } from '@/lib/conversationFiles';
 import {
   createConversation,
   listConversations,
@@ -37,61 +38,6 @@ export const maxDuration = 120;
 
 function sseEvent(event: string, data: unknown) {
   return `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`;
-}
-
-function isValidVisitorId(v: unknown): v is string {
-  return typeof v === 'string' && /^[0-9a-f-]{16,64}$/i.test(v);
-}
-
-type ChatbotAccessResult =
-  | {
-      ok: true;
-      chatbot: {
-        id: string;
-        organization_id: string;
-        system_prompt_template: string;
-        use_documents: boolean;
-        allow_email_tool: boolean;
-        notification_email: string | null;
-      };
-    }
-  | { ok: false; reason: 'not_found' | 'private' | 'origin_blocked' };
-
-/**
- * Looks up a chatbot and checks it's reachable anonymously from this
- * request: exists, `is_public`, and — if the owner configured any —
- * `allowed_origins` includes the caller's Origin/Referer. Same-origin
- * requests (our own domain, e.g. the site's own FloatingChatWidget, or a
- * fetch made by JS running *inside* our /embed/[chatbotId] iframe — that JS
- * is same-origin to us, not to the parent page framing it) always pass;
- * `allowed_origins` only applies to *other* origins calling this API
- * directly. Restricting which sites may actually iframe /embed/[chatbotId]
- * is a separate, browser-enforced mechanism (CSP frame-ancestors, see
- * middleware.ts) — an Origin check here can't see who framed the page that
- * made the fetch, only what page made it.
- */
-async function getAccessibleChatbot(
-  admin: ReturnType<typeof getAdminClient>,
-  chatbotId: string,
-  request: Request
-): Promise<ChatbotAccessResult> {
-  const { data: chatbot, error } = await admin
-    .from('chatbots')
-    .select(
-      'id, organization_id, system_prompt_template, is_public, allowed_origins, use_documents, allow_email_tool, notification_email'
-    )
-    .eq('id', chatbotId)
-    .single();
-
-  if (error || !chatbot) return { ok: false, reason: 'not_found' };
-  if (!chatbot.is_public) return { ok: false, reason: 'private' };
-
-  const selfOrigin = new URL(request.url).origin;
-  const requestOrigin = getRequestOrigin(request);
-  const originOk = requestOrigin === selfOrigin || isOriginAllowed(requestOrigin, chatbot.allowed_origins);
-  if (!originOk) return { ok: false, reason: 'origin_blocked' };
-
-  return { ok: true, chatbot };
 }
 
 // With no conversationId: lists this visitor's saved conversations for the
@@ -148,6 +94,15 @@ export async function DELETE(request: Request) {
     logWarn('public-chat.delete_blocked', { chatbotId, reason: access.reason });
     return new Response('Chatbot introuvable.', { status: 404 });
   }
+
+  // Ownership first: removing the stored files below must only happen for
+  // the visitor's own conversation, not for any (chatbotId, conversationId)
+  // pair a caller can guess.
+  const owned = await getConversationForIdentity(admin, conversationId, { chatbotId, visitorId });
+  if (!owned) {
+    return new Response('Conversation introuvable.', { status: 404 });
+  }
+  await removeConversationFiles(admin, { conversationId });
 
   const { error } = await admin
     .from('conversations')
@@ -248,7 +203,15 @@ export async function POST(request: Request) {
 
         const notifyEmail = chatbot.allow_email_tool ? chatbot.notification_email : null;
         const tools = notifyEmail
-          ? [createNotifyOwnerOfLeadTool(notifyEmail, { ...logCtx, conversationId })]
+          ? [
+              createNotifyOwnerOfLeadTool(
+                notifyEmail,
+                { ...logCtx, conversationId },
+                chatbot.allow_visitor_uploads
+                  ? () => loadConversationAttachments(admin, conversationId)
+                  : undefined
+              ),
+            ]
           : undefined;
 
         const systemPrompt = buildSystemPrompt({
