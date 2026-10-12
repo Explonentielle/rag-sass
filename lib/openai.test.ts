@@ -343,10 +343,10 @@ describe('createNotifyOwnerOfLeadTool', () => {
   const sendEmailMock = vi.fn();
   vi.doMock('@/lib/email', () => ({ sendEmail: (...args: unknown[]) => sendEmailMock(...args) }));
 
-  it('notifies the (hardcoded) owner address, including the summary and visitor contact', async () => {
+  it('notifies the address given by the chatbot settings, including the summary and visitor contact', async () => {
     sendEmailMock.mockReset().mockResolvedValueOnce(undefined);
     const { createNotifyOwnerOfLeadTool } = await import('./agenticTools');
-    const tool = createNotifyOwnerOfLeadTool({ chatbotId: 'bot-1' });
+    const tool = createNotifyOwnerOfLeadTool('proprio@exemple.com', { chatbotId: 'bot-1' });
 
     const result = await tool.execute({
       visitor_contact: 'jean@exemple.com',
@@ -355,7 +355,7 @@ describe('createNotifyOwnerOfLeadTool', () => {
 
     expect(sendEmailMock).toHaveBeenCalledTimes(1);
     const sentEmail = sendEmailMock.mock.calls[0][0];
-    expect(sentEmail.to).toBe('alex59debonnieres@gmail.com'); // TODO item 33 : en dur pour l'instant
+    expect(sentEmail.to).toBe('proprio@exemple.com');
     expect(sentEmail.body).toContain('Veut être rappelé pour un devis.');
     expect(sentEmail.body).toContain('jean@exemple.com');
     expect(result).toContain('a été notifié');
@@ -364,7 +364,7 @@ describe('createNotifyOwnerOfLeadTool', () => {
   it('still notifies the owner even when the visitor gave no contact details', async () => {
     sendEmailMock.mockReset().mockResolvedValueOnce(undefined);
     const { createNotifyOwnerOfLeadTool } = await import('./agenticTools');
-    const tool = createNotifyOwnerOfLeadTool({ chatbotId: 'bot-1' });
+    const tool = createNotifyOwnerOfLeadTool('proprio@exemple.com', { chatbotId: 'bot-1' });
 
     const result = await tool.execute({ visitor_contact: '', summary: 'Veut être rappelé.' });
 
@@ -375,7 +375,7 @@ describe('createNotifyOwnerOfLeadTool', () => {
   it('reports a clean failure message if sending fails (e.g. RESEND_API_KEY missing)', async () => {
     sendEmailMock.mockReset().mockRejectedValueOnce(new Error('RESEND_API_KEY manquante'));
     const { createNotifyOwnerOfLeadTool } = await import('./agenticTools');
-    const tool = createNotifyOwnerOfLeadTool({ chatbotId: 'bot-1' });
+    const tool = createNotifyOwnerOfLeadTool('proprio@exemple.com', { chatbotId: 'bot-1' });
 
     const result = await tool.execute({ visitor_contact: '', summary: 'Veut être rappelé.' });
 

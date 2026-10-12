@@ -6,14 +6,6 @@ import type { ChatTool } from '@/lib/openai';
 import { sendEmail } from '@/lib/email';
 import { logInfo, logWarn } from '@/lib/logger';
 
-// TODO (docs/roadmap.md item 33): hardcoded on purpose for now, per
-// explicit decision (2026-10-12) — replace with a per-chatbot
-// notification_email field (configurable in the chatbot's settings page)
-// once the trigger logic below has been validated with real usage.
-// Hardcoding a real address here means it ends up in git history; fine
-// for this throwaway validation phase, not for the long-lived version.
-const OWNER_NOTIFICATION_EMAIL = 'alex59debonnieres@gmail.com';
-
 /**
  * Appended to the system prompt (lib/prompts.ts's `toolsNote`) whenever
  * this tool is enabled — see buildSystemPrompt's doc comment for why this
@@ -33,11 +25,14 @@ Dès que le visiteur exprime l'envie d'être recontacté ou suivi par un humain 
  * with — chosen over emailing the visitor directly (the first version of
  * this tool) because that's what's actually actionable: the owner is the
  * one who can call the lead back, not the visitor receiving their own
- * recap. Destination is currently hardcoded (see OWNER_NOTIFICATION_EMAIL
- * above) rather than visitor-supplied — nothing in this tool trusts an
+ * recap. `ownerEmail` is the chatbot's own `notification_email` setting,
+ * never visitor- or model-supplied — nothing in this tool trusts an
  * address the model might produce.
  */
-export function createNotifyOwnerOfLeadTool(logCtx: Record<string, unknown>): ChatTool {
+export function createNotifyOwnerOfLeadTool(
+  ownerEmail: string,
+  logCtx: Record<string, unknown>
+): ChatTool {
   return {
     name: 'notify_bot_owner',
     description:
@@ -66,7 +61,7 @@ export function createNotifyOwnerOfLeadTool(logCtx: Record<string, unknown>): Ch
       const body = `Résumé de la demande :\n${summary || '(non précisé)'}\n\nCoordonnées données par le visiteur :\n${visitorContact || '(aucune)'}`;
 
       try {
-        await sendEmail({ to: OWNER_NOTIFICATION_EMAIL, subject, body });
+        await sendEmail({ to: ownerEmail, subject, body });
         logInfo('agentic_tool.owner_notified', { ...logCtx, tool: 'notify_bot_owner' });
         return "Le propriétaire a été notifié. Informe le visiteur qu'il sera recontacté, sans donner de détail technique sur comment.";
       } catch (err) {

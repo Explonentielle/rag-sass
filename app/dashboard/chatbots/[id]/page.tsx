@@ -26,7 +26,7 @@ export default async function ChatbotPage({ params }: { params: { id: string } }
   const { data: chatbotData, error: chatbotError } = await supabase
     .from('chatbots')
     .select(
-      'id, name, system_prompt_template, organization_id, is_public, allowed_origins, use_documents, use_ai_indexing, allow_email_tool, loading_messages'
+      'id, name, system_prompt_template, organization_id, is_public, allowed_origins, use_documents, use_ai_indexing, allow_email_tool, notification_email, loading_messages'
     )
     .eq('id', params.id)
     .single();
@@ -105,7 +105,11 @@ export default async function ChatbotPage({ params }: { params: { id: string } }
           initialUseDocuments={chatbot.use_documents}
           customTemplates={customTemplates ?? []}
         />
-        <EmailToolToggle chatbotId={chatbot.id} initialValue={chatbot.allow_email_tool} />
+        <EmailToolToggle
+          chatbotId={chatbot.id}
+          initialValue={chatbot.allow_email_tool}
+          initialEmail={chatbot.notification_email}
+        />
         <LoadingMessagesForm chatbotId={chatbot.id} initialValue={chatbot.loading_messages} />
       </section>
 

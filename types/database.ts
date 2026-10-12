@@ -70,6 +70,7 @@ export interface Database {
           use_documents: boolean;
           use_ai_indexing: boolean;
           allow_email_tool: boolean;
+          notification_email: string | null;
           loading_messages: string[] | null;
           created_at: string;
         };
@@ -83,6 +84,7 @@ export interface Database {
           use_documents?: boolean;
           use_ai_indexing?: boolean;
           allow_email_tool?: boolean;
+          notification_email?: string | null;
           loading_messages?: string[] | null;
           created_at?: string;
         };
@@ -96,6 +98,7 @@ export interface Database {
           use_documents?: boolean;
           use_ai_indexing?: boolean;
           allow_email_tool?: boolean;
+          notification_email?: string | null;
           loading_messages?: string[] | null;
           created_at?: string;
         };

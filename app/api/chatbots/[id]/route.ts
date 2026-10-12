@@ -5,6 +5,8 @@ import { deleteChatbotChunks } from '@/lib/elasticsearch';
 import { AI_INDEXING_ALLOWED_PLANS } from '@/lib/plans';
 import { logInfo, logError } from '@/lib/logger';
 
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
 export async function PATCH(request: Request, { params }: { params: { id: string } }) {
   const supabase = createClient();
   const {
@@ -23,6 +25,26 @@ export async function PATCH(request: Request, { params }: { params: { id: string
   const useAiIndexing: boolean | undefined = body?.useAiIndexing;
   const allowEmailTool: boolean | undefined = body?.allowEmailTool;
   const loadingMessagesInput: unknown = body?.loadingMessages;
+  const notificationEmailInput: unknown = body?.notificationEmail;
+
+  // null or empty string clears it; anything else must look like an email.
+  let notificationEmail: string | null | undefined;
+  if (notificationEmailInput !== undefined) {
+    if (notificationEmailInput === null) {
+      notificationEmail = null;
+    } else if (typeof notificationEmailInput === 'string') {
+      const trimmed = notificationEmailInput.trim();
+      if (trimmed === '') {
+        notificationEmail = null;
+      } else if (trimmed.length > 254 || !EMAIL_RE.test(trimmed)) {
+        return NextResponse.json({ error: "Cette adresse email n'est pas valide." }, { status: 400 });
+      } else {
+        notificationEmail = trimmed;
+      }
+    } else {
+      return NextResponse.json({ error: 'notificationEmail doit être une chaîne (ou null).' }, { status: 400 });
+    }
+  }
 
   // null (explicit reset to the app default) or a non-empty array of
   // trimmed, non-empty strings — docs/roadmap.md item 47.
@@ -67,6 +89,7 @@ export async function PATCH(request: Request, { params }: { params: { id: string
     useDocuments === undefined &&
     useAiIndexing === undefined &&
     allowEmailTool === undefined &&
+    notificationEmail === undefined &&
     loadingMessages === undefined
   ) {
     return NextResponse.json({ error: 'Rien à mettre à jour.' }, { status: 400 });
@@ -111,6 +134,7 @@ export async function PATCH(request: Request, { params }: { params: { id: string
       ...(useDocuments !== undefined ? { use_documents: useDocuments } : {}),
       ...(useAiIndexing !== undefined ? { use_ai_indexing: useAiIndexing } : {}),
       ...(allowEmailTool !== undefined ? { allow_email_tool: allowEmailTool } : {}),
+      ...(notificationEmail !== undefined ? { notification_email: notificationEmail } : {}),
       ...(loadingMessages !== undefined ? { loading_messages: loadingMessages } : {}),
     })
     .eq('id', params.id);

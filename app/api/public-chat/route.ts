@@ -52,6 +52,7 @@ type ChatbotAccessResult =
         system_prompt_template: string;
         use_documents: boolean;
         allow_email_tool: boolean;
+        notification_email: string | null;
       };
     }
   | { ok: false; reason: 'not_found' | 'private' | 'origin_blocked' };
@@ -76,7 +77,9 @@ async function getAccessibleChatbot(
 ): Promise<ChatbotAccessResult> {
   const { data: chatbot, error } = await admin
     .from('chatbots')
-    .select('id, organization_id, system_prompt_template, is_public, allowed_origins, use_documents, allow_email_tool')
+    .select(
+      'id, organization_id, system_prompt_template, is_public, allowed_origins, use_documents, allow_email_tool, notification_email'
+    )
     .eq('id', chatbotId)
     .single();
 
@@ -243,15 +246,16 @@ export async function POST(request: Request) {
         );
         controller.enqueue(encoder.encode(sseEvent('sources', { sources })));
 
-        const tools = chatbot.allow_email_tool
-          ? [createNotifyOwnerOfLeadTool({ ...logCtx, conversationId })]
+        const notifyEmail = chatbot.allow_email_tool ? chatbot.notification_email : null;
+        const tools = notifyEmail
+          ? [createNotifyOwnerOfLeadTool(notifyEmail, { ...logCtx, conversationId })]
           : undefined;
 
         const systemPrompt = buildSystemPrompt({
           systemPromptTemplate: chatbot.system_prompt_template,
           contextChunks: chunks,
           useDocuments: chatbot.use_documents,
-          toolsNote: chatbot.allow_email_tool ? NOTIFY_OWNER_PROMPT_NOTE : undefined,
+          toolsNote: notifyEmail ? NOTIFY_OWNER_PROMPT_NOTE : undefined,
         });
 
         let answer = '';

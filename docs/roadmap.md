@@ -1236,14 +1236,16 @@ chatbot. Repensé : l'outil **notifie le propriétaire** qu'un visiteur veut
   (mention de vouloir être rappelé, du mot "email"/"contact"...), sans
   exiger qu'il ait donné son adresse (contrairement à la version
   précédente).
-- **Destinataire codé en dur** (`OWNER_NOTIFICATION_EMAIL` dans
-  `lib/agenticTools.ts`) sur décision explicite (2026-10-12), le temps de
-  valider que le déclenchement fonctionne bien en usage réel — **TODO** :
-  remplacer par un champ `chatbots.notification_email` configurable dans
-  les paramètres du chatbot une fois cette phase de validation terminée.
-  Noter que coder une vraie adresse email en dur la met dans l'historique
-  Git — acceptable pour cette phase de test jetable, pas pour la version
-  durable.
+- **Destinataire configurable ✅ Fait** (migration
+  `0016_chatbot_notification_email.sql`, `chatbots.notification_email`) :
+  remplace l'adresse qui était codée en dur dans `lib/agenticTools.ts`
+  (`createNotifyOwnerOfLeadTool(ownerEmail, logCtx)`). Saisie dans
+  `components/EmailToolToggle.tsx`, format validé côté serveur dans
+  `PATCH /api/chatbots/[id]`. Les routes de chat n'exposent l'outil au
+  modèle que si `allow_email_tool` est coché **et** qu'une adresse est
+  enregistrée — un chatbot existant avec la case cochée reste donc muet
+  tant que son propriétaire n'a pas renseigné son adresse. L'ancienne
+  adresse reste dans l'historique Git.
 
 Testé : `tsc --noEmit` propre, 114 tests au vert (3 adaptés aux nouveaux
 nom/paramètres de l'outil).
