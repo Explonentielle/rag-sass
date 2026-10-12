@@ -77,4 +77,42 @@ describe('buildSystemPrompt', () => {
     expect(prompt).not.toContain('x.pdf'); // les chunks fournis sont bien ignorés
     expect(prompt).not.toContain('UNIQUE source de vérité');
   });
+
+  // roadmap item 33 : sans ce `toolsNote`, le modèle lisait "N'utilise
+  // aucune connaissance externe à ces extraits" comme une interdiction
+  // d'utiliser un outil disponible (ex. envoyer un email) — il refusait de
+  // l'appeler alors qu'il lui était techniquement proposé. Ces tests
+  // vérifient que la note est bien ajoutée, dans les deux modes (avec et
+  // sans documents), pour empêcher une régression silencieuse de ce bug.
+  it('appends toolsNote after the grounding instruction when documents are used', () => {
+    const prompt = buildSystemPrompt({
+      systemPromptTemplate: template,
+      contextChunks: [],
+      toolsNote: 'Tu peux aussi envoyer un email.',
+    });
+
+    expect(prompt).toContain('UNIQUE source de vérité');
+    expect(prompt).toContain('Tu peux aussi envoyer un email.');
+    // La note doit arriver APRÈS la règle de cadrage, pas avant — sinon la
+    // règle "n'utilise aucune connaissance externe" pourrait sembler
+    // s'appliquer à la note elle-même.
+    expect(prompt.indexOf('UNIQUE source de vérité')).toBeLessThan(prompt.indexOf('email'));
+  });
+
+  it('appends toolsNote even in prompt-only mode (useDocuments: false)', () => {
+    const prompt = buildSystemPrompt({
+      systemPromptTemplate: template,
+      contextChunks: [],
+      useDocuments: false,
+      toolsNote: 'Tu peux aussi envoyer un email.',
+    });
+
+    expect(prompt).toContain(template);
+    expect(prompt).toContain('Tu peux aussi envoyer un email.');
+  });
+
+  it('adds nothing extra when toolsNote is not provided', () => {
+    const prompt = buildSystemPrompt({ systemPromptTemplate: template, contextChunks: [] });
+    expect(prompt).not.toContain('outil');
+  });
 });

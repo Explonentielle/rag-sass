@@ -1,5 +1,6 @@
 import { getAdminClient } from '@/lib/supabase/admin';
 import { embedText, streamAnswer, rewriteQuery, rerankChunks } from '@/lib/openai';
+import { createSendFollowUpEmailTool, SEND_FOLLOW_UP_EMAIL_PROMPT_NOTE } from '@/lib/agenticTools';
 import { hybridSearch } from '@/lib/elasticsearch';
 import { buildSystemPrompt } from '@/lib/prompts';
 import { logInfo, logWarn, logError } from '@/lib/logger';
@@ -50,6 +51,7 @@ type ChatbotAccessResult =
         organization_id: string;
         system_prompt_template: string;
         use_documents: boolean;
+        allow_email_tool: boolean;
       };
     }
   | { ok: false; reason: 'not_found' | 'private' | 'origin_blocked' };
@@ -74,7 +76,7 @@ async function getAccessibleChatbot(
 ): Promise<ChatbotAccessResult> {
   const { data: chatbot, error } = await admin
     .from('chatbots')
-    .select('id, organization_id, system_prompt_template, is_public, allowed_origins, use_documents')
+    .select('id, organization_id, system_prompt_template, is_public, allowed_origins, use_documents, allow_email_tool')
     .eq('id', chatbotId)
     .single();
 
@@ -241,14 +243,19 @@ export async function POST(request: Request) {
         );
         controller.enqueue(encoder.encode(sseEvent('sources', { sources })));
 
+        const tools = chatbot.allow_email_tool
+          ? [createSendFollowUpEmailTool({ ...logCtx, conversationId })]
+          : undefined;
+
         const systemPrompt = buildSystemPrompt({
           systemPromptTemplate: chatbot.system_prompt_template,
           contextChunks: chunks,
           useDocuments: chatbot.use_documents,
+          toolsNote: chatbot.allow_email_tool ? SEND_FOLLOW_UP_EMAIL_PROMPT_NOTE : undefined,
         });
 
         let answer = '';
-        const gen = streamAnswer({ systemPrompt, history, question });
+        const gen = streamAnswer({ systemPrompt, history, question, tools });
         let step = await gen.next();
         while (!step.done) {
           answer += step.value;

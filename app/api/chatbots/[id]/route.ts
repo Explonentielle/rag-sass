@@ -21,6 +21,28 @@ export async function PATCH(request: Request, { params }: { params: { id: string
   const allowedOriginsInput: unknown = body?.allowedOrigins;
   const useDocuments: boolean | undefined = body?.useDocuments;
   const useAiIndexing: boolean | undefined = body?.useAiIndexing;
+  const allowEmailTool: boolean | undefined = body?.allowEmailTool;
+  const loadingMessagesInput: unknown = body?.loadingMessages;
+
+  // null (explicit reset to the app default) or a non-empty array of
+  // trimmed, non-empty strings — docs/roadmap.md item 47.
+  let loadingMessages: string[] | null | undefined;
+  if (loadingMessagesInput !== undefined) {
+    if (loadingMessagesInput === null) {
+      loadingMessages = null;
+    } else if (
+      Array.isArray(loadingMessagesInput) &&
+      loadingMessagesInput.every((m) => typeof m === 'string')
+    ) {
+      loadingMessages = loadingMessagesInput.map((m) => m.trim()).filter(Boolean);
+      if (loadingMessages.length === 0) loadingMessages = null;
+    } else {
+      return NextResponse.json(
+        { error: 'loadingMessages doit être un tableau de chaînes (ou null).' },
+        { status: 400 }
+      );
+    }
+  }
 
   let allowedOrigins: string[] | undefined;
   if (allowedOriginsInput !== undefined) {
@@ -43,7 +65,9 @@ export async function PATCH(request: Request, { params }: { params: { id: string
     isPublic === undefined &&
     allowedOrigins === undefined &&
     useDocuments === undefined &&
-    useAiIndexing === undefined
+    useAiIndexing === undefined &&
+    allowEmailTool === undefined &&
+    loadingMessages === undefined
   ) {
     return NextResponse.json({ error: 'Rien à mettre à jour.' }, { status: 400 });
   }
@@ -86,6 +110,8 @@ export async function PATCH(request: Request, { params }: { params: { id: string
       ...(allowedOrigins !== undefined ? { allowed_origins: allowedOrigins } : {}),
       ...(useDocuments !== undefined ? { use_documents: useDocuments } : {}),
       ...(useAiIndexing !== undefined ? { use_ai_indexing: useAiIndexing } : {}),
+      ...(allowEmailTool !== undefined ? { allow_email_tool: allowEmailTool } : {}),
+      ...(loadingMessages !== undefined ? { loading_messages: loadingMessages } : {}),
     })
     .eq('id', params.id);
 

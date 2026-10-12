@@ -91,16 +91,28 @@ export function getPromptTemplate(id: string): PromptTemplate | undefined {
  * no document wrapper and no "answer only from documents" instruction: that
  * instruction would make the model refuse every question, since there are
  * never any chunks to ground it in.
+ *
+ * `toolsNote`, when given, is appended last regardless of `useDocuments`
+ * (docs/roadmap.md item 33). Found the hard way: the "N'utilise aucune
+ * connaissance externe..." instruction below (and every template's own
+ * "réponds STRICTEMENT à partir des documents") reads to the model as
+ * "never do anything beyond answering from documents" — without an
+ * explicit carve-out, a chatbot with a tool enabled (e.g. send_follow_up_
+ * email) just refuses to call it and apologizes instead, even though the
+ * tool is technically available via the API's `tools` param. The note
+ * has to say outright that using an offered tool isn't "external
+ * knowledge" the grounding rule forbids.
  */
 export function buildSystemPrompt(params: {
   systemPromptTemplate: string;
   contextChunks: { content: string; document_filename: string }[];
   useDocuments?: boolean;
+  toolsNote?: string;
 }): string {
-  const { systemPromptTemplate, contextChunks, useDocuments = true } = params;
+  const { systemPromptTemplate, contextChunks, useDocuments = true, toolsNote } = params;
 
   if (!useDocuments) {
-    return systemPromptTemplate;
+    return toolsNote ? `${systemPromptTemplate}\n\n${toolsNote}` : systemPromptTemplate;
   }
 
   const context = contextChunks.length
@@ -111,11 +123,13 @@ export function buildSystemPrompt(params: {
         .join('\n\n---\n\n')
     : '(Aucun document pertinent trouvé pour cette question.)';
 
-  return `${systemPromptTemplate}
+  const base = `${systemPromptTemplate}
 
-Voici les extraits de documents à utiliser comme UNIQUE source de vérité pour répondre :
+Voici les extraits de documents à utiliser comme UNIQUE source de vérité pour répondre aux questions posées :
 
 ${context}
 
-N'utilise aucune connaissance externe à ces extraits. Si la réponse n'y figure pas, dis-le clairement.`;
+N'utilise aucune connaissance externe à ces extraits pour répondre aux questions. Si la réponse n'y figure pas, dis-le clairement.`;
+
+  return toolsNote ? `${base}\n\n${toolsNote}` : base;
 }

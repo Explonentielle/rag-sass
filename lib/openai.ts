@@ -44,6 +44,24 @@ export interface ChatTurn {
 }
 
 /**
+ * One agentic capability the model can choose to invoke mid-answer
+ * (docs/roadmap.md item 33). `parameters` is a JSON Schema object (same
+ * shape OpenAI expects for function tools) — `execute` receives the
+ * model's parsed arguments and returns a short string fed back to the
+ * model as the tool's result, not shown to the user directly. Business
+ * logic (what the tool actually does) lives outside this file — see
+ * lib/agenticTools.ts — this module only knows how to run the loop.
+ */
+export interface ChatTool {
+  name: string;
+  description: string;
+  parameters: Record<string, unknown>;
+  execute: (args: Record<string, unknown>) => Promise<string>;
+}
+
+type ToolCallAccumulator = { id: string; name: string; arguments: string };
+
+/**
  * Streams a RAG answer from OpenAI. `history` should NOT include the
  * current question — that's passed separately as `question` and appended
  * as the final user turn. No max_completion_tokens is set: the answer runs
@@ -52,34 +70,107 @@ export interface ChatTurn {
  * output ceiling is the only limit left. The generator's return value
  * (available via manual `.next()` iteration, not a `for await...of` loop)
  * reports whether that ceiling was hit anyway, as a safety net.
+ *
+ * `tools`, if given, lets the model call at most one round of tools
+ * before its final answer (docs/roadmap.md item 33, first version —
+ * deliberately not an open-ended multi-step agent loop yet). Nothing is
+ * yielded while the model is deciding whether to call a tool; once it
+ * either answers directly or a tool has run, the real answer streams
+ * exactly like today's no-tools path — no added latency for the common
+ * case where no tool is needed.
  */
 export async function* streamAnswer(params: {
   systemPrompt: string;
   history: ChatTurn[];
   question: string;
   model?: string;
+  tools?: ChatTool[];
 }): AsyncGenerator<string, { truncated: boolean }, void> {
-  const { systemPrompt, history, question, model } = params;
+  const { systemPrompt, history, question, model, tools } = params;
   const openai = getOpenAiClient();
 
-  const stream = await openai.chat.completions.create({
-    model: model || DEFAULT_CHAT_MODEL,
-    stream: true,
-    messages: [
-      { role: 'system', content: systemPrompt },
-      ...history.map((turn) => ({ role: turn.role, content: turn.content }) as const),
-      { role: 'user', content: question },
-    ],
-  });
+  const messages: OpenAI.Chat.ChatCompletionMessageParam[] = [
+    { role: 'system', content: systemPrompt },
+    ...history.map((turn) => ({ role: turn.role, content: turn.content }) as const),
+    { role: 'user', content: question },
+  ];
 
-  let finishReason: string | null = null;
-  for await (const chunk of stream) {
-    const text = chunk.choices[0]?.delta?.content;
-    if (text) yield text;
-    if (chunk.choices[0]?.finish_reason) finishReason = chunk.choices[0].finish_reason;
+  const toolDefs = tools?.map((t) => ({
+    type: 'function' as const,
+    function: { name: t.name, description: t.description, parameters: t.parameters },
+  }));
+
+  // Two rounds max: round 0 may call a tool (if `tools` is given); round 1
+  // never gets `tools` attached, so it can only produce a final answer —
+  // this bounds the loop without an explicit step counter.
+  for (let round = 0; round < 2; round++) {
+    const stream = await openai.chat.completions.create({
+      model: model || DEFAULT_CHAT_MODEL,
+      stream: true,
+      messages,
+      ...(toolDefs && round === 0 ? { tools: toolDefs } : {}),
+      // gpt-5.6-luna rejects tool calls combined with its default reasoning
+      // effort on /v1/chat/completions ("Function tools with
+      // reasoning_effort are not supported... set reasoning_effort to
+      // 'none'", hit live 2026-10-12). 'none' isn't in this pinned SDK's
+      // ReasoningEffort type yet (only 'low'|'medium'|'high'|null) even
+      // though the API itself accepts it — hence the cast. Scoped to
+      // tool-enabled calls only, so a normal grounded Q&A answer (the
+      // large majority of requests) keeps the model's default reasoning.
+      ...(tools ? { reasoning_effort: 'none' as OpenAI.Chat.ChatCompletionCreateParams['reasoning_effort'] } : {}),
+    });
+
+    let finishReason: string | null = null;
+    const toolCalls = new Map<number, ToolCallAccumulator>();
+
+    for await (const chunk of stream) {
+      const delta = chunk.choices[0]?.delta;
+      if (delta?.content) yield delta.content;
+      if (delta?.tool_calls) {
+        for (const tc of delta.tool_calls) {
+          const acc = toolCalls.get(tc.index) ?? { id: '', name: '', arguments: '' };
+          if (tc.id) acc.id = tc.id;
+          if (tc.function?.name) acc.name += tc.function.name;
+          if (tc.function?.arguments) acc.arguments += tc.function.arguments;
+          toolCalls.set(tc.index, acc);
+        }
+      }
+      if (chunk.choices[0]?.finish_reason) finishReason = chunk.choices[0].finish_reason;
+    }
+
+    if (finishReason !== 'tool_calls' || toolCalls.size === 0 || !tools) {
+      return { truncated: finishReason === 'length' };
+    }
+
+    // The model asked to call tool(s) instead of answering — run them,
+    // feed the results back as 'tool' messages, then loop once more
+    // (round 1) for the real, user-facing streamed answer informed by
+    // what the tool(s) returned.
+    const calls = Array.from(toolCalls.values());
+    messages.push({
+      role: 'assistant',
+      content: null,
+      tool_calls: calls.map((c) => ({
+        id: c.id,
+        type: 'function' as const,
+        function: { name: c.name, arguments: c.arguments },
+      })),
+    });
+
+    for (const call of calls) {
+      const tool = tools.find((t) => t.name === call.name);
+      let result: string;
+      try {
+        const args = call.arguments ? JSON.parse(call.arguments) : {};
+        result = tool ? await tool.execute(args) : `Outil inconnu: ${call.name}`;
+      } catch (err) {
+        result = `Échec de l'outil "${call.name}": ${err instanceof Error ? err.message : 'erreur inconnue'}`;
+      }
+      messages.push({ role: 'tool', tool_call_id: call.id, content: result });
+    }
   }
 
-  return { truncated: finishReason === 'length' };
+  return { truncated: false };
 }
 
 // ---------------------------------------------------------------------------

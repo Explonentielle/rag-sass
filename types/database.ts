@@ -69,6 +69,8 @@ export interface Database {
           allowed_origins: string[];
           use_documents: boolean;
           use_ai_indexing: boolean;
+          allow_email_tool: boolean;
+          loading_messages: string[] | null;
           created_at: string;
         };
         Insert: {
@@ -80,6 +82,8 @@ export interface Database {
           allowed_origins?: string[];
           use_documents?: boolean;
           use_ai_indexing?: boolean;
+          allow_email_tool?: boolean;
+          loading_messages?: string[] | null;
           created_at?: string;
         };
         Update: {
@@ -91,6 +95,8 @@ export interface Database {
           allowed_origins?: string[];
           use_documents?: boolean;
           use_ai_indexing?: boolean;
+          allow_email_tool?: boolean;
+          loading_messages?: string[] | null;
           created_at?: string;
         };
       };
