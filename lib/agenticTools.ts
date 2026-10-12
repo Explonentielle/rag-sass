@@ -22,7 +22,11 @@ const OWNER_NOTIFICATION_EMAIL = 'alex59debonnieres@gmail.com';
  * reads to the model as "never take any action", and it refuses to call
  * the tool even when it's technically offered via the API.
  */
-export const NOTIFY_OWNER_PROMPT_NOTE = `Tu as aussi accès à un outil, notify_bot_owner, pour prévenir le propriétaire de ce chatbot qu'un visiteur souhaite être recontacté. Ce n'est PAS une connaissance externe interdite par la règle ci-dessus : c'est une action que tu es explicitement autorisé à réaliser en plus de répondre aux questions. Utilise cet outil dès que le visiteur exprime l'envie d'être recontacté ou suivi par un humain — par exemple s'il mentionne vouloir être rappelé, demande qu'on le contacte par email, ou utilise simplement le mot "email"/"contact"/"rappeler" dans ce sens. Tu n'as pas besoin que le visiteur donne son adresse email pour utiliser cet outil : note simplement dans le résumé les coordonnées qu'il a données (email, téléphone, nom...), ou l'absence de coordonnées s'il n'en a donné aucune.`;
+export const NOTIFY_OWNER_PROMPT_NOTE = `Tu as aussi accès à un outil, notify_bot_owner, pour prévenir le propriétaire de ce chatbot qu'un visiteur souhaite être recontacté. Ce n'est PAS une connaissance externe interdite par la règle ci-dessus : c'est une action que tu es explicitement autorisé à réaliser en plus de répondre aux questions.
+
+Dès que le visiteur exprime l'envie d'être recontacté ou suivi par un humain (il mentionne vouloir être rappelé, demande qu'on le contacte, utilise le mot "email"/"contact"/"rappeler" dans ce sens...) :
+1. S'il n'a PAS encore donné de coordonnées (téléphone ou email) dans la conversation, NE PAS utiliser l'outil tout de suite — demande-lui d'abord comment le joindre ("Avec plaisir ! Quel est le meilleur moyen de vous recontacter, téléphone ou email ?"). Un rappel sans coordonnées ne sert à rien, ne confirme jamais qu'on va le recontacter avant d'avoir cette information.
+2. Une fois qu'il a répondu — qu'il ait donné ses coordonnées ou explicitement refusé de les donner — utilise l'outil, avec les coordonnées obtenues (ou une note explicite qu'il a refusé de les donner).`;
 
 /**
  * Notifies the chatbot's owner that a visitor wants to be followed up
@@ -37,14 +41,14 @@ export function createNotifyOwnerOfLeadTool(logCtx: Record<string, unknown>): Ch
   return {
     name: 'notify_bot_owner',
     description:
-      "Prévient le propriétaire du chatbot qu'un visiteur souhaite être recontacté, avec un résumé de sa demande et les coordonnées qu'il a données (s'il en a donné).",
+      "Prévient le propriétaire du chatbot qu'un visiteur souhaite être recontacté. N'appelle cet outil qu'après avoir demandé au visiteur comment le joindre — soit il a donné ses coordonnées, soit il a explicitement refusé de les donner.",
     parameters: {
       type: 'object',
       properties: {
         visitor_contact: {
           type: 'string',
           description:
-            "Coordonnées données par le visiteur dans la conversation (email, téléphone, nom...). Chaîne vide si aucune n'a été donnée.",
+            "Coordonnées données par le visiteur (email, téléphone, nom...), ou une note explicite s'il a refusé de les donner. Ne doit être vide que si tu n'as pas encore eu l'occasion de lui demander.",
         },
         summary: {
           type: 'string',
