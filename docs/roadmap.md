@@ -34,6 +34,8 @@ fixe — sert de mémoire centralisée plutôt que de planning strict.
 | 43 | Compte | Suppression d'un chatbot | Moyen | ✅ Fait |
 | 44 | Sécurité | Durcir le garde-fou SSRF de l'ingestion par URL (DNS rebinding + redirection) | Moyen (redirection) / Élevé (DNS rebinding) | Redirection ✅ Fait — DNS rebinding noté, pas implémenté (risque limité tant que réservé aux membres authentifiés) |
 | 45 | Qualité | Voir le contenu indexé (chunks) depuis la page Documents | Moyen | ✅ Fait |
+| 46 | Chat | Chatbot vocal intégrable via iframe (STT/TTS) | Élevé | Noté, pas implémenté — distinct de l'item 25 (reste dans le widget web) |
+| 47 | Chat | Indicateur de chargement du chat trop statique (points fixes) | Faible-moyen | ✅ Fait (rotation animée + personnalisable par chatbot) |
 | 21 | Catalogue | Agent de qualification de leads | Élevé | Item 3 (agent) |
 | 22 | Catalogue | Brouillon de réponse email | Moyen | — |
 | 23 | Catalogue | Analyseur de contrats (extraction de clauses) | Moyen | — |
@@ -46,7 +48,7 @@ fixe — sert de mémoire centralisée plutôt que de planning strict.
 | 30 | Compte | Suppression d'organisation + gestion des membres (retirer, changer de rôle) | Moyen | ✅ Fait |
 | 31 | Sécurité | Restriction de domaine + toggle "chatbot public/privé" pour les embeds | Moyen | ✅ Fait — couvre la limite notée à l'item 29 |
 | 32 | RAG | Mode "prompt seul" (chatbot sans document obligatoire) | Faible-moyen | ✅ Fait — même besoin identifié indépendamment côté landing (item 21bis "Assistant sans documents") |
-| 33 | Intégrations | Branchement sur plateformes tierces (calendrier, email) | Élevé | Item 3 (agent), items 21/25/26 du catalogue en sont des variantes |
+| 33 | Intégrations | Branchement sur plateformes tierces (calendrier, email) | Élevé | Étape 1 (pattern agentique, outil email) ✅ Fait — étape 2 (MCP) et étape 3 (UI config) restent backlog |
 | 34 | Pricing | Plan gratuit | Moyen | Item 17 (plan), item 10 (rate limiting déjà en place) |
 | 35 | Pricing | Calcul réel de coût/rentabilité par message | Moyen | Item 17 (comptage déjà fait) — bloqué sur le $/token réel du modèle |
 | 36 | Pricing | Comportement du plan Solo à la limite atteinte | Faible (décision) | Item 17, item 34 (le palier gratuit a le même besoin) |
@@ -1151,7 +1153,66 @@ une UI de configuration par chatbot ("quelles actions cette instance peut
 déclencher"). À dimensionner sérieusement avant de s'y engager — pas une
 extension mineure du pipeline actuel.
 
-**Effort** : élevé. Reste une idée backlog, aucun code à ce stade.
+**Décision d'implémentation (2026-10-12)** : passer par **MCP** (Model
+Context Protocol) comme mécanisme de connexion plutôt que de coder une
+intégration OAuth maison par plateforme. MCP est devenu un standard ouvert
+(donné à la Linux Foundation, soutenu par Anthropic/OpenAI/Google/
+Microsoft/Amazon), plus de 3000 serveurs MCP publics recensés — brancher
+un client MCP une fois rend accessible tout nouvel outil qui expose un
+serveur MCP (calendrier, email, CRM...) sans nouveau code d'intégration
+par plateforme. Discuté en comparant au positionnement de Mammouth AI
+(mode agentique + connecteurs MCP ajoutés mi-2026) — voir aussi item 18
+sur l'indexation IA pour le même esprit "standard existant plutôt que
+réinventer". Toujours un gros chantier (serveur MCP à héberger ou
+consommer, gestion des credentials par organisation, UI de configuration
+par chatbot) — la décision porte sur le *mécanisme*, pas sur l'effort,
+qui reste élevé.
+
+**Étape 1 — pattern agentique de base — ✅ Fait (2026-10-12), avant MCP.**
+Plutôt que d'attaquer MCP directement, validé le mécanisme de function
+calling sur une seule action concrète : l'envoi d'un email de suivi —
+choisie en premier parce qu'elle ne demande aucun OAuth par organisation
+(contrairement à un calendrier), juste une clé API (Resend).
+
+- **`lib/openai.ts`** (`streamAnswer`) : accepte maintenant un paramètre
+  `tools` optionnel (type `ChatTool` : nom, description, schéma JSON des
+  paramètres, fonction `execute`). Boucle plafonnée à 2 rounds max : le
+  round 0 peut appeler un outil (si `tools` est fourni) ; le round 1 ne
+  reçoit jamais `tools`, donc ne peut que produire une réponse finale —
+  borne la boucle sans compteur explicite. Les deltas de tool call sont
+  fragmentés sur plusieurs chunks par l'API (nom et arguments arrivent
+  en morceaux) — accumulés par index avant exécution. Rien n'est streamé
+  au visiteur tant que le modèle n'a pas décidé s'il appelle un outil ou
+  répond directement — **aucune latence ajoutée** pour le cas (largement
+  majoritaire) où aucun outil n'est nécessaire.
+- **`lib/email.ts`** : envoi transactionnel via l'API REST de Resend —
+  distinct de la config SMTP Supabase Auth (`docs/deployment.md` §3, qui
+  ne couvre que les emails *de Supabase* — invitations, changement
+  d'email). Optionnel (`RESEND_API_KEY`) : sans clé configurée, l'outil
+  échoue proprement et le signale au modèle plutôt que de planter l'app.
+- **`lib/agenticTools.ts`** (`createSendFollowUpEmailTool`) : le modèle est
+  instruit de n'utiliser une adresse que si le visiteur l'a donnée
+  explicitement dans la conversation — jamais inventée — et l'adresse est
+  revalidée côté serveur (regex) avant tout envoi, l'instruction seule
+  n'est pas une garantie suffisante.
+- **Opt-in par chatbot** (migration `0014_chatbot_email_tool.sql`,
+  `chatbots.allow_email_tool`, défaut `false`) — un chatbot ne doit pas
+  se mettre à envoyer des emails au nom de son propriétaire sans que
+  celui-ci l'active explicitement. UI : `components/EmailToolToggle.tsx`,
+  section "Comportement du chatbot" de la page du chatbot. Branché dans
+  les deux routes de chat (`/api/chat` et `/api/public-chat`).
+
+Testé : `tsc --noEmit` propre, 106 tests au vert (14 nouveaux — boucle de
+tool calling dans `lib/openai.test.ts`, dont un faux stream OpenAI avec
+tool call fragmenté sur plusieurs chunks pour reproduire fidèlement le
+comportement réel de l'API ; validation/échec de l'outil email).
+
+**Reste à faire** : étape 2 (brancher un vrai serveur MCP, calendrier en
+priorité) et étape 3 (UI de configuration listant les actions autorisées
+par chatbot — aujourd'hui un seul outil possible, pas encore un vrai
+besoin de sélection).
+
+**Effort** : élevé. Étape 1 faite, étapes 2/3 restent backlog.
 
 ---
 
@@ -1597,4 +1658,67 @@ numéro de segment.
 
 Testé : `tsc --noEmit` propre, 86 tests au vert (pas de nouveau test —
 `getDocumentChunks` est une requête ES simple, symétrique de fonctions
-déjà non testées unitairement comme `deleteDocumentChunks`).   
+déjà non testées unitairement comme `deleteDocumentChunks`).
+
+### 46. Chatbot vocal intégrable via iframe
+
+**Idée (2026-10-12)**, née de la session de repositionnement
+produit/marché (séparation Corpus.ia / brique technique RAG++, voir le
+plan d'action discuté en conversation). Le widget actuel
+(`components/EmbedBubbleWidget.tsx` + `public/widget.js`) est texte
+uniquement ; l'idée est une variante vocale du même chat — parler au lieu
+d'écrire, réponse en voix de synthèse.
+
+**Distinct de l'item 25** (Standard IA téléphone/WhatsApp) : l'item 25
+suppose une intégration téléphonie/WhatsApp Business API (canal hors
+web) ; celui-ci reste dans le widget web existant (iframe), juste une
+modalité d'entrée/sortie différente — pas de nouveau canal de
+distribution, "seulement" de l'audio en plus du texte.
+
+**Pas chiffré, gros morceau pas détaillé encore** : speech-to-text côté
+visiteur (micro navigateur, streaming), text-to-speech côté réponse
+(latence à maîtriser pour rester conversationnel), et la question de
+l'API à utiliser (OpenAI propose des modèles voix temps réel — à vérifier
+au moment de s'y mettre plutôt que de figer un choix maintenant, l'offre
+bouge vite sur ce point). Nouvelle modalité jamais touchée dans le
+produit actuel — à dimensionner sérieusement avant de s'engager, comme
+l'item 33.
+
+**Effort** : élevé. Idée backlog, aucun code à ce stade.
+
+### 47. Indicateur de chargement du chat trop statique — ✅ Fait
+
+**Signalé (2026-10-12)** : pendant la génération de la réponse (3-4
+secondes), le seul retour visuel était `<p>···</p>` — trois points fixes,
+immobiles, pas terrible en usage réel.
+
+**Solution implémentée** :
+- **`lib/loadingMessages.ts`** : `DEFAULT_LOADING_MESSAGES` (neutre et
+  professionnel — "Je réfléchis...", "J'analyse votre question...", etc.,
+  pas le ton "creating... vibing..." évoqué en discussion : c'est ce que
+  verra par défaut n'importe quel visiteur d'un vrai client, pas juste la
+  démo Corpus.ai) + `resolveLoadingMessages` (liste custom si non vide,
+  sinon repli sur les valeurs par défaut).
+- **`components/ChatWidget.tsx`** : nouveau prop `loadingMessages`, rotation
+  automatique (`setInterval`, ~1,6s) tant que `loading` est vrai, remise à
+  zéro à chaque nouvelle question. `animate-pulse` (Tailwind) en plus du
+  texte qui change, pour l'effet "clignote" minimal demandé même si le
+  visiteur ne lit pas le texte.
+- **Personnalisable par chatbot** (migration `0015_chatbot_loading_messages.sql`,
+  `chatbots.loading_messages text[]`, nullable = défaut) — UI
+  `components/LoadingMessagesForm.tsx` (textarea, un message par ligne,
+  bouton "Revenir aux valeurs par défaut"), section "Comportement du
+  chatbot" de la page du chatbot.
+- Branché partout où `ChatWidget` est rendu : chat de test authentifié
+  (`app/dashboard/chatbots/[id]/chat/page.tsx`), page d'embed brute et
+  mode bulle (`app/embed/[chatbotId]/page.tsx` → `EmbedBubbleWidget.tsx`,
+  lues via le client admin puisque cette route est anonyme). Le widget
+  support interne (`FloatingChatWidget.tsx`) n'a pas été modifié — pas de
+  config par chatbot nécessaire pour l'usage interne, il garde les valeurs
+  par défaut automatiquement.
+
+Testé : `tsc --noEmit` propre, 114 tests au vert (4 nouveaux pour
+`resolveLoadingMessages`).
+
+**Effort** : faible pour le clignotement seul ; moyen pour les messages
+alternés custom (nouveau champ de config + UI back-office).   

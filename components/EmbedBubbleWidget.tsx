@@ -18,9 +18,11 @@ import { Icon, ICONS } from '@/components/icons';
 export default function EmbedBubbleWidget({
   chatbotId,
   accentColor,
+  loadingMessages,
 }: {
   chatbotId: string;
   accentColor?: string;
+  loadingMessages?: string[];
 }) {
   const [open, setOpen] = useState(false);
 
@@ -48,6 +50,7 @@ export default function EmbedBubbleWidget({
             placeholder="Posez votre question..."
             className="h-full rounded-xl border border-slate-200 shadow-2xl"
             accentColor={accentColor}
+            loadingMessages={loadingMessages}
           />
         </div>
       )}

@@ -4,6 +4,12 @@ import { useState, useRef, useEffect } from 'react';
 import ReactMarkdown from 'react-markdown';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Card';
+import { resolveLoadingMessages } from '@/lib/loadingMessages';
+
+// How long each message stays on screen before rotating to the next
+// (docs/roadmap.md item 47) — short enough that even a fast answer shows
+// at least two, long enough to actually be readable.
+const LOADING_MESSAGE_INTERVAL_MS = 1600;
 
 // Chat responses come back as Markdown (the LLM formats naturally with
 // **bold**, lists, headers) — render it instead of showing raw syntax.
@@ -222,6 +228,7 @@ export default function ChatWidget({
   placeholder = 'Posez une question sur les documents de ce chatbot.',
   className = 'rounded-xl border border-slate-200 shadow-card',
   accentColor,
+  loadingMessages,
 }: {
   chatbotId: string;
   apiEndpoint?: string;
@@ -234,12 +241,19 @@ export default function ChatWidget({
   // color by the caller (app/embed/[chatbotId]/page.tsx); not re-validated
   // here.
   accentColor?: string;
+  // Custom rotation shown while an answer streams in (docs/roadmap.md item
+  // 47) — falls back to lib/loadingMessages.ts's defaults when omitted or
+  // empty, same resolution the caller already applied server-side, applied
+  // again here defensively in case a caller passes the raw DB column.
+  loadingMessages?: string[];
 }) {
   const isPublic = apiEndpoint === '/api/public-chat';
+  const effectiveLoadingMessages = resolveLoadingMessages(loadingMessages);
 
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
+  const [loadingMessageIndex, setLoadingMessageIndex] = useState(0);
   const [conversations, setConversations] = useState<ConversationSummary[]>([]);
   const [activeConversationId, setActiveConversationId] = useState<string | null>(null);
   // Read from localStorage in an effect, not a useState initializer — that
@@ -251,6 +265,19 @@ export default function ChatWidget({
   useEffect(() => {
     if (isPublic) setVisitorId(getOrCreateVisitorId());
   }, [isPublic]);
+
+  // Rotates the loading message while an answer streams in (item 47) —
+  // starts fresh at index 0 each time loading begins, stops (clearInterval
+  // via the cleanup function) as soon as it ends, whichever triggers first.
+  useEffect(() => {
+    if (!loading) return;
+    setLoadingMessageIndex(0);
+    const interval = setInterval(() => {
+      setLoadingMessageIndex((i) => (i + 1) % effectiveLoadingMessages.length);
+    }, LOADING_MESSAGE_INTERVAL_MS);
+    return () => clearInterval(interval);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loading, effectiveLoadingMessages.length]);
 
   function historyUrl(conversationId?: string) {
     const params = new URLSearchParams({ chatbotId });
@@ -459,7 +486,12 @@ export default function ChatWidget({
                 m.content ? (
                   <ReactMarkdown components={MARKDOWN_COMPONENTS}>{m.content}</ReactMarkdown>
                 ) : (
-                  loading && i === messages.length - 1 && <p>···</p>
+                  loading &&
+                  i === messages.length - 1 && (
+                    <p className="animate-pulse text-slate-500">
+                      {effectiveLoadingMessages[loadingMessageIndex]}
+                    </p>
+                  )
                 )
               ) : (
                 <p className="whitespace-pre-wrap">{m.content}</p>

@@ -1,5 +1,6 @@
 import ChatWidget from '@/components/ChatWidget';
 import EmbedBubbleWidget from '@/components/EmbedBubbleWidget';
+import { getAdminClient } from '@/lib/supabase/admin';
 
 // Only #rgb / #rrggbb / #rrggbbaa — the value flows into inline styles, so
 // this keeps it to a harmless CSS color instead of trusting an arbitrary
@@ -19,7 +20,7 @@ function readAccentColor(color: string | undefined): string | undefined {
 //   iframe itself in response — the "one script tag" integration path.
 // ?color=#rrggbb (either mode): pseudo white-label — see public/widget.js's
 // data-primary-color and readAccentColor() above.
-export default function EmbedPage({
+export default async function EmbedPage({
   params,
   searchParams,
 }: {
@@ -28,8 +29,27 @@ export default function EmbedPage({
 }) {
   const accentColor = readAccentColor(searchParams.color);
 
+  // No session on this route (anonymous iframe) — admin client, same as
+  // /api/public-chat. Not gated behind the full is_public/allowed_origins
+  // check that route does: loading_messages is non-sensitive display text,
+  // and real chat access is still enforced there regardless of what loads
+  // here. Falls back to defaults (ChatWidget's resolveLoadingMessages) on
+  // any failure, including a chatbot that doesn't exist.
+  const { data: chatbot } = await getAdminClient()
+    .from('chatbots')
+    .select('loading_messages')
+    .eq('id', params.chatbotId)
+    .single();
+  const loadingMessages = chatbot?.loading_messages ?? undefined;
+
   if (searchParams.widget === '1') {
-    return <EmbedBubbleWidget chatbotId={params.chatbotId} accentColor={accentColor} />;
+    return (
+      <EmbedBubbleWidget
+        chatbotId={params.chatbotId}
+        accentColor={accentColor}
+        loadingMessages={loadingMessages}
+      />
+    );
   }
 
   return (
@@ -39,6 +59,7 @@ export default function EmbedPage({
         apiEndpoint="/api/public-chat"
         className="h-full border-0 shadow-none"
         accentColor={accentColor}
+        loadingMessages={loadingMessages}
       />
     </div>
   );
