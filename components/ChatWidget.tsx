@@ -533,7 +533,12 @@ export default function ChatWidget({
 
   return (
     <div className={`flex flex-1 flex-col overflow-hidden bg-white ${className}`}>
-      {(conversations.length > 0 || messages.length > 0) && (
+      {/* Public widget (client sites): never show the conversation switcher —
+          a visitor only ever sees their current conversation. Browsing or
+          switching between a visitor's past conversations is dashboard-only
+          (ConversationsPanel, roadmap.md item 48). The internal dashboard
+          "test this chatbot" preview (isPublic false) keeps the switcher. */}
+      {!isPublic && (conversations.length > 0 || messages.length > 0) && (
         <div className="border-b border-slate-200 px-2 py-1.5">
           <ConversationSwitcher
             conversations={conversations}

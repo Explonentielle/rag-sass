@@ -205,6 +205,40 @@ export async function deleteConversationForChatbot(
 }
 
 /**
+ * Loads one conversation's full message thread for the dashboard admin
+ * list (roadmap.md item 20-B/48's expandable row) — any identity, not just
+ * the caller's own, same trust model as listAllConversationsForChatbot.
+ * Scoped to chatbotId first so a conversationId from another chatbot in the
+ * same org can't be pulled into this chatbot's admin view. Returns null if
+ * no matching conversation exists (wrong id, or belongs to another org —
+ * RLS makes it invisible rather than an error).
+ */
+export async function loadHistoryForChatbot(
+  supabase: SupabaseClient<Database>,
+  conversationId: string,
+  chatbotId: string
+): Promise<StoredMessage[] | null> {
+  const { data, error } = await supabase
+    .from('conversations')
+    .select('id')
+    .eq('id', conversationId)
+    .eq('chatbot_id', chatbotId)
+    .maybeSingle();
+
+  if (error) {
+    logError('conversations.load_history_for_chatbot_verify_failed', {
+      conversationId,
+      chatbotId,
+      error: error.message,
+    });
+    throw new Error(`Impossible de vérifier la conversation: ${error.message}`);
+  }
+  if (!data) return null;
+
+  return loadHistory(supabase, conversationId);
+}
+
+/**
  * Fetches a conversation by id, scoped to this identity — used to verify
  * ownership before reading/appending to a client-supplied conversationId.
  * Returns null if it doesn't exist or belongs to someone else.

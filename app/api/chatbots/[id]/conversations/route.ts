@@ -1,6 +1,10 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
-import { listAllConversationsForChatbot, deleteConversationForChatbot } from '@/lib/conversations';
+import {
+  listAllConversationsForChatbot,
+  deleteConversationForChatbot,
+  loadHistoryForChatbot,
+} from '@/lib/conversations';
 import { logError } from '@/lib/logger';
 
 // Dashboard admin tool (roadmap.md item 20-B): lists and deletes any
@@ -19,6 +23,29 @@ export async function GET(request: Request, { params }: { params: { id: string }
   } = await supabase.auth.getUser();
   if (!user) {
     return NextResponse.json({ error: 'Non authentifié.' }, { status: 401 });
+  }
+
+  // Optional: ?conversationId=... returns that one conversation's full
+  // message thread instead of the list — the dashboard's expandable row
+  // detail (roadmap.md item 48).
+  const conversationId = new URL(request.url).searchParams.get('conversationId');
+  if (conversationId) {
+    try {
+      const messages = await loadHistoryForChatbot(supabase, conversationId, params.id);
+      if (!messages) {
+        return NextResponse.json({ error: 'Conversation introuvable.' }, { status: 404 });
+      }
+      return NextResponse.json({ messages });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Erreur inconnue.';
+      logError('admin_conversations.load_history_failed', {
+        userId: user.id,
+        chatbotId: params.id,
+        conversationId,
+        error: message,
+      });
+      return NextResponse.json({ error: message }, { status: 500 });
+    }
   }
 
   try {
