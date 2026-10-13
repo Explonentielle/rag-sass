@@ -189,13 +189,15 @@ export async function loadConversationAttachments(
  */
 export async function removeConversationFiles(
   client: Client,
-  scope: { conversationId: string } | { chatbotIds: string[] }
+  scope: { conversationId: string } | { conversationIds: string[] } | { chatbotIds: string[] }
 ): Promise<void> {
   const base = client.from('conversation_files').select('storage_path');
   const { data, error } =
     'conversationId' in scope
       ? await base.eq('conversation_id', scope.conversationId)
-      : await base.in('chatbot_id', scope.chatbotIds);
+      : 'conversationIds' in scope
+        ? await base.in('conversation_id', scope.conversationIds)
+        : await base.in('chatbot_id', scope.chatbotIds);
 
   if (error) {
     logError('conversation_files.paths_query_failed', { error: error.message });

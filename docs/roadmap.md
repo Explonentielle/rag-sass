@@ -36,7 +36,7 @@ fixe — sert de mémoire centralisée plutôt que de planning strict.
 | 45 | Qualité | Voir le contenu indexé (chunks) depuis la page Documents | Moyen | ✅ Fait |
 | 46 | Chat | Chatbot vocal intégrable via iframe (STT/TTS) | Élevé | Noté, pas implémenté — distinct de l'item 25 (reste dans le widget web) |
 | 47 | Chat | Indicateur de chargement du chat trop statique (points fixes) | Faible-moyen | ✅ Fait (rotation animée + personnalisable par chatbot) |
-| 48 | Chat | Envoi de fichiers par le visiteur dans le widget (réglable par chatbot) | Moyen-élevé | ✅ Fait (stockage + téléchargement dashboard + pièce jointe de l'email) — purge de rétention des fichiers non faite |
+| 48 | Chat | Envoi de fichiers par le visiteur dans le widget (réglable par chatbot) | Moyen-élevé | ✅ Fait (stockage + téléchargement dashboard + pièce jointe de l'email + purge de rétention à 90 jours via Vercel Cron) |
 | 49 | Chat | Analyse IA du fichier envoyé (interpréter le contenu et répondre directement) | Élevé | Noté, pas implémenté — dépend de l'item 48 (et de l'OCR, item 7, pour scans/images) |
 | 21 | Catalogue | Agent de qualification de leads | Élevé | Item 3 (agent) |
 | 22 | Catalogue | Brouillon de réponse email | Moyen | — |
@@ -1834,13 +1834,41 @@ Rien ne lit ni n'analyse son contenu (voir item 49).
   (`removeConversationFiles`). La suppression visiteur vérifie d'abord que la
   conversation lui appartient.
 
-**Reste ouvert — rétention RGPD** : la purge quotidienne pg_cron (migration
-0006, 90 jours) supprime bien les conversations et les lignes
-`conversation_files` en cascade, mais **pas les objets de Storage** (le SQL ne
-les supprime pas réellement). Un fichier reste donc stocké au-delà de la
-rétention annoncée tant qu'un nettoyage n'est pas ajouté (route planifiée qui
-supprime les objets sans ligne correspondante, ou file de suppression).
-À traiter avant d'ouvrir cette option à un vrai client externe.
+**Rétention RGPD — ✅ Fait (2026-10-13)** : la purge `pg_cron` (migration
+0006) supprimait bien les conversations et les lignes `conversation_files`
+en cascade, mais **pas les objets de Storage** — le SQL ne peut pas les
+atteindre. Un fichier restait donc stocké pour toujours au-delà des 90
+jours annoncés.
+
+Corrigé en déplaçant toute la purge de `pg_cron` vers un **Vercel Cron
+Job** (`vercel.json`, quotidien à 3h UTC) :
+- `lib/retentionPurge.ts` (`purgeExpiredConversations`) : trouve les
+  conversations expirées, nettoie **d'abord** leurs objets Storage
+  (`removeConversationFiles`, étendu pour accepter une liste
+  `conversationIds` plutôt qu'un seul id ou un chatbot entier), **puis**
+  supprime les conversations — l'ordre compte : une fois les conversations
+  supprimées, les lignes `conversation_files` (et leur `storage_path`)
+  disparaissent en cascade, impossible de retrouver les objets après coup.
+- **Les deux mécanismes ne pouvaient pas coexister** : si `pg_cron`
+  continuait de tourner en parallèle, il pouvait supprimer une
+  conversation avant que le job applicatif n'ait eu la main dessus,
+  rendant son fichier introuvable pour toujours. Migration
+  `0018_retention_purge_to_vercel_cron.sql` : désinscrit l'ancien job
+  (`cron.unschedule`), protégée par une vérification d'existence (sûre
+  que la migration 0006 ait tourné ou non sur cette base).
+- `app/api/cron/purge-conversations/route.ts` : protégé par
+  `CRON_SECRET` si définie (Vercel l'envoie automatiquement sur les
+  appels planifiés) — pas de check si absente, comme les autres variables
+  optionnelles du projet (ex. `RESEND_API_KEY`).
+
+Testé : `tsc --noEmit` propre, 133 tests au vert (4 nouveaux pour
+`purgeExpiredConversations` — rien à purger, purge Storage puis
+suppression dans le bon ordre, échec de requête, échec de suppression
+après nettoyage Storage déjà fait).
+
+**À appliquer en prod** : migration `0018` (dans l'ordre après les
+précédentes) + variable `CRON_SECRET` sur Vercel (ou laisser vide pour le
+pilote, au prix de l'endpoint non protégé).
 
 **À tester en conditions réelles (pas encore fait)** — le code est écrit et
 type-checké, les règles de validation et l'outil email sont couverts par des
