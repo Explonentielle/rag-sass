@@ -64,13 +64,15 @@ export default function EmailToolToggle({
         <span className="flex-1">
           <span className="flex items-center gap-2">
             <span className="block text-sm font-medium text-slate-900">
-              Notifier par email quand un visiteur veut être recontacté
+              Autoriser l'envoi d'un email sur demande
             </span>
             <Badge tone="blue">Agentique</Badge>
           </span>
           <span className="block text-xs text-slate-500">
-            Le chatbot détecte quand un visiteur souhaite être recontacté et envoie un résumé par
-            email avec ses coordonnées si elles ont été données.
+            Permet au chatbot d'envoyer un email quand l'interlocuteur le demande explicitement,
+            ou fait une demande qui peut nécessiter un suivi par email (être recontacté, recevoir
+            des infos...) dans le widget public comme dans le chat du dashboard. Le chatbot
+            demande toujours confirmation avant d'envoyer.
           </span>
         </span>
       </div>

@@ -111,11 +111,6 @@ export default async function ChatbotPage({ params }: { params: { id: string } }
           initialValue={chatbot.allow_email_tool}
           initialEmail={chatbot.notification_email}
         />
-        <VisitorUploadsToggle
-          chatbotId={chatbot.id}
-          initialValue={chatbot.allow_visitor_uploads}
-          emailNotificationsReady={chatbot.allow_email_tool && !!chatbot.notification_email}
-        />
         <LoadingMessagesForm chatbotId={chatbot.id} initialValue={chatbot.loading_messages} />
       </section>
 
@@ -171,30 +166,35 @@ export default async function ChatbotPage({ params }: { params: { id: string } }
       </section>
 
       <section className="space-y-3">
-        <h2 className="flex items-center gap-2 font-semibold text-slate-900">
-          <Icon className="h-4 w-4 text-brand-600">{ICONS.shield}</Icon>
-          Accès public / embed
-        </h2>
-        <EmbedSettingsForm
-          chatbotId={chatbot.id}
-          initialIsPublic={chatbot.is_public}
-          initialAllowedOrigins={chatbot.allowed_origins}
-        />
-      </section>
-
-      <section className="space-y-3">
         <div>
           <h2 className="flex items-center gap-2 font-semibold text-slate-900">
             <Icon className="h-4 w-4 text-brand-600">{ICONS.quote}</Icon>
             Conversations
           </h2>
           <p className="mt-1 text-sm text-slate-500">
-            Toutes les conversations de ce chatbot, côté équipe (chat de test) et côté visiteurs
+            Toutes les conversations de ce chatbot, côté équipe et côté visiteurs
             (widget public). Utile pour retrouver et supprimer la conversation d'un visiteur sur
             demande RGPD.
           </p>
         </div>
         <ConversationsPanel chatbotId={chatbot.id} initialConversations={conversations} />
+      </section>
+
+      <section className="space-y-3">
+        <h2 className="flex items-center gap-2 font-semibold text-slate-900">
+          <Icon className="h-4 w-4 text-brand-600">{ICONS.globe}</Icon>
+          Widget (accès public, apparence, embed)
+        </h2>
+        <EmbedSettingsForm
+          chatbotId={chatbot.id}
+          initialIsPublic={chatbot.is_public}
+          initialAllowedOrigins={chatbot.allowed_origins}
+        />
+        <VisitorUploadsToggle
+          chatbotId={chatbot.id}
+          initialValue={chatbot.allow_visitor_uploads}
+          emailNotificationsReady={chatbot.allow_email_tool && !!chatbot.notification_email}
+        />
       </section>
 
       <section className="space-y-3">

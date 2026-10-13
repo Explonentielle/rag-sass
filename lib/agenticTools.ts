@@ -14,11 +14,12 @@ import { logInfo, logWarn } from '@/lib/logger';
  * reads to the model as "never take any action", and it refuses to call
  * the tool even when it's technically offered via the API.
  */
-export const NOTIFY_OWNER_PROMPT_NOTE = `Tu as aussi accès à un outil, notify_bot_owner, pour prévenir le propriétaire de ce chatbot qu'un visiteur souhaite être recontacté. Ce n'est PAS une connaissance externe interdite par la règle ci-dessus : c'est une action que tu es explicitement autorisé à réaliser en plus de répondre aux questions.
+export const NOTIFY_OWNER_PROMPT_NOTE = `Tu as aussi accès à un outil, notify_bot_owner, pour prévenir le propriétaire de ce chatbot qu'un interlocuteur souhaite être recontacté. Ce n'est PAS une connaissance externe interdite par la règle ci-dessus : c'est une action que tu es explicitement autorisé à réaliser en plus de répondre aux questions.
 
-Dès que le visiteur exprime l'envie d'être recontacté ou suivi par un humain (il mentionne vouloir être rappelé, demande qu'on le contacte, utilise le mot "email"/"contact"/"rappeler" dans ce sens...) :
+Dès que l'interlocuteur exprime l'envie d'être recontacté ou suivi par un humain (il mentionne vouloir être rappelé, demande qu'on le contacte, utilise le mot "email"/"contact"/"rappeler" dans ce sens...), procède en TROIS étapes, chacune sur un tour de conversation distinct — n'utilise JAMAIS l'outil au même tour que la première fois qu'il exprime cette envie :
 1. S'il n'a PAS encore donné de coordonnées (téléphone ou email) dans la conversation, NE PAS utiliser l'outil tout de suite — demande-lui d'abord comment le joindre ("Avec plaisir ! Quel est le meilleur moyen de vous recontacter, téléphone ou email ?"). Un rappel sans coordonnées ne sert à rien, ne confirme jamais qu'on va le recontacter avant d'avoir cette information.
-2. Une fois qu'il a répondu — qu'il ait donné ses coordonnées ou explicitement refusé de les donner — utilise l'outil, avec les coordonnées obtenues (ou une note explicite qu'il a refusé de les donner).`;
+2. Une fois qu'il a répondu — qu'il ait donné ses coordonnées ou explicitement refusé de les donner — NE PAS utiliser l'outil non plus : confirme d'abord ce que tu t'apprêtes à faire ("Je préviens [nom du propriétaire si connu, sinon 'notre équipe'] par email avec ces coordonnées, c'est bon pour vous ?") et attends sa réponse.
+3. Seulement s'il confirme (oui, d'accord, vas-y...), utilise l'outil, avec les coordonnées obtenues (ou une note explicite qu'il a refusé de les donner). S'il décline ou ne confirme pas clairement, n'utilise pas l'outil et réponds-lui normalement.`;
 
 /**
  * Notifies the chatbot's owner that a visitor wants to be followed up
@@ -41,7 +42,7 @@ export function createNotifyOwnerOfLeadTool(
   return {
     name: 'notify_bot_owner',
     description:
-      "Prévient le propriétaire du chatbot qu'un visiteur souhaite être recontacté. N'appelle cet outil qu'après avoir demandé au visiteur comment le joindre — soit il a donné ses coordonnées, soit il a explicitement refusé de les donner.",
+      "Prévient le propriétaire du chatbot qu'un interlocuteur souhaite être recontacté. N'appelle cet outil qu'après (1) avoir demandé ses coordonnées — données ou explicitement refusées — ET (2) avoir confirmé avec lui que tu vas prévenir le propriétaire, et qu'il a répondu oui.",
     parameters: {
       type: 'object',
       properties: {
