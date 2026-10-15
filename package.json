@@ -31,7 +31,7 @@
     "stripe": "^23.0.0",
     "uuid": "^11.0.0",
     "xlsx": "https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz",
-    "zod": "^4.5.4"
+    "zod": "^3.25.76"
   },
   "devDependencies": {
     "@types/jsdom": "^30.0.0",

@@ -3,6 +3,15 @@ import { getAdminClient } from '@/lib/supabase/admin';
 import { purgeExpiredConversations } from '@/lib/retentionPurge';
 import { logError } from '@/lib/logger';
 
+// Without CRON_SECRET set, the auth check below never reads `request`
+// (short-circuits on `expected &&`), so this handler has no dynamic-API
+// usage Next.js can detect — it would otherwise get statically optimized
+// and actually run once at *build* time (confirmed: logged
+// `retention_purge.done` during `next build` before this was added),
+// re-purging on every deploy instead of only on the real Vercel Cron
+// schedule. Forcing dynamic is what the Vercel Cron Job actually needs.
+export const dynamic = 'force-dynamic';
+
 // Scheduled by vercel.json (daily) — docs/roadmap.md item 48. Vercel sends
 // `Authorization: Bearer <CRON_SECRET>` automatically on cron-triggered
 // requests when that env var is set on the project; checked here so this

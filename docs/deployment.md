@@ -49,7 +49,7 @@ environnement, voir `scripts/migrate-french-analyzer.mts`.
 
 ## 2. Supabase — appliquer les migrations
 
-**Aucune des 10 migrations n'est protégée contre une double exécution par
+**Aucune des 18 migrations n'est protégée contre une double exécution par
 un mécanisme de suivi automatique** (pas de CLI Supabase liée, voir
 `supabase/migrations/`) — mais la plupart sont écrites de façon
 idempotente (`create table if not exists`, `add column if not exists`,
@@ -68,6 +68,14 @@ Editor**, exécute-les dans l'ordre, une par une :
 | 8 | `0008_chatbot_no_document_mode.sql` | Sans effet si déjà appliquée |
 | 9 | `0009_organization_plan.sql` | Sans effet si déjà appliquée |
 | 10 | `0010_org_member_self_leave.sql` | Sans effet si déjà appliquée (`drop policy if exists` avant recréation) |
+| 11 | `0011_organization_billing.sql` | Sans effet si déjà appliquée (`add column if not exists`) |
+| 12 | `0012_chatbot_ai_indexing.sql` | Sans effet si déjà appliquée |
+| 13 | `0013_document_url_source.sql` | Sans effet si déjà appliquée |
+| 14 | `0014_chatbot_email_tool.sql` | Sans effet si déjà appliquée |
+| 15 | `0015_chatbot_loading_messages.sql` | Sans effet si déjà appliquée |
+| 16 | `0016_chatbot_notification_email.sql` | Sans effet si déjà appliquée |
+| 17 | `0017_visitor_file_uploads.sql` | Sans effet si déjà appliquée (`drop policy if exists`, `on conflict do nothing`) |
+| 18 | `0018_retention_purge_to_vercel_cron.sql` | Sans effet si déjà appliquée (désactive l'ancien job `pg_cron`, voir §5) |
 
 Pour les n° 1 à 4 : si l'exécution s'arrête sur une erreur
 `policy "..." already exists`, c'est le signal que cette migration (au
@@ -75,20 +83,16 @@ moins sa partie policies) est déjà en place — passe simplement à la
 migration suivante, rien d'autre à faire.
 
 **Si c'est un projet Supabase tout neuf** (jamais aucune migration
-appliquée) : exécute simplement les 10 dans l'ordre, aucune erreur
+appliquée) : exécute simplement les 18 dans l'ordre, aucune erreur
 attendue.
 
-**Vérification rapide après coup** (SQL Editor) :
-```sql
-select cron.job_run_details.status, cron.job_run_details.start_time
-from cron.job_run_details
-join cron.job on cron.job.jobid = cron.job_run_details.jobid
-where cron.job.jobname = 'purge-old-conversations'
-order by start_time desc limit 5;
-```
-Si cette requête échoue (`relation "cron.job" does not exist`), l'extension
-`pg_cron` n'a pas pu s'activer automatiquement — l'activer manuellement via
-**Database → Extensions** dans le dashboard, puis rejouer `0006_conversation_retention.sql`.
+**Vérification rapide après coup** : la purge de rétention (item 48 du
+roadmap) ne tourne plus via `pg_cron` — `0018` désactive l'ancien job
+SQL-only `purge-old-conversations` créé par `0006`, au profit d'un Vercel
+Cron Job (`app/api/cron/purge-conversations/route.ts`), seul capable de
+nettoyer aussi les fichiers visiteurs dans Storage (pas juste les lignes en
+base). Rien à vérifier côté SQL Editor pour ça — la vérification se fait
+côté Vercel, voir §5 et §6.
 
 Dans **Authentication → Providers → Email**, désactive "Confirm email"
 pour le pilote (évite la friction de confirmation pendant les tests) —
@@ -126,6 +130,11 @@ personnalisé, pas appeler une API tierce. Resend fournit justement un
 4. Tester : inviter un membre depuis **Paramètres → Membres** dans l'app, vérifier que l'email arrive.
 
 Aucun changement de code nécessaire une fois ça configuré.
+
+**Même domaine pour l'outil email agentique** : une fois le domaine vérifié
+sur Resend ici, il sert aussi à `RESEND_API_KEY`/`RESEND_FROM_EMAIL` (étape
+5, Vercel) — pas besoin de vérifier un deuxième domaine, une seule clé API
+Resend suffit pour les deux usages.
 
 ---
 
@@ -165,8 +174,10 @@ avant d'ouvrir plus largement.
 
 ## 5. Vercel — déployer l'app
 
-1. Importer le repo GitHub dans Vercel (Next.js détecté automatiquement,
-   aucune config `vercel.json` nécessaire).
+1. Importer le repo GitHub dans Vercel (Next.js détecté automatiquement).
+   `vercel.json` à la racine du repo est déjà configuré pour le Cron Job de
+   purge de rétention (`0 3 * * *`, voir item 48 du roadmap) — rien à
+   configurer manuellement pour ça, juste `CRON_SECRET` ci-dessous.
 2. Renseigner les variables d'environnement (Project Settings →
    Environment Variables) :
 
@@ -182,6 +193,9 @@ avant d'ouvrir plus largement.
 | `OPENAI_EMBEDDING_MODEL` | `text-embedding-3-small` (défaut) |
 | `OPENAI_CHAT_MODEL` | `gpt-5.6-luna` (défaut, ou un modèle plus cher si besoin de qualité) |
 | `CONVERSATION_ENCRYPTION_KEY` | `openssl rand -base64 32` — **si plusieurs environnements partagent la même base Supabase, cette clé doit être strictement identique partout**, sinon les messages chiffrés sur l'un deviennent illisibles depuis l'autre |
+| `CRON_SECRET` | Project Settings → Cron Jobs sur Vercel en génère un automatiquement à l'activation, ou en définir un toi-même (`openssl rand -base64 24`). **Fortement recommandé en prod** — sans ça, `/api/cron/purge-conversations` n'a aucune authentification (voir item 48 du roadmap) |
+| `RESEND_API_KEY` | Clé API Resend (platform resend.com → API Keys) — pour l'outil email agentique (`lib/email.ts`), distinct du SMTP Supabase de l'étape 3 ci-dessus mais même compte/domaine Resend |
+| `RESEND_FROM_EMAIL` | Une adresse du domaine vérifié sur Resend (ex. `notifications@corpus-ai.fr`) — sans domaine vérifié, reste à `onboarding@resend.dev` (fonctionne mais moins pro, limites d'envoi) |
 | `NEXT_PUBLIC_SUPPORT_CHATBOT_ID` | Optionnel — voir `docs/integration.md` |
 | `STRIPE_SECRET_KEY` | Optionnel (étape 4) — Stripe Dashboard → Developers → API keys |
 | `STRIPE_WEBHOOK_SECRET` | Optionnel (étape 4) — généré à la création du webhook |

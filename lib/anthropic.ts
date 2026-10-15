@@ -2,7 +2,11 @@
 // billing on a single provider. Kept in place — and kept in sync feature-
 // for-feature with lib/openai.ts — in case that decision flips back.
 import Anthropic from '@anthropic-ai/sdk';
-import { z } from 'zod';
+// zod 3.25+ ships a forward-compat v4 API at this subpath — needed because
+// @anthropic-ai/sdk's zodOutputFormat helper (below) is typed against zod
+// v4's internals ($ZodTypeInternals); the classic `from 'zod'` import on a
+// 3.x install is still the old v3 shape and doesn't satisfy it.
+import { z } from 'zod/v4';
 import { zodOutputFormat } from '@anthropic-ai/sdk/helpers/zod';
 import { logWarn } from '@/lib/logger';
 
