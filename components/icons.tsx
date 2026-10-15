@@ -32,11 +32,11 @@ export function IconBadge({
   spacing?: string;
 }) {
   const tones = {
-    brand: 'bg-brand-100 text-brand-700',
+    brand: 'bg-brand-100 text-brand-700 shadow-lg shadow-brand-700/20',
     white: 'bg-white/10 text-white',
-    green: 'bg-emerald-100 text-emerald-700',
-    amber: 'bg-amber-100 text-amber-700',
-    red: 'bg-red-100 text-red-700',
+    green: 'bg-emerald-100 text-emerald-700 shadow-lg shadow-emerald-600/20',
+    amber: 'bg-amber-100 text-amber-700 shadow-lg shadow-amber-600/20',
+    red: 'bg-red-100 text-red-700 shadow-lg shadow-red-600/20',
   };
   const sizes = {
     sm: { box: 'h-8 w-8', icon: 'h-4 w-4' },
@@ -44,7 +44,7 @@ export function IconBadge({
   };
   return (
     <div
-      className={`flex flex-shrink-0 items-center justify-center rounded-lg ${sizes[size].box} ${tones[tone]} ${spacing}`}
+      className={`flex flex-shrink-0 items-center justify-center rounded-xl ${sizes[size].box} ${tones[tone]} ${spacing}`}
     >
       <Icon className={sizes[size].icon}>{children}</Icon>
     </div>

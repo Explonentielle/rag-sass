@@ -7,7 +7,7 @@ export function Logo({
 }) {
   return (
     <span className={`inline-flex items-center gap-2 font-semibold tracking-tight ${className}`}>
-      <span className="flex h-6 w-6 items-center justify-center rounded-md bg-brand-800 text-xs font-bold text-white">
+      <span className="flex h-6 w-6 items-center justify-center rounded-xl bg-brand-800 text-xs font-bold text-white">
         C
       </span>
       <span>

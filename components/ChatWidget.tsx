@@ -246,7 +246,7 @@ export default function ChatWidget({
   chatbotId,
   apiEndpoint = '/api/chat',
   placeholder = 'Posez une question sur les documents de ce chatbot.',
-  className = 'rounded-xl border border-slate-200 shadow-card',
+  className = 'rounded-2xl border border-slate-200 shadow-card',
   accentColor,
   loadingMessages,
   allowUploads,

@@ -2,11 +2,11 @@ import { forwardRef } from 'react';
 import Link from 'next/link';
 
 const base =
-  'inline-flex items-center justify-center gap-2 rounded-md text-sm font-medium transition-colors disabled:opacity-50 disabled:pointer-events-none';
+  'inline-flex items-center justify-center gap-2 rounded-full text-sm font-medium transition-colors disabled:opacity-50 disabled:pointer-events-none';
 
 const variants = {
-  primary: 'bg-brand-700 text-white hover:bg-brand-800',
-  secondary: 'bg-white text-brand-900 border border-slate-300 hover:bg-slate-50',
+  primary: 'bg-brand-700 text-white shadow-lg shadow-brand-700/30 hover:bg-brand-800',
+  secondary: 'bg-white text-brand-900 border border-slate-300 shadow-sm hover:bg-slate-50',
   ghost: 'text-slate-600 hover:text-slate-900 hover:bg-slate-100',
   danger: 'bg-white text-red-600 border border-red-200 hover:bg-red-50',
 };

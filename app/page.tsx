@@ -73,8 +73,8 @@ function Hero({ isLoggedIn }: { isLoggedIn: boolean }) {
           <span className={styles.eyebrow}>Pilote gratuit pour les premières entreprises</span>
           <h1 className={styles.heroTitle}>
             De vos documents
-            <br />à un assistant qui <em>répond</em> —<br />
-            bientôt, qui <em>agit</em>.
+            <br />à un assistant qui <em>répond</em><br />
+            et, qui <em>agit</em>.
           </h1>
           <p className={styles.heroLede}>
             Corpus.ai transforme les documents et process de n&apos;importe quelle PME ou
@@ -307,6 +307,7 @@ function Catalogue() {
           <div className={styles.catGrid}>
             {roadmap.map((c) => (
               <div key={c.title} className={`${styles.catCard} ${styles.catCardRoadmap}`}>
+                <span className={styles.catBadgeSoon}>Bientôt</span>
                 <h4>{c.title}</h4>
                 <p>{c.body}</p>
                 <span className={styles.catFor}>Pour → {c.who}</span>
