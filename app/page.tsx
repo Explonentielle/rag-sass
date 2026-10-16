@@ -3,7 +3,7 @@ import { createClient } from '@/lib/supabase/server';
 import styles from './landing.module.css';
 
 // Fonts are loaded once, globally, in app/layout.tsx (--font-display,
-// --font-body, --font-label) — this page just consumes those variables via
+// --font-body, --font-label). This page just consumes those variables via
 // landing.module.css, same as every other page in the app now.
 
 function CheckIcon() {
@@ -29,7 +29,6 @@ export default async function LandingPage() {
       <Nav isLoggedIn={!!user} />
       <Hero isLoggedIn={!!user} />
       <TrustBar />
-      <Thesis />
       <HowItWorks />
       <Features />
       <Catalogue />
@@ -91,9 +90,9 @@ function Hero({ isLoggedIn }: { isLoggedIn: boolean }) {
             <span className={styles.accent}>répond</span>
           </h1>
           <p className={styles.heroLede}>
-            Corpus.ai transforme les documents et process de n&apos;importe quelle PME ou
-            indépendant en un assistant IA opérationnel dès aujourd&apos;hui. Un forfait simple,
-            aucun jargon technique, sources citées à chaque réponse.
+            Corpus.ai transforme vos documents, notes et procédures en un assistant qui vous
+            répond instantanément, seul ou en équipe, pour vous ou pour vos clients. Un forfait
+            simple, aucun jargon technique, sources citées à chaque réponse.
           </p>
           <div className={styles.heroCtas}>
             <Link
@@ -184,28 +183,12 @@ function TrustBar() {
   );
 }
 
-function Thesis() {
-  return (
-    <section className={styles.thesis}>
-      <div className={`${styles.wrap} ${styles.thesisInner}`}>
-        <span className={styles.tag}>Vision produit</span>
-        <blockquote className={styles.thesisQuote}>
-          Corpus.ai est la plateforme qui transforme les documents et process de
-          n&apos;importe quelle PME ou indépendant en un assistant IA qui répond dès
-          aujourd&apos;hui, et qui agira demain — vendue simplement, sans jargon technique
-          ni promesse au-delà de ce qui est construit.
-        </blockquote>
-      </div>
-    </section>
-  );
-}
-
 function HowItWorks() {
   const steps = [
     {
       k: '01',
       title: 'Avec documents, ou sans',
-      body: "Uploadez vos fichiers (PDF, Word, texte, CSV, Excel) — ou décrivez simplement votre métier si vous n'avez rien à uploader.",
+      body: "Uploadez vos fichiers (PDF, Word, texte, CSV, Excel), ou décrivez simplement votre métier si vous n'avez rien à uploader.",
     },
     {
       k: '02',
@@ -215,7 +198,7 @@ function HowItWorks() {
     {
       k: '03',
       title: 'Votre équipe ou vos clients posent leurs questions',
-      body: 'En interne ou via le widget public sur votre site — réponses instantanées et sourcées, strictement fondées sur vos documents.',
+      body: 'En interne ou via le widget public sur votre site, avec des réponses instantanées et sourcées, strictement fondées sur vos documents.',
     },
   ];
   return (
@@ -300,7 +283,7 @@ function Features() {
       icon: FEATURE_ICONS.doc,
       title: "Prêt à l'emploi",
       points: [
-        'Templates par secteur : vente, support, immobilier, secrétariat médical.',
+        'Templates par secteur : vente, support, immobilier, santé, ou gardez vos propres notes pour vous seul.',
         'Widget intégrable sur votre site en quelques minutes.',
       ],
     },
@@ -356,16 +339,17 @@ interface CatalogueEntry {
 
 function Catalogue() {
   const available: CatalogueEntry[] = [
+    { title: 'Second cerveau', body: 'Déposez vos notes et supports, retrouvez-les en langage naturel, pour vous seul.', who: 'Indépendants, coachs, consultants' },
+    { title: 'Assistant sans documents', body: 'Le savoir tient dans quelques consignes : zéro upload, zéro indexation, en ligne en minutes.', who: 'Indépendants, artisans' },
+    { title: 'Cabinet de santé', body: "Horaires, tarifs, prise de rendez-vous : répond aux questions pratiques, jamais d'avis médical.", who: 'Professionnels de santé, secrétariat' },
     { title: 'Chatbot documentaire', body: 'Répond aux questions à partir de vos documents, sources citées à chaque réponse.', who: 'Tout le monde' },
-    { title: 'Assistant sans documents', body: 'Le savoir tient dans quelques consignes — zéro upload, zéro indexation, en ligne en minutes.', who: 'Indépendants, artisans' },
+    { title: 'Agence immobilière', body: "Procédures de visite, mandats, pièces à fournir : un modèle prêt à l'emploi.", who: 'Agences, indépendants immo' },
     { title: 'Copilote commercial', body: 'Argumentaires et réponses aux objections retrouvés en quelques secondes, en plein appel.', who: 'Équipes vente structurées' },
     { title: 'Assistant conformité', body: '« Puis-je faire X ? » posé directement sur vos politiques internes.', who: 'Secteurs réglementés' },
-    { title: 'Agence immobilière', body: "Procédures de visite, mandats, pièces à fournir — un modèle prêt à l'emploi.", who: 'Agences, indépendants immo' },
-    { title: 'Second cerveau', body: 'Déposez vos notes et supports, retrouvez-les en langage naturel — pour vous seul.', who: 'Coachs, consultants, formateurs' },
   ];
 
   const roadmap: CatalogueEntry[] = [
-    { title: 'Indexation assistée par IA', body: 'Uploadez un document brut ou une URL, sans rien préparer — une IA nettoie et structure le contenu.', who: 'Tout document mal formaté' },
+    { title: 'Indexation assistée par IA', body: 'Uploadez un document brut ou une URL, sans rien préparer : une IA nettoie et structure le contenu.', who: 'Tout document mal formaté' },
     { title: 'Agent de qualification', body: 'Engage un visiteur, pose les bonnes questions, score et route le contact.', who: 'B2B à cycle de vente long' },
     { title: 'Brouillon de réponse email', body: 'Rédige une réponse client à partir de la base de connaissance, à valider avant envoi.', who: 'Support à fort volume' },
     { title: 'Analyseur de contrats', body: "Dépose un contrat, obtiens l'extraction des clauses clés et pose tes questions dessus.", who: 'PME sans juriste interne' },
@@ -380,8 +364,8 @@ function Catalogue() {
           <span className={styles.sectionLabel}>Catalogue</span>
           <h2>Ce que Corpus.ai peut faire pour votre activité</h2>
           <p className={styles.dek}>
-            Une base large de cas d&apos;usage — certains tournent déjà, d&apos;autres sont
-            notre feuille de route.
+            Du second cerveau personnel à l&apos;assistant partagé en équipe, certains cas
+            d&apos;usage tournent déjà, d&apos;autres sont notre feuille de route.
           </p>
         </div>
 
@@ -390,7 +374,7 @@ function Catalogue() {
             <span className={`${styles.swatch} ${styles.swatchNow}`} /> Disponible aujourd&apos;hui
           </span>
           <span className={styles.registerKey}>
-            <span className={`${styles.swatch} ${styles.swatchNext}`} /> Feuille de route — à venir
+            <span className={`${styles.swatch} ${styles.swatchNext}`} /> Feuille de route (à venir)
           </span>
         </div>
 
@@ -506,20 +490,25 @@ function Pricing({ isLoggedIn }: { isLoggedIn: boolean }) {
 }
 
 function Testimonials() {
-  // Placeholder quotes, replace with real pilot client feedback before launch.
+  // Real person (the user's own business advisor), quote still a placeholder
+  // pending his own wording. Only one entry for now, deliberately not
+  // padded out with invented people.
   const quotes = [
-    { quote: 'Outil très utile, on a gagné un temps précieux sur le support client.', name: 'John Doe', role: 'CEO, Acme Corp' },
-    { quote: "Nos commerciaux retrouvent l'argumentaire en quelques secondes, ça change tout en appel.", name: 'Jane Doe', role: 'Responsable des ventes, Exemple SAS' },
-    { quote: 'Simple à mettre en place, et les réponses citent toujours la bonne procédure.', name: 'Paul Martin', role: 'Support client, Entreprise Test' },
+    {
+      quote:
+        "Je retrouve mes notes clients et mes process en quelques secondes, sans fouiller dans mes dossiers. C'est devenu mon second cerveau pour mon activité d'accompagnement.",
+      name: 'Willy',
+      role: 'Accompagnateur business, indépendant',
+    },
   ];
   return (
     <section className={styles.testimonials}>
       <div className={styles.wrap}>
         <div className={`${styles.sectionHead} ${styles.sectionHeadCenter}`}>
           <span className={styles.sectionLabel}>Avis</span>
-          <h2>Ce qu&apos;en disent nos premiers utilisateurs</h2>
+          <h2>Ce qu&apos;en dit un premier utilisateur</h2>
         </div>
-        <div className={styles.testiGrid}>
+        <div className={`${styles.testiGrid} ${quotes.length === 1 ? styles.testiGridSolo : ''}`}>
           {quotes.map((t) => (
             <div key={t.name} className={styles.testiCard}>
               <p className={styles.testiQuote}>{t.quote}</p>
@@ -550,7 +539,7 @@ function Faq() {
     },
     {
       q: 'Quels formats de documents sont supportés ?',
-      a: "PDF avec texte natif, Word (.docx), texte brut (.txt), CSV et Excel (.xlsx, .xls). Les PDF scannés (sans texte extractible) ne sont pas encore supportés — l'OCR est sur notre feuille de route.",
+      a: "PDF avec texte natif, Word (.docx), texte brut (.txt), CSV et Excel (.xlsx, .xls). Les PDF scannés (sans texte extractible) ne sont pas encore supportés : l'OCR est sur notre feuille de route.",
     },
     { q: 'Puis-je annuler à tout moment ?', a: 'Oui, sans engagement ni préavis.' },
     {

@@ -29,7 +29,7 @@ const label = JetBrains_Mono({
 export const metadata: Metadata = {
   title: 'Corpus.ai : de vos documents à un assistant qui répond',
   description:
-    "Corpus.ai transforme les documents et process de n'importe quelle PME ou indépendant en un assistant IA opérationnel dès aujourd'hui, sources citées à chaque réponse.",
+    "Corpus.ai transforme vos documents et notes en un assistant qui répond instantanément, seul ou en équipe. Un forfait simple, sources citées à chaque réponse.",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
