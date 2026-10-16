@@ -6,6 +6,18 @@ import styles from './landing.module.css';
 // --font-body, --font-label) — this page just consumes those variables via
 // landing.module.css, same as every other page in the app now.
 
+function CheckIcon() {
+  return (
+    <svg viewBox="0 0 20 20" fill="currentColor" width="1em" height="1em">
+      <path
+        fillRule="evenodd"
+        d="M16.704 4.153a.75.75 0 01.143 1.052l-8 10.5a.75.75 0 01-1.127.075l-4.5-4.5a.75.75 0 011.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 011.05-.143z"
+        clipRule="evenodd"
+      />
+    </svg>
+  );
+}
+
 export default async function LandingPage() {
   const supabase = createClient();
   const {
@@ -70,11 +82,13 @@ function Hero({ isLoggedIn }: { isLoggedIn: boolean }) {
     <header className={styles.hero}>
       <div className={`${styles.wrap} ${styles.heroGrid}`}>
         <div>
-          <span className={styles.eyebrow}>Pilote gratuit pour les premières entreprises</span>
+          <span className={styles.heroBadge}>
+            <CheckIcon />
+            Pilote gratuit et sans engagement
+          </span>
           <h1 className={styles.heroTitle}>
-            De vos documents
-            <br />à un assistant qui <em>répond</em><br />
-            et, qui <em>agit</em>.
+            De vos documents à un assistant qui{' '}
+            <span className={styles.accent}>répond</span>
           </h1>
           <p className={styles.heroLede}>
             Corpus.ai transforme les documents et process de n&apos;importe quelle PME ou
@@ -86,40 +100,60 @@ function Hero({ isLoggedIn }: { isLoggedIn: boolean }) {
               href={isLoggedIn ? '/dashboard' : '/signup'}
               className={`${styles.btn} ${styles.btnPrimary}`}
             >
-              {isLoggedIn ? 'Aller au dashboard' : 'Commencer gratuitement →'}
+              {isLoggedIn ? 'Aller au dashboard' : 'Commencer gratuitement'}
             </Link>
-            <a href="#comment-ca-marche" className={`${styles.btn} ${styles.btnGhost}`}>
+            <a href="#comment-ca-marche" className={`${styles.btn} ${styles.btnOutlineLight}`}>
               Voir comment ça marche
             </a>
           </div>
-          <p className={styles.heroNote}>Sans engagement, sans carte bancaire pour démarrer.</p>
+          <ul className={styles.heroChecks}>
+            <li>
+              <CheckIcon /> 100% gratuit pour démarrer
+            </li>
+            <li>
+              <CheckIcon /> Sans engagement
+            </li>
+            <li>
+              <CheckIcon /> En ligne en quelques minutes
+            </li>
+          </ul>
         </div>
 
-        <div className={styles.dossier} aria-hidden="true">
-          <div className={`${styles.docCard} ${styles.doc1}`}>
-            <div className={styles.docLabel}>Procédures.pdf</div>
-            <div className={styles.docLine}></div>
-            <div className={styles.docLine}></div>
-            <div className={styles.docLine}></div>
-            <div className={styles.docLine}></div>
+        <div className={styles.heroVisual} aria-hidden="true">
+          <div className={styles.heroChart}>
+            <div className={styles.heroChartTitle}>Trouver une information dans vos documents</div>
+            <div className={styles.heroChartSub}>Temps moyen, à titre d&apos;illustration</div>
+            <div className={styles.heroBars}>
+              <div className={styles.heroBar}>
+                <div className={styles.heroBarTrack}>
+                  <div
+                    className={`${styles.heroBarFill} ${styles.heroBarFillBefore}`}
+                    style={{ height: '88%' }}
+                  />
+                </div>
+                <strong>~8 min</strong>
+                <span>Sans assistant</span>
+              </div>
+              <div className={styles.heroBar}>
+                <div className={styles.heroBarTrack}>
+                  <div
+                    className={`${styles.heroBarFill} ${styles.heroBarFillAfter}`}
+                    style={{ height: '12%' }}
+                  />
+                </div>
+                <strong>~10 sec</strong>
+                <span>Avec Corpus.ai</span>
+              </div>
+            </div>
           </div>
-          <div className={`${styles.docCard} ${styles.doc2}`}>
-            <div className={styles.docLabel}>Tarifs.xlsx</div>
-            <div className={styles.docLine}></div>
-            <div className={styles.docLine}></div>
-            <div className={styles.docLine}></div>
-          </div>
-          <div className={`${styles.docCard} ${styles.doc3}`}>
-            <div className={styles.docLabel}>Script-objections.pdf</div>
-            <div className={styles.docLine}></div>
-            <div className={styles.docLine}></div>
-            <div className={styles.docLine}></div>
-            <div className={styles.docLine}></div>
-          </div>
-          <div className={styles.chatBubble}>
-            <div className={styles.chatBubbleWho}>Assistant</div>
-            Ne baisse jamais le prix directement — reformule la valeur perçue, comparée au coût
-            de l&apos;inaction.
+          <div className={styles.heroChartBadge}>
+            <span className={styles.ico}>
+              <CheckIcon />
+            </span>
+            <div>
+              <strong>Réponse immédiate</strong>
+              <span>Sourcée, en quelques secondes</span>
+            </div>
           </div>
         </div>
       </div>
@@ -129,9 +163,9 @@ function Hero({ isLoggedIn }: { isLoggedIn: boolean }) {
 
 function TrustBar() {
   const items = [
-    { title: 'Données isolées', body: 'Chaque organisation est cloisonnée au niveau base de données.' },
-    { title: 'Réponses sourcées', body: 'Chaque réponse pointe vers le document utilisé.' },
-    { title: 'Indexation rapide', body: "De l'upload au chatbot prêt, en quelques minutes." },
+    { stat: '100%', title: 'Données isolées', body: 'Chaque organisation est cloisonnée au niveau base de données.' },
+    { stat: '< 5 min', title: 'Indexation rapide', body: "De l'upload au chatbot prêt à répondre." },
+    { stat: 'Chaque réponse', title: 'Sourcée', body: 'Toujours un lien vers le document utilisé.' },
   ];
   return (
     <section className={styles.trust}>
@@ -139,11 +173,9 @@ function TrustBar() {
         <div className={styles.trustGrid}>
           {items.map((item) => (
             <div key={item.title} className={styles.trustItem}>
-              <span className={styles.trustDot} />
-              <div>
-                <strong>{item.title}</strong>
-                <span>{item.body}</span>
-              </div>
+              <span className={styles.trustStat}>{item.stat}</span>
+              <strong>{item.title}</strong>
+              <span>{item.body}</span>
             </div>
           ))}
         </div>
@@ -171,17 +203,17 @@ function Thesis() {
 function HowItWorks() {
   const steps = [
     {
-      k: 'Étape 01',
+      k: '01',
       title: 'Avec documents, ou sans',
       body: "Uploadez vos fichiers (PDF, Word, texte, CSV, Excel) — ou décrivez simplement votre métier si vous n'avez rien à uploader.",
     },
     {
-      k: 'Étape 02',
+      k: '02',
       title: 'Indexation automatique',
       body: 'Vos documents sont découpés, vectorisés et indexés en quelques minutes, sans configuration de votre côté.',
     },
     {
-      k: 'Étape 03',
+      k: '03',
       title: 'Votre équipe ou vos clients posent leurs questions',
       body: 'En interne ou via le widget public sur votre site — réponses instantanées et sourcées, strictement fondées sur vos documents.',
     },
@@ -207,36 +239,109 @@ function HowItWorks() {
   );
 }
 
+const FEATURE_ICONS = {
+  check: (
+    <path
+      fillRule="evenodd"
+      d="M16.704 4.153a.75.75 0 01.143 1.052l-8 10.5a.75.75 0 01-1.127.075l-4.5-4.5a.75.75 0 011.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 011.05-.143z"
+      clipRule="evenodd"
+    />
+  ),
+  search: (
+    <path
+      fillRule="evenodd"
+      d="M9 3.5a5.5 5.5 0 100 11 5.5 5.5 0 000-11zM2 9a7 7 0 1112.452 4.391l3.328 3.329a.75.75 0 11-1.06 1.06l-3.329-3.328A7 7 0 012 9z"
+      clipRule="evenodd"
+    />
+  ),
+  shield: (
+    <path
+      fillRule="evenodd"
+      d="M10 1.75a.75.75 0 01.37.097l6.25 3.5a.75.75 0 01.38.653v4.5c0 4.21-2.72 7.627-6.657 9.253a.75.75 0 01-.586 0C5.82 18.127 3.1 14.71 3.1 10.5V6a.75.75 0 01.38-.653l6.25-3.5A.75.75 0 0110 1.75z"
+      clipRule="evenodd"
+    />
+  ),
+  doc: (
+    <path
+      fillRule="evenodd"
+      d="M5.5 2A1.5 1.5 0 004 3.5v13A1.5 1.5 0 005.5 18h9a1.5 1.5 0 001.5-1.5V7.621a1.5 1.5 0 00-.44-1.06l-4.12-4.122A1.5 1.5 0 0010.378 2H5.5zm4.75 1.5V6a1 1 0 001 1h2.5l-3.5-3.5z"
+      clipRule="evenodd"
+    />
+  ),
+};
+
 function Features() {
-  const features = [
-    { title: 'Réponses toujours sourcées', body: 'Chaque réponse cite les documents utilisés, vos équipes vérifient en un clic.' },
-    { title: 'Aucune approximation', body: "Si une information ne figure pas dans vos documents, l'assistant le signale plutôt que de deviner." },
-    { title: 'Recherche hybride', body: 'Combine recherche par mots-clés et recherche sémantique pour ne rien manquer.' },
-    { title: 'Multi-organisation', body: 'Isolation stricte des données entre organisations, sécurité au niveau base de données.' },
-    { title: "Templates prêts à l'emploi", body: 'Vente, support, immobilier, secrétariat médical : un point de départ par secteur.' },
-    { title: 'Répond dans la langue du visiteur', body: 'Une même base documentaire, des réponses en français, anglais ou toute autre langue.' },
+  const groups = [
+    {
+      icon: FEATURE_ICONS.check,
+      title: 'Réponses fiables',
+      points: [
+        'Chaque réponse cite les documents utilisés, vérifiable en un clic.',
+        "Si l'information ne figure pas dans vos documents, l'assistant le signale au lieu de deviner.",
+      ],
+    },
+    {
+      icon: FEATURE_ICONS.search,
+      title: 'Recherche puissante',
+      points: [
+        'Recherche hybride : mots-clés et sens combinés, pour ne rien manquer.',
+        'Répond dans la langue du visiteur, à partir de la même base documentaire.',
+      ],
+    },
+    {
+      icon: FEATURE_ICONS.shield,
+      title: 'Données isolées',
+      points: [
+        'Chaque organisation est cloisonnée au niveau base de données (Row Level Security).',
+        "Domaines d'intégration restreints : vous choisissez où le widget peut tourner.",
+      ],
+    },
+    {
+      icon: FEATURE_ICONS.doc,
+      title: "Prêt à l'emploi",
+      points: [
+        'Templates par secteur : vente, support, immobilier, secrétariat médical.',
+        'Widget intégrable sur votre site en quelques minutes.',
+      ],
+    },
   ];
   return (
     <section id="fonctionnalites" className={styles.features}>
-      <div className={`${styles.wrap} ${styles.featuresGrid}`}>
-        <div className={styles.featuresIntro}>
-          <span className={styles.sectionLabel}>Fonctionnalités</span>
-          <h2>Tout ce qu&apos;il faut, rien de superflu</h2>
-          <p>
-            Pas de fonctionnalités gadget : chaque point ci-contre répond à une exigence
-            concrète pour un assistant utilisable en production.
-          </p>
+      <div className={styles.wrap}>
+        <div className={styles.featuresHead}>
+          <span className={styles.sectionLabel}>Ce que nous proposons</span>
+          <h2>Nos fonctionnalités</h2>
+          <p>Pour des réponses fiables, rapides et en sécurité.</p>
         </div>
-        <div className={styles.featureList}>
-          {features.map((f) => (
-            <div key={f.title} className={styles.featureItem}>
-              <span className={styles.featureDot} />
-              <div>
-                <strong>{f.title}</strong>
-                <span>{f.body}</span>
-              </div>
+        <div className={styles.featureGrid}>
+          {groups.map((g, i) => (
+            <div key={g.title} className={styles.featureCard}>
+              <span className={styles.featureNum}>{String(i + 1).padStart(2, '0')}</span>
+              <span className={styles.featureIcon}>
+                <svg viewBox="0 0 20 20" fill="currentColor">
+                  {g.icon}
+                </svg>
+              </span>
+              <h4>{g.title}</h4>
+              <ul className={styles.featurePoints}>
+                {g.points.map((p) => (
+                  <li key={p}>
+                    <CheckIcon />
+                    <span>{p}</span>
+                  </li>
+                ))}
+              </ul>
             </div>
           ))}
+        </div>
+        <div className={styles.featureCta}>
+          <p>
+            <strong>Pas sûr que ce soit adapté à votre activité ?</strong>
+            <span>On en discute ensemble avant toute mise en route.</span>
+          </p>
+          <Link href="/signup" className={`${styles.btn} ${styles.btnBrass} ${styles.btnSm}`}>
+            Commencer gratuitement
+          </Link>
         </div>
       </div>
     </section>
@@ -419,8 +524,11 @@ function Testimonials() {
             <div key={t.name} className={styles.testiCard}>
               <p className={styles.testiQuote}>{t.quote}</p>
               <div className={styles.testiMeta}>
-                <strong>{t.name}</strong>
-                <span>{t.role}</span>
+                <span className={styles.testiAvatar}>{t.name.charAt(0)}</span>
+                <div>
+                  <strong>{t.name}</strong>
+                  <span>{t.role}</span>
+                </div>
               </div>
             </div>
           ))}
@@ -457,20 +565,28 @@ function Faq() {
   return (
     <section className={styles.faq}>
       <div className={styles.wrap}>
-        <div className={`${styles.sectionHead} ${styles.sectionHeadCenter}`}>
-          <span className={styles.sectionLabel}>Questions fréquentes</span>
-          <h2>Tout ce qu&apos;on nous demande</h2>
-        </div>
-        <div className={styles.faqList}>
-          {items.map((item) => (
-            <details key={item.q} className={styles.faqItem}>
-              <summary>
-                {item.q}
-                <span className={styles.faqPlus}>+</span>
-              </summary>
-              <p>{item.a}</p>
-            </details>
-          ))}
+        <div className={styles.faqGrid}>
+          <div className={styles.faqHead}>
+            <div className={`${styles.sectionHead}`}>
+              <span className={styles.sectionLabel}>Questions fréquentes</span>
+              <h2>Tout ce qu&apos;on nous demande</h2>
+            </div>
+            <div className={styles.faqContact}>
+              <strong>Une autre question ?</strong>
+              <span>Écrivez-nous, on vous répond rapidement.</span>
+            </div>
+          </div>
+          <div className={styles.faqList}>
+            {items.map((item) => (
+              <details key={item.q} className={styles.faqItem}>
+                <summary>
+                  {item.q}
+                  <span className={styles.faqPlus}>+</span>
+                </summary>
+                <p>{item.a}</p>
+              </details>
+            ))}
+          </div>
         </div>
       </div>
     </section>
@@ -480,18 +596,21 @@ function Faq() {
 function FinalCta({ isLoggedIn }: { isLoggedIn: boolean }) {
   return (
     <section className={styles.closing}>
-      <div className={styles.wrap}>
-        <div className={styles.closingInner}>
-          <div>
-            <h3>Prêt à essayer sur vos documents ?</h3>
-            <p>Pilote gratuit, sans engagement, pour les premières entreprises.</p>
-          </div>
+      <div className={styles.closingInner}>
+        <h3>
+          Prêt à essayer Corpus.ai sur <span className={styles.accent}>vos documents</span> ?
+        </h3>
+        <p>Pilote gratuit, sans engagement, pour les premières entreprises.</p>
+        <div className={styles.closingCtas}>
           <Link
             href={isLoggedIn ? '/dashboard' : '/signup'}
-            className={`${styles.btn} ${styles.btnBrass}`}
+            className={`${styles.btn} ${styles.btnPrimary}`}
           >
             {isLoggedIn ? 'Aller au dashboard' : 'Commencer gratuitement'}
           </Link>
+          <a href="#tarifs" className={`${styles.btn} ${styles.btnOutlineLight}`}>
+            Voir les tarifs
+          </a>
         </div>
       </div>
     </section>
@@ -501,17 +620,36 @@ function FinalCta({ isLoggedIn }: { isLoggedIn: boolean }) {
 function Footer() {
   return (
     <footer className={styles.footer}>
-      <div className={`${styles.wrap} ${styles.footerInner}`}>
-        <span className={styles.logo}>
-          <span className={styles.mark}>C</span>
-          Corpus.ai
-        </span>
-        <nav className={styles.footerLinks}>
-          <Link href="/legal/mentions-legales">Mentions légales</Link>
-          <Link href="/legal/confidentialite">Confidentialité</Link>
-          <Link href="/legal/cgu">CGU</Link>
-        </nav>
-        <p className={styles.footerCopy}>© {new Date().getFullYear()} Corpus.ai</p>
+      <div className={styles.wrap}>
+        <div className={styles.footerGrid}>
+          <div className={styles.footerBrand}>
+            <span className={styles.logo}>
+              <span className={styles.mark}>C</span>
+              Corpus.ai
+            </span>
+            <p>Transformez vos documents et process en un assistant IA qui répond.</p>
+          </div>
+          <div className={styles.footerCol}>
+            <span className={styles.footerColTitle}>Navigation</span>
+            <a href="#comment-ca-marche">Comment ça marche</a>
+            <a href="#fonctionnalites">Fonctionnalités</a>
+            <a href="#catalogue">Catalogue</a>
+            <a href="#tarifs">Tarifs</a>
+          </div>
+          <div className={styles.footerCol}>
+            <span className={styles.footerColTitle}>Compte</span>
+            <Link href="/login">Connexion</Link>
+            <Link href="/signup">Essayer gratuitement</Link>
+          </div>
+        </div>
+        <div className={styles.footerBottom}>
+          <p>© {new Date().getFullYear()} Corpus.ai. Tous droits réservés.</p>
+          <nav className={styles.footerLinks}>
+            <Link href="/legal/mentions-legales">Mentions légales</Link>
+            <Link href="/legal/confidentialite">Confidentialité</Link>
+            <Link href="/legal/cgu">CGU</Link>
+          </nav>
+        </div>
       </div>
     </footer>
   );
