@@ -161,9 +161,9 @@ export default function UrlUploader({ chatbotId }: { chatbotId: string }) {
           onChange={(e) => setUrl(e.target.value)}
           placeholder="https://exemple.com/page"
           disabled={busy || pages !== null}
-          className="w-56"
+          className="w-56 min-w-0"
         />
-        <label className="flex items-center gap-1.5 whitespace-nowrap text-xs text-slate-600">
+        <label className="flex flex-shrink-0 items-center gap-1.5 whitespace-nowrap text-xs text-slate-600">
           <input
             type="checkbox"
             checked={wholeSite}
@@ -178,6 +178,7 @@ export default function UrlUploader({ chatbotId }: { chatbotId: string }) {
           variant="secondary"
           size="sm"
           disabled={busy || pages !== null || !url.trim()}
+          className="flex-shrink-0 whitespace-nowrap"
         >
           {submitting ? (wholeSite ? 'Recherche des pages...' : 'Ajout...') : '+ Ajouter une URL'}
         </Button>
