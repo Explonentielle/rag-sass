@@ -29,6 +29,55 @@ import { resolveLoadingMessages } from '@/lib/loadingMessages';
 // at least two, long enough to actually be readable.
 const LOADING_MESSAGE_INTERVAL_MS = 1600;
 
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+function isEmbedded(): boolean {
+  return typeof window !== 'undefined' && window.self !== window.top;
+}
+
+// Inside the /embed iframe, a relative link in an answer ("/contact") belongs
+// to the site embedding the widget, not to ours — the browser would otherwise
+// resolve it against the iframe's own origin. The iframe's referrer is that
+// parent page; null when the browser withholds it.
+function getHostSiteOrigin(): string | null {
+  try {
+    return document.referrer ? new URL(document.referrer).origin : null;
+  } catch {
+    return null;
+  }
+}
+
+function textOf(children: React.ReactNode): string {
+  if (typeof children === 'string') return children;
+  if (Array.isArray(children)) return children.map(textOf).join('');
+  return '';
+}
+
+function ChatLink({ href, children }: { href?: string; children?: React.ReactNode }) {
+  const text = textOf(children).trim();
+
+  if (href?.startsWith('mailto:') || EMAIL_RE.test(text)) {
+    return (
+      <a href={href?.startsWith('mailto:') ? href : `mailto:${text}`} className="font-semibold text-brand-700 underline">
+        {children}
+      </a>
+    );
+  }
+
+  let resolved = href;
+  if (href?.startsWith('/') && !href.startsWith('//') && isEmbedded()) {
+    const hostOrigin = getHostSiteOrigin();
+    if (!hostOrigin) return <span>{children}</span>;
+    resolved = `${hostOrigin}${href}`;
+  }
+
+  return (
+    <a href={resolved} target="_blank" rel="noreferrer" className="text-brand-700 underline">
+      {children}
+    </a>
+  );
+}
+
 // Chat responses come back as Markdown (the LLM formats naturally with
 // **bold**, lists, headers) — render it instead of showing raw syntax.
 // Only used for assistant bubbles; user messages render as plain text.
@@ -55,11 +104,7 @@ const MARKDOWN_COMPONENTS = {
   h3: ({ children }: { children?: React.ReactNode }) => (
     <h3 className="mb-1 mt-2 font-semibold first:mt-0">{children}</h3>
   ),
-  a: ({ href, children }: { href?: string; children?: React.ReactNode }) => (
-    <a href={href} target="_blank" rel="noreferrer" className="text-brand-700 underline">
-      {children}
-    </a>
-  ),
+  a: ChatLink,
   code: ({ children }: { children?: React.ReactNode }) => (
     <code className="rounded bg-slate-200 px-1 py-0.5 font-mono text-xs">{children}</code>
   ),

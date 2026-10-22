@@ -6,6 +6,13 @@ import { Readability } from '@mozilla/readability';
 import { isIP } from 'node:net';
 import dns from 'node:dns/promises';
 import { logWarn } from '@/lib/logger';
+import {
+  extractHrefs,
+  extractSitemapLocs,
+  normalizePageUrl,
+  toSameSitePageUrl,
+  MAX_SITE_PAGES,
+} from '@/lib/siteLinks';
 
 // Below this average of extracted characters per PDF page, we assume the
 // PDF is a scanned image with no text layer (OCR is out of scope for now).
@@ -236,12 +243,12 @@ async function fetchOneHop(target: URL): Promise<Response> {
 }
 
 /**
- * Fetches a URL and extracts its main textual content, stripping
- * navigation/ads/footers via Readability — the same extraction engine
- * behind Firefox's Reader View. Returns plain text, ready for the same
- * chunk/embed/index pipeline as an uploaded file's extracted text.
+ * Fetches a public URL with the SSRF guard applied to the URL and to every
+ * redirect hop. Returns the final response (2xx) and the URL it came from
+ * after redirects. Shared by page extraction and site discovery so both get
+ * exactly the same protections.
  */
-export async function extractFromUrl(rawUrl: string): Promise<string> {
+async function fetchPublicUrl(rawUrl: string): Promise<{ response: Response; url: URL }> {
   let url: URL;
   try {
     url = new URL(rawUrl);
@@ -287,18 +294,36 @@ export async function extractFromUrl(rawUrl: string): Promise<string> {
   if (!response.ok) {
     throw new UnsupportedDocumentError(`Cette URL a répondu avec une erreur (${response.status}).`);
   }
+  return { response, url };
+}
 
+async function readBoundedText(response: Response): Promise<string> {
+  const text = await response.text();
+  if (Buffer.byteLength(text, 'utf-8') > URL_MAX_RESPONSE_BYTES) {
+    throw new UnsupportedDocumentError('Cette page est trop volumineuse.');
+  }
+  return text;
+}
+
+async function fetchPublicHtml(rawUrl: string): Promise<{ html: string; url: URL }> {
+  const { response, url } = await fetchPublicUrl(rawUrl);
   const contentType = response.headers.get('content-type') || '';
   if (!contentType.includes('text/html')) {
     throw new UnsupportedDocumentError(
       "Cette URL ne renvoie pas une page web (HTML) — seules les pages web sont supportées pour l'instant."
     );
   }
+  return { html: await readBoundedText(response), url };
+}
 
-  const html = await response.text();
-  if (Buffer.byteLength(html, 'utf-8') > URL_MAX_RESPONSE_BYTES) {
-    throw new UnsupportedDocumentError('Cette page est trop volumineuse.');
-  }
+/**
+ * Fetches a URL and extracts its main textual content, stripping
+ * navigation/ads/footers via Readability — the same extraction engine
+ * behind Firefox's Reader View. Returns plain text, ready for the same
+ * chunk/embed/index pipeline as an uploaded file's extracted text.
+ */
+export async function extractFromUrl(rawUrl: string): Promise<string> {
+  const { html, url } = await fetchPublicHtml(rawUrl);
 
   const dom = new JSDOM(html, { url: url.toString() });
   const article = new Readability(dom.window.document).parse();
@@ -308,4 +333,71 @@ export async function extractFromUrl(rawUrl: string): Promise<string> {
   }
 
   return article.textContent.trim();
+}
+
+// ---------------------------------------------------------------------------
+// Whole-site discovery (docs/roadmap.md item 50): lists the pages of the site
+// a URL belongs to, so each can then be ingested as its own document through
+// the normal single-URL pipeline above. Sources: the site's sitemap.xml when
+// there is one, plus the links found on the start page and on the pages it
+// links to (two levels: enough for a typical brochure site whose navigation
+// is on every page). Every fetch goes through fetchPublicUrl, so the SSRF
+// guard and redirect re-validation apply to each page and to the sitemap.
+// ---------------------------------------------------------------------------
+
+const MAX_CHILD_SITEMAPS = 3;
+const DISCOVERY_BATCH_SIZE = 5;
+
+async function readSitemapLocs(origin: string): Promise<string[]> {
+  const fetchLocs = async (sitemapUrl: string) => {
+    const { response } = await fetchPublicUrl(sitemapUrl);
+    return extractSitemapLocs(await readBoundedText(response));
+  };
+
+  const locs = await fetchLocs(`${origin}/sitemap.xml`);
+  // A sitemap index lists other sitemaps rather than pages.
+  const childSitemaps = locs.filter((loc) => /\.xml(\.gz)?$/i.test(loc)).slice(0, MAX_CHILD_SITEMAPS);
+  const pages = locs.filter((loc) => !/\.xml(\.gz)?$/i.test(loc));
+  for (const child of childSitemaps) {
+    const childLocs = await fetchLocs(child).catch(() => []);
+    pages.push(...childLocs);
+  }
+  return pages;
+}
+
+/**
+ * Returns up to `maxPages` normalized page URLs of the site `rawUrl` belongs
+ * to, starting with `rawUrl` itself (as reached after redirects). Throws
+ * UnsupportedDocumentError only if the start page itself can't be fetched;
+ * a missing sitemap or an unreachable linked page is simply skipped.
+ */
+export async function discoverSiteUrls(rawUrl: string, maxPages = MAX_SITE_PAGES): Promise<string[]> {
+  const { html: startHtml, url: start } = await fetchPublicHtml(rawUrl);
+  const found = new Set<string>([normalizePageUrl(start)]);
+
+  const add = (href: string, base: URL): string | null => {
+    if (found.size >= maxPages) return null;
+    const page = toSameSitePageUrl(href, base);
+    if (!page || found.has(page)) return null;
+    found.add(page);
+    return page;
+  };
+
+  const sitemapLocs = await readSitemapLocs(start.origin).catch(() => []);
+  for (const loc of sitemapLocs) add(loc, start);
+
+  const linkedFromStart = extractHrefs(startHtml)
+    .map((href) => add(href, start))
+    .filter((page): page is string => page !== null);
+
+  for (let i = 0; i < linkedFromStart.length && found.size < maxPages; i += DISCOVERY_BATCH_SIZE) {
+    const batch = linkedFromStart.slice(i, i + DISCOVERY_BATCH_SIZE);
+    const results = await Promise.allSettled(batch.map((page) => fetchPublicHtml(page)));
+    for (const result of results) {
+      if (result.status !== 'fulfilled') continue;
+      for (const href of extractHrefs(result.value.html)) add(href, result.value.url);
+    }
+  }
+
+  return Array.from(found);
 }

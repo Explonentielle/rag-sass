@@ -38,6 +38,7 @@ fixe — sert de mémoire centralisée plutôt que de planning strict.
 | 47 | Chat | Indicateur de chargement du chat trop statique (points fixes) | Faible-moyen | ✅ Fait (rotation animée + personnalisable par chatbot) |
 | 48 | Chat | Envoi de fichiers par le visiteur dans le widget (réglable par chatbot) | Moyen-élevé | ✅ Fait (stockage + téléchargement dashboard + pièce jointe de l'email + purge de rétention à 90 jours via Vercel Cron) |
 | 49 | Chat | Analyse IA du fichier envoyé (interpréter le contenu et répondre directement) | Élevé | Noté, pas implémenté — dépend de l'item 48 (et de l'OCR, item 7, pour scans/images) |
+| 50 | Ingestion | Le scan d'URL ne lit qu'une page, pas le site entier | Moyen | ✅ Fait (option "Tout le site", une page = un document) — pas encore testé en prod |
 | 21 | Catalogue | Agent de qualification de leads | Élevé | Item 3 (agent) |
 | 22 | Catalogue | Brouillon de réponse email | Moyen | — |
 | 23 | Catalogue | Analyseur de contrats (extraction de clauses) | Moyen | — |
@@ -1904,3 +1905,52 @@ Pistes, pour mémoire :
   limite de taille du contexte.
 
 **Effort** : élevé. Dépend de l'item 48.
+
+---
+
+### 50. Le scan d'URL ne lit qu'une page, pas le site entier — ✅ Fait
+
+**Constat (2026-10-22, en prod)** : en ajoutant `https://www.votreaccompagnateur.fr/`
+comme source, seule la page d'accueil est indexée. `extractFromUrl`
+(`lib/extract.ts`) récupère la page demandée et n'en suit aucun lien : les
+pages `/partenaires`, `/smart-sales`, `/devenir-accompagnateur`, `/contact`,
+`/mentions-legales` et `/confidentialite` sont ignorées (le site n'a pas de
+`sitemap.xml`, pages trouvées via les liens de l'accueil). Résultat : le
+chatbot a très peu d'informations.
+
+**Contournement immédiat** : ajouter chaque page à la main, une URL par
+document.
+
+**Fait (2026-10-22)** :
+- **UI** (`components/UrlUploader.tsx`) : case "Tout le site" à côté du champ
+  URL. Elle liste les pages trouvées, toutes cochées sauf celles déjà
+  ajoutées comme documents (badge "déjà ajoutée", pour ne pas créer de
+  doublons en re-scannant). Chaque page cochée est envoyée, une à la fois, à
+  la route existante `upload-url` : **une page = un document** (réessai et
+  suppression page par page, source exacte citée dans les réponses, chaque
+  page traitée par sa propre requête, donc pas de risque de dépasser le
+  `maxDuration` de Vercel).
+- **Découverte** (`discoverSiteUrls`, `lib/extract.ts`, route
+  `app/api/documents/discover-urls`) : `sitemap.xml` s'il existe (et jusqu'à 3
+  sous-sitemaps d'un index), plus les liens de la page de départ et des pages
+  qu'elle lie (2 niveaux, par lots de 5 requêtes). Plafond 30 pages
+  (`MAX_SITE_PAGES`). Le téléchargement sécurisé (garde SSRF + revalidation à
+  chaque redirection) est maintenant une fonction partagée
+  (`fetchPublicUrl`) utilisée par l'extraction d'une page et par la
+  découverte : mêmes protections pour chaque page et pour le sitemap.
+- **Filtrage** (`lib/siteLinks.ts`, pur, testé) : même site seulement (www et
+  domaine nu = même site), pas de mailto/tel/javascript, pas de fichiers
+  (PDF, images...) ni d'assets (`/_next/`, `/api/`...). URL normalisées sans
+  fragment, sans query string et sans `/` final, pour dédoublonner.
+
+Testé : 10 tests unitaires (`lib/siteLinks.test.ts`), types propres ; la
+logique de liens appliquée au vrai site trouve bien ses 7 pages. **Pas encore
+testé de bout en bout** (route + UI + indexation des pages) en prod.
+
+**Limites connues** : profondeur 2 sans sitemap (une page enfouie plus loin
+n'est trouvée que via le sitemap) ; les sites dont les liens ne sont générés
+qu'en JavaScript côté navigateur ne sont pas parcourables (même limite que
+l'extraction actuelle) ; les query strings sont ignorées (deux pages qui ne
+diffèrent que par `?id=` sont fusionnées).
+
+**Effort** : moyen.
