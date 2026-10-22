@@ -39,6 +39,7 @@ fixe — sert de mémoire centralisée plutôt que de planning strict.
 | 48 | Chat | Envoi de fichiers par le visiteur dans le widget (réglable par chatbot) | Moyen-élevé | ✅ Fait (stockage + téléchargement dashboard + pièce jointe de l'email + purge de rétention à 90 jours via Vercel Cron) |
 | 49 | Chat | Analyse IA du fichier envoyé (interpréter le contenu et répondre directement) | Élevé | Noté, pas implémenté — dépend de l'item 48 (et de l'OCR, item 7, pour scans/images) |
 | 50 | Ingestion | Le scan d'URL ne lit qu'une page, pas le site entier | Moyen | ✅ Fait (option "Tout le site", une page = un document) — pas encore testé en prod |
+| 51 | Chat | Messages d'attente contextuels (étapes réelles avec le sujet de la question) | Faible-moyen | ✅ Fait (choix par chatbot, désactivé par défaut) — pas encore testé en prod |
 | 21 | Catalogue | Agent de qualification de leads | Élevé | Item 3 (agent) |
 | 22 | Catalogue | Brouillon de réponse email | Moyen | — |
 | 23 | Catalogue | Analyseur de contrats (extraction de clauses) | Moyen | — |
@@ -1954,3 +1955,41 @@ l'extraction actuelle) ; les query strings sont ignorées (deux pages qui ne
 diffèrent que par `?id=` sont fusionnées).
 
 **Effort** : moyen.
+
+---
+
+### 51. Messages d'attente contextuels — ✅ Fait
+
+**Besoin (2026-10-22)** : les messages d'attente (item 47) sont génériques ;
+l'idée était qu'ils s'adaptent à la conversation.
+
+**Idée écartée** : demander au LLM, dans le même prompt que la réponse, de
+générer 3-5 messages d'attente pour la *prochaine* question. Pas de coût
+d'appel en plus (quelques tokens de sortie), mais : la prochaine question est
+impossible à anticiper (messages souvent à côté si le visiteur change de
+sujet), les messages proposés décrivaient des actions que le chatbot ne fait
+pas ("Calcul de vos économies", "Consultation de nos partenaires" — trompeur
+pour le visiteur), et il aurait fallu les retirer du flux de la réponse
+affichée.
+
+**Retenu : les étapes réelles**, contextuelles dès la première question et
+toujours exactes, sans appel supplémentaire :
+- Les deux routes de chat envoient un événement SSE `status` :
+  `{ step: 'searching', topic }` juste après la reformulation de la question
+  (`topic` = les mots-clés produits par `rewriteQuery`, déjà calculés pour la
+  recherche), puis `{ step: 'writing' }` juste avant la génération. Envoyés
+  toujours (le widget décide de les afficher ou non).
+- `components/ChatWidget.tsx` (`showLoadingSteps`) : "Je cherche "<sujet>"
+  dans nos informations…" (sujet tronqué à 50 caractères, rendu en texte, jamais
+  en HTML), puis "Je rédige la réponse…". Avant la première étape, la
+  rotation des messages configurés reste affichée.
+- **Choix par chatbot** (migration `0019_chatbot_loading_steps.sql`,
+  `chatbots.show_loading_steps`, défaut `false` : rien ne change pour les
+  chatbots existants) — deux boutons radio "Messages personnalisés" / "Étapes
+  réelles" au-dessus de la liste des messages (`LoadingMessagesForm`). Les
+  chatbots sans documents n'ont pas d'étape de recherche : rotation, puis
+  "Je rédige la réponse…".
+
+Testé : types propres. **Pas encore testé dans un navigateur ni en prod.**
+
+**Effort** : faible-moyen.

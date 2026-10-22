@@ -49,7 +49,7 @@ environnement, voir `scripts/migrate-french-analyzer.mts`.
 
 ## 2. Supabase — appliquer les migrations
 
-**Aucune des 18 migrations n'est protégée contre une double exécution par
+**Aucune des 19 migrations n'est protégée contre une double exécution par
 un mécanisme de suivi automatique** (pas de CLI Supabase liée, voir
 `supabase/migrations/`) — mais la plupart sont écrites de façon
 idempotente (`create table if not exists`, `add column if not exists`,
@@ -76,6 +76,7 @@ Editor**, exécute-les dans l'ordre, une par une :
 | 16 | `0016_chatbot_notification_email.sql` | Sans effet si déjà appliquée |
 | 17 | `0017_visitor_file_uploads.sql` | Sans effet si déjà appliquée (`drop policy if exists`, `on conflict do nothing`) |
 | 18 | `0018_retention_purge_to_vercel_cron.sql` | Sans effet si déjà appliquée (désactive l'ancien job `pg_cron`, voir §5) |
+| 19 | `0019_chatbot_loading_steps.sql` | Sans effet si déjà appliquée (`add column if not exists`) |
 
 Pour les n° 1 à 4 : si l'exécution s'arrête sur une erreur
 `policy "..." already exists`, c'est le signal que cette migration (au

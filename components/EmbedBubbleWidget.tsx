@@ -20,11 +20,13 @@ export default function EmbedBubbleWidget({
   accentColor,
   loadingMessages,
   allowUploads,
+  showLoadingSteps,
 }: {
   chatbotId: string;
   accentColor?: string;
   loadingMessages?: string[];
   allowUploads?: boolean;
+  showLoadingSteps?: boolean;
 }) {
   const [open, setOpen] = useState(false);
 
@@ -54,6 +56,7 @@ export default function EmbedBubbleWidget({
             accentColor={accentColor}
             loadingMessages={loadingMessages}
             allowUploads={allowUploads}
+            showLoadingSteps={showLoadingSteps}
           />
         </div>
       )}

@@ -185,6 +185,9 @@ export async function POST(request: Request) {
         let chunks: Awaited<ReturnType<typeof hybridSearch>> = [];
         if (chatbot.use_documents) {
           const { semanticQuery, keywordQuery } = await rewriteQuery(question);
+          // Real progress for widgets that show steps instead of rotating
+          // messages (docs/roadmap.md item 51).
+          controller.enqueue(encoder.encode(sseEvent('status', { step: 'searching', topic: keywordQuery })));
           const queryEmbedding = await embedText(semanticQuery);
 
           chunks = await hybridSearch({
@@ -221,6 +224,7 @@ export async function POST(request: Request) {
           toolsNote: notifyEmail ? NOTIFY_OWNER_PROMPT_NOTE : undefined,
         });
 
+        controller.enqueue(encoder.encode(sseEvent('status', { step: 'writing' })));
         let answer = '';
         const gen = streamAnswer({ systemPrompt, history, question, tools });
         let step = await gen.next();

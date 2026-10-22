@@ -9,7 +9,7 @@ export default async function ChatPage({ params }: { params: { id: string } }) {
 
   const { data: chatbotData, error: chatbotError } = await supabase
     .from('chatbots')
-    .select('id, name, loading_messages')
+    .select('id, name, loading_messages, show_loading_steps')
     .eq('id', params.id)
     .single();
   const chatbot = logQueryError('chat_page.chatbot_failed', { chatbotId: params.id }, chatbotData, chatbotError);
@@ -26,7 +26,11 @@ export default async function ChatPage({ params }: { params: { id: string } }) {
           ← {chatbot.name}
         </Link>
       </div>
-      <ChatWidget chatbotId={chatbot.id} loadingMessages={chatbot.loading_messages ?? undefined} />
+      <ChatWidget
+        chatbotId={chatbot.id}
+        loadingMessages={chatbot.loading_messages ?? undefined}
+        showLoadingSteps={chatbot.show_loading_steps}
+      />
     </div>
   );
 }

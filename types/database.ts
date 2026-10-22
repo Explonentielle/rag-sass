@@ -72,6 +72,7 @@ export interface Database {
           allow_email_tool: boolean;
           notification_email: string | null;
           allow_visitor_uploads: boolean;
+          show_loading_steps: boolean;
           loading_messages: string[] | null;
           created_at: string;
         };
@@ -87,6 +88,7 @@ export interface Database {
           allow_email_tool?: boolean;
           notification_email?: string | null;
           allow_visitor_uploads?: boolean;
+          show_loading_steps?: boolean;
           loading_messages?: string[] | null;
           created_at?: string;
         };
@@ -102,6 +104,7 @@ export interface Database {
           allow_email_tool?: boolean;
           notification_email?: string | null;
           allow_visitor_uploads?: boolean;
+          show_loading_steps?: boolean;
           loading_messages?: string[] | null;
           created_at?: string;
         };

@@ -27,7 +27,7 @@ export default async function ChatbotPage({ params }: { params: { id: string } }
   const { data: chatbotData, error: chatbotError } = await supabase
     .from('chatbots')
     .select(
-      'id, name, system_prompt_template, organization_id, is_public, allowed_origins, use_documents, use_ai_indexing, allow_email_tool, notification_email, allow_visitor_uploads, loading_messages'
+      'id, name, system_prompt_template, organization_id, is_public, allowed_origins, use_documents, use_ai_indexing, allow_email_tool, notification_email, allow_visitor_uploads, show_loading_steps, loading_messages'
     )
     .eq('id', params.id)
     .single();
@@ -111,7 +111,11 @@ export default async function ChatbotPage({ params }: { params: { id: string } }
           initialValue={chatbot.allow_email_tool}
           initialEmail={chatbot.notification_email}
         />
-        <LoadingMessagesForm chatbotId={chatbot.id} initialValue={chatbot.loading_messages} />
+        <LoadingMessagesForm
+          chatbotId={chatbot.id}
+          initialValue={chatbot.loading_messages}
+          initialShowSteps={chatbot.show_loading_steps}
+        />
       </section>
 
       <section className="space-y-3">

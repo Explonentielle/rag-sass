@@ -26,6 +26,7 @@ export async function PATCH(request: Request, { params }: { params: { id: string
   const useAiIndexing: boolean | undefined = body?.useAiIndexing;
   const allowEmailTool: boolean | undefined = body?.allowEmailTool;
   const allowVisitorUploads: boolean | undefined = body?.allowVisitorUploads;
+  const showLoadingSteps: boolean | undefined = body?.showLoadingSteps;
   const loadingMessagesInput: unknown = body?.loadingMessages;
   const notificationEmailInput: unknown = body?.notificationEmail;
 
@@ -92,6 +93,7 @@ export async function PATCH(request: Request, { params }: { params: { id: string
     useAiIndexing === undefined &&
     allowEmailTool === undefined &&
     allowVisitorUploads === undefined &&
+    showLoadingSteps === undefined &&
     notificationEmail === undefined &&
     loadingMessages === undefined
   ) {
@@ -138,6 +140,7 @@ export async function PATCH(request: Request, { params }: { params: { id: string
       ...(useAiIndexing !== undefined ? { use_ai_indexing: useAiIndexing } : {}),
       ...(allowEmailTool !== undefined ? { allow_email_tool: allowEmailTool } : {}),
       ...(allowVisitorUploads !== undefined ? { allow_visitor_uploads: allowVisitorUploads } : {}),
+      ...(showLoadingSteps !== undefined ? { show_loading_steps: showLoadingSteps } : {}),
       ...(notificationEmail !== undefined ? { notification_email: notificationEmail } : {}),
       ...(loadingMessages !== undefined ? { loading_messages: loadingMessages } : {}),
     })

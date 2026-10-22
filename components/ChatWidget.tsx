@@ -31,6 +31,21 @@ const LOADING_MESSAGE_INTERVAL_MS = 1600;
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
+const MAX_STEP_TOPIC_CHARS = 50;
+
+/** Text for a `status` event from the chat routes, or null for an unknown
+ * step (keeps the current message rather than showing nothing). */
+function describeLoadingStep(data: { step?: unknown; topic?: unknown }): string | null {
+  if (data.step === 'searching') {
+    const topic = typeof data.topic === 'string' ? data.topic.trim() : '';
+    if (!topic) return 'Je cherche dans nos informations…';
+    const short = topic.length > MAX_STEP_TOPIC_CHARS ? `${topic.slice(0, MAX_STEP_TOPIC_CHARS).trimEnd()}…` : topic;
+    return `Je cherche "${short}" dans nos informations…`;
+  }
+  if (data.step === 'writing') return 'Je rédige la réponse…';
+  return null;
+}
+
 function isEmbedded(): boolean {
   return typeof window !== 'undefined' && window.self !== window.top;
 }
@@ -295,6 +310,7 @@ export default function ChatWidget({
   accentColor,
   loadingMessages,
   allowUploads,
+  showLoadingSteps,
 }: {
   chatbotId: string;
   apiEndpoint?: string;
@@ -316,6 +332,10 @@ export default function ChatWidget({
   // the authenticated dashboard chat has no upload endpoint. Display only:
   // /api/public-chat/files enforces the chatbot's setting server-side.
   allowUploads?: boolean;
+  // Show the real progress steps the chat routes stream (`status` events)
+  // instead of rotating loadingMessages (docs/roadmap.md item 51). The
+  // rotation still covers the moment before the first step arrives.
+  showLoadingSteps?: boolean;
 }) {
   const isPublic = apiEndpoint === '/api/public-chat';
   const canUpload = !!allowUploads && isPublic;
@@ -325,6 +345,7 @@ export default function ChatWidget({
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
   const [loadingMessageIndex, setLoadingMessageIndex] = useState(0);
+  const [loadingStep, setLoadingStep] = useState<string | null>(null);
   const [conversations, setConversations] = useState<ConversationSummary[]>([]);
   const [activeConversationId, setActiveConversationId] = useState<string | null>(null);
   // Read from localStorage in an effect, not a useState initializer — that
@@ -490,6 +511,7 @@ export default function ChatWidget({
 
     setMessages((prev) => [...prev, { role: 'user', content: question }, { role: 'assistant', content: '' }]);
     setInput('');
+    setLoadingStep(null);
     setLoading(true);
 
     try {
@@ -542,6 +564,8 @@ export default function ChatWidget({
                 ]);
                 return data.conversationId;
               });
+            } else if (event === 'status') {
+              if (showLoadingSteps) setLoadingStep((prev) => describeLoadingStep(data) ?? prev);
             } else if (event === 'sources') {
               setMessages((prev) => {
                 const next = [...prev];
@@ -619,7 +643,7 @@ export default function ChatWidget({
                   loading &&
                   i === messages.length - 1 && (
                     <p className="animate-pulse text-slate-500">
-                      {effectiveLoadingMessages[loadingMessageIndex]}
+                      {loadingStep ?? effectiveLoadingMessages[loadingMessageIndex]}
                     </p>
                   )
                 )
