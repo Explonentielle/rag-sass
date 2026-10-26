@@ -1,9 +1,8 @@
-import Link from 'next/link';
 import { createClient } from '@/lib/supabase/server';
 import { getCurrentOrg } from '@/lib/org';
 import CreateChatbotForm from '@/components/CreateChatbotForm';
 import { Card } from '@/components/ui/Card';
-import { IconBadge, ICONS } from '@/components/icons';
+import ChatbotCard from '@/components/ChatbotCard';
 import { logQueryError } from '@/lib/supabaseResult';
 import { notFound } from 'next/navigation';
 
@@ -58,17 +57,7 @@ export default async function ChatbotsPage() {
       ) : (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {(chatbots ?? []).map((bot) => (
-            <Link key={bot.id} href={`/dashboard/chatbots/${bot.id}`} className="block">
-              <Card className="p-5 transition-shadow hover:shadow-md">
-                <IconBadge size="sm" spacing="mb-3">
-                  {ICONS.chat}
-                </IconBadge>
-                <p className="font-medium text-slate-900">{bot.name}</p>
-                <p className="mt-1 text-xs text-slate-400">
-                  Créé le {new Date(bot.created_at).toLocaleDateString('fr-FR')}
-                </p>
-              </Card>
-            </Link>
+            <ChatbotCard key={bot.id} id={bot.id} name={bot.name} createdAt={bot.created_at} />
           ))}
         </div>
       )}
