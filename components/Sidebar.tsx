@@ -20,19 +20,39 @@ export default function Sidebar({
   orgs,
   currentOrgId,
   userEmail,
+  open,
+  onClose,
 }: {
   orgs: { id: string; name: string }[];
   currentOrgId: string;
   userEmail: string | undefined;
+  // Mobile drawer state (components/DashboardShell.tsx) — below the `lg`
+  // breakpoint this fixed-width sidebar would otherwise eat most of a phone
+  // screen, so it becomes a slide-in drawer there; at `lg` and up it stays
+  // the always-visible static sidebar this was before.
+  open: boolean;
+  onClose: () => void;
 }) {
   const pathname = usePathname();
 
   return (
-    <aside className="sticky top-0 flex h-screen w-64 flex-shrink-0 flex-col overflow-y-auto bg-brand-950 text-white">
-      <div className="flex h-16 items-center border-b border-white/10 px-6">
+    <aside
+      className={`fixed inset-y-0 left-0 z-40 flex h-screen w-64 flex-shrink-0 transform flex-col overflow-y-auto bg-brand-950 text-white transition-transform duration-200 ease-out lg:sticky lg:top-0 lg:translate-x-0 ${
+        open ? 'translate-x-0' : '-translate-x-full'
+      }`}
+    >
+      <div className="flex h-16 items-center justify-between border-b border-white/10 px-6">
         <Link href="/">
           <Logo className="text-white" tone="inverted" />
         </Link>
+        <button
+          type="button"
+          onClick={onClose}
+          aria-label="Fermer le menu"
+          className="-mr-2 flex h-9 w-9 items-center justify-center rounded-md text-brand-200 hover:bg-white/5 hover:text-white lg:hidden"
+        >
+          <Icon className="h-5 w-5">{ICONS.close}</Icon>
+        </button>
       </div>
 
       <OrgSwitcher orgs={orgs} currentOrgId={currentOrgId} />
@@ -46,6 +66,7 @@ export default function Sidebar({
             <Link
               key={item.href}
               href={item.href}
+              onClick={onClose}
               className={`flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors ${
                 isActive
                   ? 'bg-white/10 text-white'
