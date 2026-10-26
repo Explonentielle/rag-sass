@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import { logError } from '@/lib/logger';
 import type { OrgRole } from '@/types/database';
 
 async function getMembership(
@@ -148,14 +149,34 @@ export async function DELETE(
     }
   }
 
-  const { error } = await supabase
+  // `.select()` on the delete so we get back the row(s) actually removed —
+  // without it, a DELETE that RLS silently filters down to zero matching
+  // rows returns no error at all (not a violation, just "nothing matched"),
+  // so this would otherwise report success while quietly deleting nothing.
+  const { data: deleted, error } = await supabase
     .from('users_organizations')
     .delete()
     .eq('organization_id', params.id)
-    .eq('user_id', params.userId);
+    .eq('user_id', params.userId)
+    .select('user_id');
 
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 400 });
+  }
+
+  if (!deleted || deleted.length === 0) {
+    logError('organization_members.delete_no_row_matched', {
+      organizationId: params.id,
+      targetUserId: params.userId,
+      callerRole,
+    });
+    return NextResponse.json(
+      {
+        error:
+          "La suppression n'a rien supprimé (probablement une policy RLS trop stricte côté base de données) — vérifiez la policy users_organizations_delete.",
+      },
+      { status: 403 }
+    );
   }
 
   return NextResponse.json({ ok: true });
