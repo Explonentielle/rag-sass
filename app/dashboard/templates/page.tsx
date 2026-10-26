@@ -73,7 +73,7 @@ export default async function TemplatesPage() {
                     <DeleteTemplateButton templateId={t.id} />
                   </div>
                 </div>
-                <pre className="mt-3 whitespace-pre-wrap rounded-md bg-slate-50 p-4 font-mono text-xs leading-relaxed text-slate-600">
+                <pre className="mt-3 whitespace-pre-wrap break-words rounded-md bg-slate-50 p-4 font-mono text-xs leading-relaxed text-slate-600">
                   {t.template}
                 </pre>
               </Card>
@@ -97,7 +97,7 @@ export default async function TemplatesPage() {
                 </IconBadge>
                 <h3 className="font-semibold text-slate-900">{t.label}</h3>
               </div>
-              <pre className="mt-3 whitespace-pre-wrap rounded-md bg-slate-50 p-4 font-mono text-xs leading-relaxed text-slate-600">
+              <pre className="mt-3 whitespace-pre-wrap break-words rounded-md bg-slate-50 p-4 font-mono text-xs leading-relaxed text-slate-600">
                 {t.template}
               </pre>
             </Card>
