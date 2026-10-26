@@ -140,15 +140,17 @@ export default async function DashboardPage() {
               <Link
                 key={doc.id}
                 href={`/dashboard/chatbots/${doc.chatbot_id}`}
-                className="flex items-center justify-between px-5 py-4 text-sm hover:bg-slate-50"
+                className="flex items-center justify-between gap-3 px-5 py-4 text-sm hover:bg-slate-50"
               >
-                <div>
-                  <p className="font-medium text-slate-900">{doc.filename}</p>
-                  <p className="mt-0.5 text-xs text-slate-400">
+                <div className="min-w-0 flex-1">
+                  <p className="truncate font-medium text-slate-900">{doc.filename}</p>
+                  <p className="mt-0.5 truncate text-xs text-slate-400">
                     {chatbot?.name} · {new Date(doc.uploaded_at).toLocaleDateString('fr-FR')}
                   </p>
                 </div>
-                <DocumentStatusBadge status={doc.status as DocumentStatus} />
+                <div className="flex-shrink-0">
+                  <DocumentStatusBadge status={doc.status as DocumentStatus} />
+                </div>
               </Link>
             );
           })}
