@@ -14,6 +14,13 @@ import path from 'node:path';
 
 const LOG_DIR = path.join(process.cwd(), 'logs');
 
+// Vercel (and other serverless hosts) ship a read-only filesystem outside
+// /tmp — every single mkdir() here would fail and print an ENOENT stack
+// trace, in practice drowning out the one line that actually matters in the
+// Vercel log viewer. `VERCEL` is set automatically in that runtime; skip the
+// file write there entirely instead of failing on every call.
+const CAN_WRITE_LOG_FILE = !process.env.VERCEL;
+
 type LogLevel = 'info' | 'warn' | 'error';
 
 interface LogFields {
@@ -21,6 +28,7 @@ interface LogFields {
 }
 
 async function writeToFile(line: string) {
+  if (!CAN_WRITE_LOG_FILE) return;
   try {
     await mkdir(LOG_DIR, { recursive: true });
     const date = new Date().toISOString().slice(0, 10); // YYYY-MM-DD

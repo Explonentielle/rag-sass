@@ -1,5 +1,6 @@
 import type { getAdminClient } from '@/lib/supabase/admin';
 import { getRequestOrigin, isOriginAllowed } from '@/lib/embedAccess';
+import { logError } from '@/lib/logger';
 
 // Shared by every anonymous visitor endpoint (app/api/public-chat and
 // app/api/public-chat/files) — route files can't export helpers, so the
@@ -50,6 +51,13 @@ export async function getAccessibleChatbot(
     .eq('id', chatbotId)
     .single();
 
+  // PGRST116 = .single() found zero (or more than one) row — a genuine
+  // "doesn't exist". Any other error is a real query failure (DB timeout,
+  // connection issue...) that would otherwise look identical to a deleted
+  // chatbot in the logs, with no way to tell the two apart after the fact.
+  if (error && error.code !== 'PGRST116') {
+    logError('public_chat_access.query_failed', { chatbotId, error: error.message, code: error.code });
+  }
   if (error || !chatbot) return { ok: false, reason: 'not_found' };
   if (!chatbot.is_public) return { ok: false, reason: 'private' };
 
