@@ -30,7 +30,7 @@ fixe — sert de mémoire centralisée plutôt que de planning strict.
 | 39 | RAG | Analyseur français manquant sur l'index Elasticsearch | Moyen | ✅ Fait |
 | 40 | Ingestion | Traitement de plusieurs fichiers en simultané | Moyen | ✅ Fait |
 | 41 | Chat | Chaîne longue sans espace casse l'affichage dans l'iframe | Faible | ✅ Fait |
-| 42 | Infra | Déploiement VPS (ES sécurisé) + Vercel + migrations | Élevé | Vercel ✅ déployé et en ligne (build + migrations appliquées) — VPS ✅ provisionné (OVH, Canada/BHS) — reste : nom de domaine, pointer `es.<domaine>` dessus, lancer `docker-compose.prod.yml`+Caddy sur le VPS, renseigner `ELASTICSEARCH_URL`/`USERNAME`/`PASSWORD` sur Vercel et redéployer |
+| 42 | Infra | Déploiement VPS (ES sécurisé) + Vercel + migrations | Élevé | ✅ Fait et en prod : Vercel déployé, VPS (OVH, Canada/BHS) avec Elasticsearch opérationnel, un chatbot fonctionne déjà sur le dashboard prod et sur un site client — seul le nom de domaine dédié (`corpusia`) manque encore |
 | 43 | Compte | Suppression d'un chatbot | Moyen | ✅ Fait |
 | 44 | Sécurité | Durcir le garde-fou SSRF de l'ingestion par URL (DNS rebinding + redirection) | Moyen (redirection) / Élevé (DNS rebinding) | Redirection ✅ Fait — DNS rebinding noté, pas implémenté (risque limité tant que réservé aux membres authentifiés) |
 | 45 | Qualité | Voir le contenu indexé (chunks) depuis la page Documents | Moyen | ✅ Fait |
@@ -1620,24 +1620,20 @@ déploiement, rien ne documentait l'application des migrations en prod.
   registre de traitement, mention visiteur widget, gabarit DPA) — voir
   item 20.
 
-**Mise à jour (2026-10-26)** : le déploiement Vercel est fait et en ligne
-(`rag-sass-seven.vercel.app`), les migrations jusqu'à `0019` sont appliquées
-en prod. Le VPS est provisionné chez OVH (datacenter Canada/BHS — l'idéal
-aurait été France/UE, à corriger plus tard si la latence transatlantique
-pose problème pour des visiteurs européens, voir note dans la conversation
-du 2026-10-26).
+**Mise à jour (2026-10-26)** : entièrement opérationnel en prod. Vercel est
+déployé et en ligne (`rag-sass-seven.vercel.app`), les migrations jusqu'à
+`0019` sont appliquées, le VPS (OVH, datacenter Canada/BHS) héberge
+Elasticsearch et fonctionne — un chatbot répond déjà réellement, aussi bien
+depuis le dashboard de prod que depuis le widget embarqué sur un site
+client.
 
-**Reste à faire par l'utilisateur** (accès dont je ne dispose pas) :
-1. Acheter/configurer le nom de domaine (`corpusia` ou équivalent, chez OVH).
-2. Pointer un sous-domaine (ex. `es.<domaine>`) vers l'IP du VPS (enregistrement A).
-3. Lancer `docker-compose.prod.yml` + `Caddyfile` sur le VPS (voir
-   `docs/deployment.md` §1) — pas encore fait, le VPS existe mais
-   Elasticsearch n'y tourne pas encore.
-4. Renseigner `ELASTICSEARCH_URL`/`ELASTICSEARCH_USERNAME`/`ELASTICSEARCH_PASSWORD`
-   sur Vercel (actuellement vides, le chat RAG ne fonctionne qu'avec un
-   Elasticsearch local tant que ce n'est pas fait) et redéployer.
-5. Domaine vérifié sur Resend (`RESEND_API_KEY`/`RESEND_FROM_EMAIL`) — même
-   domaine que l'étape 1, voir `docs/deployment.md` §3.
+**Reste à faire par l'utilisateur** : acheter/configurer le nom de domaine
+dédié (`corpusia` ou équivalent, chez OVH) — actuellement sur le domaine
+Vercel par défaut. Point secondaire noté en conversation (2026-10-26) : le
+VPS est au Canada plutôt qu'en France/UE comme demandé initialement
+(latence transatlantique ajoutée pour les visiteurs européens) — pas
+bloquant, à corriger plus tard si besoin (OVH ne permet pas de migrer un
+VPS existant de datacenter, il faudrait en recommander un).
 
 ### 43. Aucun moyen de supprimer un chatbot — ✅ Fait
 
