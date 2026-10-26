@@ -270,6 +270,30 @@ function ConversationSwitcher({
 
 const VISITOR_ID_KEY = 'corpus-visitor-id';
 
+// crypto.randomUUID() needs a fairly recent browser and a secure context,
+// not reliably present in every embed context this widget ends up in (seen
+// in practice: a site builder's own preview iframe threw "crypto.randomUUID
+// is not a function" and took down the whole widget via Next's error
+// boundary). Not a security credential, just a localStorage key to group a
+// visitor's own conversations, so a weaker fallback is fine here.
+function generateVisitorId(): string {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return crypto.randomUUID();
+  }
+  if (typeof crypto !== 'undefined' && typeof crypto.getRandomValues === 'function') {
+    const bytes = crypto.getRandomValues(new Uint8Array(16));
+    bytes[6] = (bytes[6] & 0x0f) | 0x40;
+    bytes[8] = (bytes[8] & 0x3f) | 0x80;
+    const hex = Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('');
+    return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
+  }
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+    const r = (Math.random() * 16) | 0;
+    const v = c === 'x' ? r : (r & 0x3) | 0x8;
+    return v.toString(16);
+  });
+}
+
 // Anonymous identity for the public widget/embed — there's no Supabase
 // session to key conversation history on. Stored per-origin, so an iframe
 // embed keeps its own id scoped to wherever it's mounted (fine: it only
@@ -281,11 +305,11 @@ function getOrCreateVisitorId(): string {
   try {
     const existing = localStorage.getItem(VISITOR_ID_KEY);
     if (existing) return existing;
-    const fresh = crypto.randomUUID();
+    const fresh = generateVisitorId();
     localStorage.setItem(VISITOR_ID_KEY, fresh);
     return fresh;
   } catch {
-    return crypto.randomUUID();
+    return generateVisitorId();
   }
 }
 
