@@ -165,16 +165,16 @@ export async function DELETE(
   }
 
   if (!deleted || deleted.length === 0) {
+    // Technical detail (likely an overly strict RLS policy) stays in the
+    // server logs — a visitor-facing error should never mention internal
+    // implementation details like a database policy name.
     logError('organization_members.delete_no_row_matched', {
       organizationId: params.id,
       targetUserId: params.userId,
       callerRole,
     });
     return NextResponse.json(
-      {
-        error:
-          "La suppression n'a rien supprimé (probablement une policy RLS trop stricte côté base de données) — vérifiez la policy users_organizations_delete.",
-      },
+      { error: 'Erreur lors du retrait du membre. Réessayez, ou contactez le support si ça persiste.' },
       { status: 403 }
     );
   }
