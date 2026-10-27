@@ -5,8 +5,11 @@
 	reverse_proxy elasticsearch:9200
 }
 
-{$OCR_DOMAIN} {
-	# Même principe que le bloc ES_DOMAIN ci-dessus, pour le service OCR
-	# (docs/roadmap.md item 7) — sous-domaine DNS distinct requis.
+{$ES_DOMAIN}:8443 {
+	# Service OCR (docs/roadmap.md item 7) — même nom d'hôte que ci-dessus
+	# (le domaine auto-fourni par OVH pour ce VPS), différencié par port
+	# plutôt que par sous-domaine : aucun enregistrement DNS supplémentaire
+	# requis. À revoir pour un sous-domaine dédié si un vrai nom de domaine
+	# est acheté pour le produit.
 	reverse_proxy ocr:8080
 }

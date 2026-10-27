@@ -53,30 +53,31 @@ scannés — voir `ocr-service/`. Optionnel : sans lui, un PDF scanné est
 simplement rejeté avec un message clair à l'upload, comme avant qu'il
 existe.
 
-**Prérequis supplémentaire** : un second sous-domaine DNS (ex.
-`ocr.corpus-ai.fr`), avec son enregistrement A pointant déjà vers l'IP de ce
-même VPS — Caddy sert les deux domaines (ES et OCR) avec des certificats
-TLS séparés.
+**Pas de prérequis DNS supplémentaire** : ce service tourne sur le même
+nom d'hôte que `ES_DOMAIN` (DNS acheté, ou nom auto-fourni par
+l'hébergeur — ex. `xxx.vps.ovh.ca`), juste sur un port différent
+(`8443`), via un second bloc dans le `Caddyfile`. Si un vrai domaine est
+acheté pour le produit plus tard, ça peut être changé pour un sous-domaine
+dédié, mais ce n'est pas nécessaire pour démarrer.
 
 ```bash
 # Dans .env.prod (même fichier qu'à l'étape 1 ci-dessus), en plus de
 # ES_DOMAIN/ELASTIC_PASSWORD, remplir :
-#   OCR_DOMAIN (le sous-domaine ci-dessus)
 #   OCR_SERVICE_SECRET (généré avec: openssl rand -base64 24)
 
-docker compose -f docker-compose.prod.yml --env-file .env.prod up -d
+docker compose -f docker-compose.prod.yml --env-file .env.prod up -d --build
 
 # Vérifier (depuis le VPS ou n'importe où) :
 curl -X POST \
   -H "Authorization: Bearer LE_SECRET" \
   -H "Content-Type: application/pdf" \
   --data-binary @un-pdf-scanne.pdf \
-  https://ocr.corpus-ai.fr/ocr
+  https://<ES_DOMAIN>:8443/ocr
 # → {"text": "...", "pageCount": N}
 ```
 
 Garder `OCR_SERVICE_SECRET` — à recopier dans les variables Vercel à
-l'étape 5 (`OCR_SERVICE_URL=https://<OCR_DOMAIN>`,
+l'étape 5 (`OCR_SERVICE_URL=https://<ES_DOMAIN>:8443`,
 `OCR_SERVICE_SECRET=<même valeur>`).
 
 ---
@@ -224,7 +225,7 @@ avant d'ouvrir plus largement.
 | `ELASTICSEARCH_URL` | `https://es.corpus-ai.fr` (le domaine de l'étape 1) |
 | `ELASTICSEARCH_USERNAME` | `elastic` |
 | `ELASTICSEARCH_PASSWORD` | Le `ELASTIC_PASSWORD` généré à l'étape 1 |
-| `OCR_SERVICE_URL` | `https://ocr.corpus-ai.fr` (le domaine de l'étape 1b) — optionnel, sans lui un PDF scanné est juste rejeté comme avant |
+| `OCR_SERVICE_URL` | `https://<ES_DOMAIN>:8443` (même domaine que ci-dessus, port 8443 — étape 1b) — optionnel, sans lui un PDF scanné est juste rejeté comme avant |
 | `OCR_SERVICE_SECRET` | Le `OCR_SERVICE_SECRET` généré à l'étape 1b |
 | `OPENAI_API_KEY` | platform.openai.com, avec facturation active |
 | `OPENAI_EMBEDDING_MODEL` | `text-embedding-3-small` (défaut) |

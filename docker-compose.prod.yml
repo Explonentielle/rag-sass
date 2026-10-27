@@ -12,12 +12,12 @@
 #
 # Usage (voir docs/deployment.md pour le détail complet) :
 #   1. Copier .env.prod.example -> .env.prod, remplir ELASTIC_PASSWORD,
-#      ES_DOMAIN, OCR_DOMAIN et OCR_SERVICE_SECRET (sous-domaines DNS
-#      pointant vers l'IP de ce VPS).
+#      ES_DOMAIN (DNS ou nom d'hôte auto-fourni par l'hébergeur, ex. OVH)
+#      et OCR_SERVICE_SECRET.
 #   2. docker compose -f docker-compose.prod.yml --env-file .env.prod up -d
 #   3. Dans les variables d'env Vercel : ELASTICSEARCH_URL=https://<ES_DOMAIN>,
 #      ELASTICSEARCH_USERNAME=elastic, ELASTICSEARCH_PASSWORD=<ELASTIC_PASSWORD>,
-#      OCR_SERVICE_URL=https://<OCR_DOMAIN>, OCR_SERVICE_SECRET=<OCR_SERVICE_SECRET>.
+#      OCR_SERVICE_URL=https://<ES_DOMAIN>:8443, OCR_SERVICE_SECRET=<OCR_SERVICE_SECRET>.
 services:
   elasticsearch:
     image: docker.elastic.co/elasticsearch/elasticsearch:8.19.23
@@ -70,9 +70,9 @@ services:
     ports:
       - "80:80"
       - "443:443"
+      - "8443:8443"
     environment:
       - ES_DOMAIN=${ES_DOMAIN}
-      - OCR_DOMAIN=${OCR_DOMAIN}
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
       - caddy_data:/data
