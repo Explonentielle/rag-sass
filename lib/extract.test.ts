@@ -52,12 +52,16 @@ describe('detectFileType', () => {
     ['prix.csv', 'csv'],
     ['catalogue.xlsx', 'xlsx'],
     ['ancien.xls', 'xlsx'], // .xls est aussi redirigé vers le handler 'xlsx'
+    ['capture.png', 'image'],
+    ['photo.JPG', 'image'], // insensible à la casse
+    ['scan.jpeg', 'image'],
+    ['dessin.webp', 'image'],
   ])('detects %s as %s', (filename, expected) => {
     expect(detectFileType(filename)).toBe(expected);
   });
 
   it('returns null for an unsupported extension', () => {
-    expect(detectFileType('image.png')).toBeNull();
+    expect(detectFileType('animation.gif')).toBeNull();
   });
 
   it('returns null for a filename with no extension', () => {
@@ -169,6 +173,62 @@ describe('extractText: xlsx', () => {
     const buffer = XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' }) as Buffer;
 
     await expect(extractText(buffer, 'xlsx')).rejects.toThrow(UnsupportedDocumentError);
+  });
+});
+
+describe('extractText: image (via le service OCR)', () => {
+  // Contrairement à .docx/.pdf (voir la note en tête de fichier), la branche
+  // 'image' ne dépend d'aucune librairie de parsing de fichier réel — elle
+  // envoie directement les octets au service OCR (lib/ocrService.ts, un
+  // simple appel fetch) — donc testable ici en mockant fetch, comme pour
+  // extractFromUrl plus bas.
+  beforeEach(() => {
+    fetchMock.mockReset();
+    vi.stubGlobal('fetch', fetchMock);
+    vi.stubEnv('OCR_SERVICE_URL', 'https://ocr.exemple.com');
+    vi.stubEnv('OCR_SERVICE_SECRET', 'le-secret');
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.unstubAllEnvs();
+  });
+
+  function ocrJsonResponse(body: unknown, status = 200) {
+    return { ok: status >= 200 && status < 300, status, json: async () => body } as unknown as Response;
+  }
+
+  it('returns the recognized text when the OCR service finds enough of it', async () => {
+    const recognized = 'Un texte bien assez long pour dépasser le seuil minimal attendu par extractText.';
+    fetchMock.mockResolvedValueOnce(ocrJsonResponse({ text: recognized }));
+
+    const text = await extractText(Buffer.from('fake-png-bytes'), 'image');
+    expect(text).toBe(recognized);
+  });
+
+  it('rejects when the OCR service finds no readable text', async () => {
+    fetchMock.mockResolvedValueOnce(ocrJsonResponse({ text: '' }));
+
+    await expect(extractText(Buffer.from('fake-png-bytes'), 'image')).rejects.toThrow(
+      UnsupportedDocumentError
+    );
+  });
+
+  it('rejects when the OCR service itself fails', async () => {
+    fetchMock.mockRejectedValueOnce(new Error('connexion refusée'));
+
+    await expect(extractText(Buffer.from('fake-png-bytes'), 'image')).rejects.toThrow(
+      UnsupportedDocumentError
+    );
+  });
+
+  it('rejects without calling fetch when OCR_SERVICE_URL is not configured', async () => {
+    vi.stubEnv('OCR_SERVICE_URL', '');
+
+    await expect(extractText(Buffer.from('fake-png-bytes'), 'image')).rejects.toThrow(
+      UnsupportedDocumentError
+    );
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 });
 

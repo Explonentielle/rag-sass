@@ -51,7 +51,7 @@ export async function POST(request: Request) {
       logWarn('upload.unsupported_format', { userId: user.id, chatbotId, filename: file.name, ext });
       return NextResponse.json(
         {
-          error: `Le format .${ext} n'est pas encore supporté (seuls .pdf, .docx, .txt, .md, .csv, .xlsx et .xls le sont pour l'instant).`,
+          error: `Le format .${ext} n'est pas encore supporté (seuls .pdf, .docx, .txt, .md, .csv, .xlsx, .xls, .png, .jpg/.jpeg et .webp le sont pour l'instant).`,
         },
         { status: 400 }
       );

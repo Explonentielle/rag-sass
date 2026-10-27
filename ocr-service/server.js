@@ -1,7 +1,9 @@
 // Service interne OCR pour le VPS (docs/roadmap.md item 7) — appelé par
-// lib/ocrService.ts quand un PDF n'a pas de texte natif extractible. Pas de
-// dépendance npm : module `http` natif, binaires système (`pdftoppm` du
-// paquet poppler-utils, `tesseract`) installés dans le Dockerfile.
+// lib/ocrService.ts, soit en fallback quand un PDF n'a pas de texte natif
+// extractible, soit directement pour une image (PNG/JPEG/WebP) uploadée
+// telle quelle. Pas de dépendance npm : module `http` natif, binaires
+// système (`pdftoppm` du paquet poppler-utils, `tesseract`) installés dans
+// le Dockerfile.
 //
 // Jamais exposé directement sur Internet : seul Caddy (TLS) l'est, ce
 // conteneur n'écoute que sur le réseau Docker interne (voir
@@ -23,6 +25,26 @@ const SECRET = process.env.OCR_SERVICE_SECRET;
 const MAX_BODY_BYTES = 20 * 1024 * 1024; // 20 Mo
 const MAX_PAGES = 50;
 const RENDER_DPI = 200;
+
+/** Détecte le format réel à partir des octets magiques du fichier, plutôt
+ * que de faire confiance au Content-Type déclaré par le client — plus
+ * robuste, et évite de devoir faire remonter le type exact depuis
+ * lib/extract.ts jusqu'ici. */
+function detectFormat(buffer) {
+  if (buffer.length >= 4 && buffer.subarray(0, 4).toString('ascii') === '%PDF') return 'pdf';
+  if (buffer.length >= 4 && buffer[0] === 0x89 && buffer[1] === 0x50 && buffer[2] === 0x4e && buffer[3] === 0x47) {
+    return 'png';
+  }
+  if (buffer.length >= 3 && buffer[0] === 0xff && buffer[1] === 0xd8 && buffer[2] === 0xff) return 'jpg';
+  if (
+    buffer.length >= 12 &&
+    buffer.subarray(0, 4).toString('ascii') === 'RIFF' &&
+    buffer.subarray(8, 12).toString('ascii') === 'WEBP'
+  ) {
+    return 'webp';
+  }
+  return null;
+}
 
 function execFileAsync(cmd, args) {
   return new Promise((resolve, reject) => {
@@ -81,6 +103,19 @@ async function ocrPdfBuffer(pdfBuffer) {
   }
 }
 
+/** OCR direct sur une seule image (pas de rasterisation PDF nécessaire). */
+async function ocrImageBuffer(imageBuffer, ext) {
+  const workDir = await fs.mkdtemp(path.join(os.tmpdir(), 'ocr-'));
+  try {
+    const imagePath = path.join(workDir, `image.${ext}`);
+    await fs.writeFile(imagePath, imageBuffer);
+    const text = await execFileAsync('tesseract', [imagePath, 'stdout', '-l', 'fra+eng']);
+    return { text: text.trim(), pageCount: 1 };
+  } finally {
+    await fs.rm(workDir, { recursive: true, force: true });
+  }
+}
+
 function timingSafeEqual(a, b) {
   const bufA = Buffer.from(a);
   const bufB = Buffer.from(b);
@@ -109,16 +144,28 @@ const server = http.createServer(async (req, res) => {
   }
 
   try {
-    const pdfBuffer = await readBody(req);
-    if (pdfBuffer.length === 0) {
+    const buffer = await readBody(req);
+    if (buffer.length === 0) {
       res.writeHead(400, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ error: 'Corps de requête vide.' }));
       return;
     }
 
-    const { text, pageCount } = await ocrPdfBuffer(pdfBuffer);
+    const format = detectFormat(buffer);
+
+    let result;
+    if (format === 'pdf') {
+      result = await ocrPdfBuffer(buffer);
+    } else if (format) {
+      result = await ocrImageBuffer(buffer, format);
+    } else {
+      res.writeHead(415, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: 'Format de fichier non reconnu (ni PDF, ni PNG/JPEG/WebP).' }));
+      return;
+    }
+
     res.writeHead(200, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({ text, pageCount }));
+    res.end(JSON.stringify(result));
   } catch (err) {
     console.error('ocr.failed', err instanceof Error ? err.message : err);
     res.writeHead(500, { 'Content-Type': 'application/json' });

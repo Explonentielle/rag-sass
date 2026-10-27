@@ -52,7 +52,7 @@ Ouvre [http://localhost:3000](http://localhost:3000).
 
 1. Créez un compte (`/signup`), ça crée aussi votre organisation.
 2. Crée un chatbot, choisis un template ("Closer / vente" ou "Infopreneur / support").
-3. Uploade un `.pdf` (texte natif), `.docx`, `.txt` ou `.md`. Le statut passe `pending` → `processing` → `indexed`.
+3. Uploade un `.pdf` (texte natif ou scanné via OCR), `.docx`, `.txt`, `.md`, ou une image (`.png`/`.jpg`/`.webp`). Le statut passe `pending` → `processing` → `indexed`.
 4. Ouvre le chat et pose une question sur le contenu du document.
 
 ## Structure

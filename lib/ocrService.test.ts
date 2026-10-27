@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { ocrPdf, OcrServiceError } from './ocrService';
+import { runOcr, OcrServiceError } from './ocrService';
 
 const fetchMock = vi.fn();
 
@@ -11,7 +11,7 @@ function jsonResponse(body: unknown, status = 200) {
   } as unknown as Response;
 }
 
-describe('ocrPdf', () => {
+describe('runOcr', () => {
   beforeEach(() => {
     vi.stubGlobal('fetch', fetchMock);
   });
@@ -25,19 +25,19 @@ describe('ocrPdf', () => {
   it('returns null without calling fetch when OCR_SERVICE_URL is not configured', async () => {
     vi.stubEnv('OCR_SERVICE_URL', '');
 
-    const result = await ocrPdf(Buffer.from('%PDF-fake'));
+    const result = await runOcr(Buffer.from('%PDF-fake'));
 
     expect(result).toBeNull();
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
-  it('sends the PDF with the expected method/headers and returns the recognized text', async () => {
+  it('sends the file with the expected method/headers and returns the recognized text', async () => {
     vi.stubEnv('OCR_SERVICE_URL', 'https://ocr.exemple.com');
     vi.stubEnv('OCR_SERVICE_SECRET', 'le-secret');
     fetchMock.mockResolvedValueOnce(jsonResponse({ text: 'Texte reconnu', pageCount: 2 }));
 
     const buffer = Buffer.from('%PDF-fake');
-    const result = await ocrPdf(buffer);
+    const result = await runOcr(buffer);
 
     expect(result).toBe('Texte reconnu');
     expect(fetchMock).toHaveBeenCalledTimes(1);
@@ -45,7 +45,7 @@ describe('ocrPdf', () => {
     expect(url).toBe('https://ocr.exemple.com/ocr');
     expect(options.method).toBe('POST');
     expect(options.headers.Authorization).toBe('Bearer le-secret');
-    expect(options.headers['Content-Type']).toBe('application/pdf');
+    expect(options.headers['Content-Type']).toBe('application/octet-stream');
     expect(Buffer.from(options.body)).toEqual(buffer);
   });
 
@@ -54,7 +54,7 @@ describe('ocrPdf', () => {
     vi.stubEnv('OCR_SERVICE_SECRET', '');
     fetchMock.mockResolvedValueOnce(jsonResponse({ text: 'ok' }));
 
-    await ocrPdf(Buffer.from('%PDF-fake'));
+    await runOcr(Buffer.from('%PDF-fake'));
 
     const [, options] = fetchMock.mock.calls[0];
     expect(options.headers.Authorization).toBeUndefined();
@@ -64,13 +64,13 @@ describe('ocrPdf', () => {
     vi.stubEnv('OCR_SERVICE_URL', 'https://ocr.exemple.com');
     fetchMock.mockResolvedValueOnce(jsonResponse({ error: 'boom' }, 500));
 
-    await expect(ocrPdf(Buffer.from('%PDF-fake'))).rejects.toThrow(OcrServiceError);
+    await expect(runOcr(Buffer.from('%PDF-fake'))).rejects.toThrow(OcrServiceError);
   });
 
   it('throws OcrServiceError on a network/timeout failure', async () => {
     vi.stubEnv('OCR_SERVICE_URL', 'https://ocr.exemple.com');
     fetchMock.mockRejectedValueOnce(new Error('fetch failed'));
 
-    await expect(ocrPdf(Buffer.from('%PDF-fake'))).rejects.toThrow(OcrServiceError);
+    await expect(runOcr(Buffer.from('%PDF-fake'))).rejects.toThrow(OcrServiceError);
   });
 });

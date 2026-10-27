@@ -6,7 +6,7 @@ import { Readability } from '@mozilla/readability';
 import { isIP } from 'node:net';
 import dns from 'node:dns/promises';
 import { logWarn } from '@/lib/logger';
-import { ocrPdf } from '@/lib/ocrService';
+import { runOcr } from '@/lib/ocrService';
 import {
   extractHrefs,
   extractSitemapLocs,
@@ -17,13 +17,18 @@ import {
 
 // Below this average of extracted characters per PDF page, we assume the
 // PDF is a scanned image with no text layer, and fall back to the OCR
-// service (see ocrPdf below).
+// service (see runOcr below).
 const MIN_CHARS_PER_PAGE = 20;
 
 // Flat minimum (not per-page, unlike MIN_CHARS_PER_PAGE above) below which
 // the OCR service's own output is considered a failure too (e.g. a blank
 // or unreadable scan) rather than a usable result.
 const MIN_OCR_CHARS = 50;
+
+// Images have no "native text" to fall back from — they always go
+// straight through OCR (runOcr detects the actual format itself from the
+// file's bytes, see lib/ocrService.ts).
+const IMAGE_EXTENSIONS = new Set(['png', 'jpg', 'jpeg', 'webp']);
 
 // Row count above which we warn in logs (not block) — CSV/XLSX ingestion
 // packs rows into Markdown-like text and runs them through the normal
@@ -35,7 +40,27 @@ const LARGE_SHEET_ROW_WARNING = 5000;
 
 export class UnsupportedDocumentError extends Error {}
 
-export type SupportedFileType = 'pdf' | 'docx' | 'txt' | 'md' | 'csv' | 'xlsx';
+/**
+ * Shared tail for the two cases that need OCR: a scanned PDF (no native
+ * text) and a plain image (never has native text). `context` is a French
+ * sentence describing what's being OCR'd, used to build a clear error if
+ * OCR fails or comes back empty.
+ */
+async function ocrOrThrow(buffer: Buffer, context: string): Promise<string> {
+  const ocrText = await runOcr(buffer).catch((err) => {
+    throw new UnsupportedDocumentError(
+      `${context} L'OCR a échoué : ${err instanceof Error ? err.message : 'erreur inconnue'}.`
+    );
+  });
+
+  if (!ocrText || ocrText.trim().length < MIN_OCR_CHARS) {
+    throw new UnsupportedDocumentError(`${context} L'OCR n'y a trouvé aucun texte lisible.`);
+  }
+
+  return ocrText;
+}
+
+export type SupportedFileType = 'pdf' | 'docx' | 'txt' | 'md' | 'csv' | 'xlsx' | 'image';
 
 export function detectFileType(filename: string): SupportedFileType | null {
   const ext = filename.toLowerCase().split('.').pop();
@@ -45,6 +70,7 @@ export function detectFileType(filename: string): SupportedFileType | null {
   if (ext === 'md') return 'md';
   if (ext === 'csv') return 'csv';
   if (ext === 'xlsx' || ext === 'xls') return 'xlsx';
+  if (ext && IMAGE_EXTENSIONS.has(ext)) return 'image';
   return null;
 }
 
@@ -106,22 +132,14 @@ export async function extractText(buffer: Buffer, fileType: SupportedFileType): 
     const avgCharsPerPage = data.numpages > 0 ? text.trim().length / data.numpages : 0;
 
     if (avgCharsPerPage < MIN_CHARS_PER_PAGE) {
-      const ocrText = await ocrPdf(buffer).catch((err) => {
-        throw new UnsupportedDocumentError(
-          `Ce PDF semble être un scan/image sans texte extractible, et l'OCR a échoué : ${err instanceof Error ? err.message : 'erreur inconnue'}.`
-        );
-      });
-
-      if (!ocrText || ocrText.trim().length < MIN_OCR_CHARS) {
-        throw new UnsupportedDocumentError(
-          "Ce PDF semble être un scan/image sans texte extractible, et l'OCR n'y a trouvé aucun texte lisible."
-        );
-      }
-
-      return ocrText;
+      return ocrOrThrow(buffer, 'Ce PDF semble être un scan/image sans texte extractible.');
     }
 
     return text;
+  }
+
+  if (fileType === 'image') {
+    return ocrOrThrow(buffer, 'Cette image ne contient aucun texte extractible nativement.');
   }
 
   if (fileType === 'csv') {
