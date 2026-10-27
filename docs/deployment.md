@@ -45,6 +45,40 @@ du roadmap) se crée automatiquement au premier appel de l'app
 environnement neuf. S'il y a déjà des données à migrer depuis un ancien
 environnement, voir `scripts/migrate-french-analyzer.mts`.
 
+### 1b. Même VPS — service OCR (optionnel, item 7 du roadmap)
+
+Un second service, `ocr` (défini dans le même `docker-compose.prod.yml`),
+tourne un petit serveur HTTP qui fait de l'OCR (Tesseract) sur les PDF
+scannés — voir `ocr-service/`. Optionnel : sans lui, un PDF scanné est
+simplement rejeté avec un message clair à l'upload, comme avant qu'il
+existe.
+
+**Prérequis supplémentaire** : un second sous-domaine DNS (ex.
+`ocr.corpus-ai.fr`), avec son enregistrement A pointant déjà vers l'IP de ce
+même VPS — Caddy sert les deux domaines (ES et OCR) avec des certificats
+TLS séparés.
+
+```bash
+# Dans .env.prod (même fichier qu'à l'étape 1 ci-dessus), en plus de
+# ES_DOMAIN/ELASTIC_PASSWORD, remplir :
+#   OCR_DOMAIN (le sous-domaine ci-dessus)
+#   OCR_SERVICE_SECRET (généré avec: openssl rand -base64 24)
+
+docker compose -f docker-compose.prod.yml --env-file .env.prod up -d
+
+# Vérifier (depuis le VPS ou n'importe où) :
+curl -X POST \
+  -H "Authorization: Bearer LE_SECRET" \
+  -H "Content-Type: application/pdf" \
+  --data-binary @un-pdf-scanne.pdf \
+  https://ocr.corpus-ai.fr/ocr
+# → {"text": "...", "pageCount": N}
+```
+
+Garder `OCR_SERVICE_SECRET` — à recopier dans les variables Vercel à
+l'étape 5 (`OCR_SERVICE_URL=https://<OCR_DOMAIN>`,
+`OCR_SERVICE_SECRET=<même valeur>`).
+
 ---
 
 ## 2. Supabase — appliquer les migrations
@@ -190,6 +224,8 @@ avant d'ouvrir plus largement.
 | `ELASTICSEARCH_URL` | `https://es.corpus-ai.fr` (le domaine de l'étape 1) |
 | `ELASTICSEARCH_USERNAME` | `elastic` |
 | `ELASTICSEARCH_PASSWORD` | Le `ELASTIC_PASSWORD` généré à l'étape 1 |
+| `OCR_SERVICE_URL` | `https://ocr.corpus-ai.fr` (le domaine de l'étape 1b) — optionnel, sans lui un PDF scanné est juste rejeté comme avant |
+| `OCR_SERVICE_SECRET` | Le `OCR_SERVICE_SECRET` généré à l'étape 1b |
 | `OPENAI_API_KEY` | platform.openai.com, avec facturation active |
 | `OPENAI_EMBEDDING_MODEL` | `text-embedding-3-small` (défaut) |
 | `OPENAI_CHAT_MODEL` | `gpt-5.6-luna` (défaut, ou un modèle plus cher si besoin de qualité) |

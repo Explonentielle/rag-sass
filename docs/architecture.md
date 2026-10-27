@@ -19,7 +19,9 @@ flowchart TB
     subgraph VPS["VPS (Docker, auto-hébergé)"]
         Caddy["Caddy (reverse proxy)<br/>TLS + Basic Auth"]
         ES[("Elasticsearch<br/>index documents_chunks<br/>(alias -> index physique versionné)")]
+        OCR["Service OCR<br/>(Tesseract + poppler-utils)"]
         Caddy --> ES
+        Caddy --> OCR
     end
 
     subgraph SupabaseCloud["Supabase Cloud"]
@@ -41,6 +43,7 @@ flowchart TB
     App -->|auth, sessions| Auth
     App -->|upload/lecture fichiers| Storage
     App -->|HTTPS + auth| Caddy
+    App -->|HTTPS + secret partagé, PDF scanné uniquement| Caddy
     App -->|embeddings + génération| Embeddings
     App -->|génération réponse| ChatModel
 ```
@@ -59,6 +62,7 @@ qui est dev-only).
 | **Postgres (Supabase)** | Source de vérité métier, multi-tenant | `organizations`, `chatbots`, `documents` (métadonnées), `conversations`/`messages` (chiffrés en AES-256-GCM), `custom_templates`, `users_organizations` | RLS sur toutes les tables, scopées par `organization_id` (directement ou via jointure). Voir `supabase/migrations/`. |
 | **Supabase Storage** | Fichiers sources uploadés | PDF/DOCX/TXT/MD/CSV/XLSX bruts, à `{organization_id}/{chatbot_id}/{document_id}-{filename}` | RLS basée sur le 1er segment du chemin. Pas le contenu indexé — juste l'original, pour re-traitement éventuel. |
 | **Elasticsearch** | Index de recherche hybride | `documents_chunks` (alias) → chunks de texte + vecteurs d'embedding (1536 dims), `organization_id`/`chatbot_id`/`document_id` en `keyword` | **Pas de RLS native** — l'isolation multi-tenant est appliquée à la main dans `lib/elasticsearch.ts` (filtre obligatoire sur `organization_id` + `chatbot_id` à chaque requête). Point critique à ne jamais contourner. Analyseur français (stemming) depuis l'item 39 du roadmap. |
+| **Service OCR** | Fallback OCR pour les PDF scannés (`ocr-service/`, item 7 du roadmap) | Ne stocke rien — reçoit un PDF, renvoie le texte reconnu (Tesseract), rien de persisté côté service | Appelé uniquement quand `lib/extract.ts` détecte un PDF sans texte natif. Optionnel : non configuré, un tel PDF est simplement rejeté. Secret partagé (`OCR_SERVICE_SECRET`), pas de RLS applicable (pas de base de données). |
 
 ## Flux : ingestion d'un document
 

@@ -6,6 +6,7 @@ import { Readability } from '@mozilla/readability';
 import { isIP } from 'node:net';
 import dns from 'node:dns/promises';
 import { logWarn } from '@/lib/logger';
+import { ocrPdf } from '@/lib/ocrService';
 import {
   extractHrefs,
   extractSitemapLocs,
@@ -15,8 +16,14 @@ import {
 } from '@/lib/siteLinks';
 
 // Below this average of extracted characters per PDF page, we assume the
-// PDF is a scanned image with no text layer (OCR is out of scope for now).
+// PDF is a scanned image with no text layer, and fall back to the OCR
+// service (see ocrPdf below).
 const MIN_CHARS_PER_PAGE = 20;
+
+// Flat minimum (not per-page, unlike MIN_CHARS_PER_PAGE above) below which
+// the OCR service's own output is considered a failure too (e.g. a blank
+// or unreadable scan) rather than a usable result.
+const MIN_OCR_CHARS = 50;
 
 // Row count above which we warn in logs (not block) — CSV/XLSX ingestion
 // packs rows into Markdown-like text and runs them through the normal
@@ -99,9 +106,19 @@ export async function extractText(buffer: Buffer, fileType: SupportedFileType): 
     const avgCharsPerPage = data.numpages > 0 ? text.trim().length / data.numpages : 0;
 
     if (avgCharsPerPage < MIN_CHARS_PER_PAGE) {
-      throw new UnsupportedDocumentError(
-        "Ce PDF semble être un scan/image sans texte extractible. L'OCR n'est pas encore supporté, merci d'uploader un PDF avec du texte natif."
-      );
+      const ocrText = await ocrPdf(buffer).catch((err) => {
+        throw new UnsupportedDocumentError(
+          `Ce PDF semble être un scan/image sans texte extractible, et l'OCR a échoué : ${err instanceof Error ? err.message : 'erreur inconnue'}.`
+        );
+      });
+
+      if (!ocrText || ocrText.trim().length < MIN_OCR_CHARS) {
+        throw new UnsupportedDocumentError(
+          "Ce PDF semble être un scan/image sans texte extractible, et l'OCR n'y a trouvé aucun texte lisible."
+        );
+      }
+
+      return ocrText;
     }
 
     return text;

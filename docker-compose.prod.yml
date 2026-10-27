@@ -1,18 +1,23 @@
-# Elasticsearch de PRODUCTION pour un VPS, à l'opposé de docker-compose.yml
-# (dev local, sécurité désactivée). Deux différences volontaires :
-#   1. xpack.security.enabled=true — authentification requise.
-#   2. Elasticsearch n'est PAS exposé directement sur Internet : seul Caddy
-#      l'est (ports 80/443), et sert de terminaison TLS. Le trajet
-#      Caddy -> Elasticsearch reste en HTTP simple, mais sur le réseau
-#      Docker interne uniquement (jamais exposé à l'extérieur du VPS) — pas
-#      besoin de certificats TLS côté Elasticsearch lui-même.
+# Elasticsearch + OCR (Tesseract) de PRODUCTION pour un VPS, à l'opposé de
+# docker-compose.yml (dev local, sécurité désactivée). Différences
+# volontaires par rapport au dev :
+#   1. xpack.security.enabled=true sur Elasticsearch — authentification
+#      requise ; le service `ocr` vérifie lui-même un secret partagé
+#      (OCR_SERVICE_SECRET).
+#   2. Aucun des deux n'est exposé directement sur Internet : seul Caddy
+#      l'est (ports 80/443), et sert de terminaison TLS pour les deux
+#      domaines. Le trajet Caddy -> service reste en HTTP simple, mais sur
+#      le réseau Docker interne uniquement (jamais exposé à l'extérieur du
+#      VPS) — pas besoin de certificats TLS côté Elasticsearch/OCR eux-mêmes.
 #
 # Usage (voir docs/deployment.md pour le détail complet) :
-#   1. Copier .env.prod.example -> .env.prod, remplir ELASTIC_PASSWORD et
-#      ES_DOMAIN (le sous-domaine DNS pointant vers l'IP de ce VPS).
+#   1. Copier .env.prod.example -> .env.prod, remplir ELASTIC_PASSWORD,
+#      ES_DOMAIN, OCR_DOMAIN et OCR_SERVICE_SECRET (sous-domaines DNS
+#      pointant vers l'IP de ce VPS).
 #   2. docker compose -f docker-compose.prod.yml --env-file .env.prod up -d
 #   3. Dans les variables d'env Vercel : ELASTICSEARCH_URL=https://<ES_DOMAIN>,
-#      ELASTICSEARCH_USERNAME=elastic, ELASTICSEARCH_PASSWORD=<ELASTIC_PASSWORD>.
+#      ELASTICSEARCH_USERNAME=elastic, ELASTICSEARCH_PASSWORD=<ELASTIC_PASSWORD>,
+#      OCR_SERVICE_URL=https://<OCR_DOMAIN>, OCR_SERVICE_SECRET=<OCR_SERVICE_SECRET>.
 services:
   elasticsearch:
     image: docker.elastic.co/elasticsearch/elasticsearch:8.19.23
@@ -45,6 +50,16 @@ services:
       timeout: 5s
       retries: 10
 
+  ocr:
+    build: ./ocr-service
+    container_name: rag-saas-ocr-prod
+    restart: unless-stopped
+    environment:
+      - OCR_SERVICE_SECRET=${OCR_SERVICE_SECRET}
+    # Pas de port publié vers l'hôte, même logique que `elasticsearch`.
+    expose:
+      - "8080"
+
   caddy:
     image: caddy:2-alpine
     container_name: rag-saas-caddy
@@ -57,6 +72,7 @@ services:
       - "443:443"
     environment:
       - ES_DOMAIN=${ES_DOMAIN}
+      - OCR_DOMAIN=${OCR_DOMAIN}
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
       - caddy_data:/data

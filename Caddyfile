@@ -4,3 +4,9 @@
 	# publique de ce VPS avant de démarrer, sinon la validation ACME échoue.
 	reverse_proxy elasticsearch:9200
 }
+
+{$OCR_DOMAIN} {
+	# Même principe que le bloc ES_DOMAIN ci-dessus, pour le service OCR
+	# (docs/roadmap.md item 7) — sous-domaine DNS distinct requis.
+	reverse_proxy ocr:8080
+}
