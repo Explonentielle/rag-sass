@@ -13,7 +13,7 @@ fixe — sert de mémoire centralisée plutôt que de planning strict.
 | 4 | RAG | Reranking post-récupération | Moyen | ✅ Fait (LLM, voir `lib/openai.ts` `rerankChunks`) |
 | 5 | RAG | Chunking sémantique (par section) | Moyen | ✅ Fait |
 | 6 | Ingestion | Traitement asynchrone (queue) | Élevé | ✅ Fait (version légère) |
-| 7 | Ingestion | OCR pour PDF scannés | Élevé | — |
+| 7 | Ingestion | OCR pour PDF scannés | Élevé | ✅ Fait (service Tesseract sur le VPS, PDF scannés + images directes) |
 | 8 | Ingestion | Formats CSV / Excel | Moyen | ✅ Fait |
 | 9 | Chat | Historique de conversation persistant | Moyen | ✅ Fait (migration à appliquer) |
 | 10 | Chat | Rate limiting (surtout `/api/public-chat`) | Faible | ✅ Fait |
@@ -391,15 +391,66 @@ acceptable pour le pilote (rare, et l'utilisateur peut resupprimer/réuploader),
 TypeScript clean, `waitUntil` vérifié en local (tâche de fond exécutée après
 le retour de la fonction).
 
-### 7. OCR pour les PDF scannés
+### 7. OCR pour les PDF scannés — ✅ Fait
 
-**Problème** : un PDF sans texte natif est aujourd'hui rejeté avec un
-message clair (voir `lib/extract.ts`), pas de fallback.
+**Problème** : un PDF sans texte natif (scan) était rejeté avec un message
+clair (voir `lib/extract.ts`), sans fallback.
 
-**Proposition** : intégrer un moteur OCR.
+**Techno choisie** : Tesseract (OCR open source, gratuit, historiquement
+développé par HP puis maintenu par Google ~10 ans). Déploiement en service
+interne sur le VPS OVH plutôt qu'en dépendance serverless (Tesseract.js) côté
+Vercel — mêmes raisons que le reste de l'infra déjà sur ce VPS
+(Elasticsearch) : binaires natifs Linux plus robustes que des dépendances
+WASM/canvas fragiles en serverless, zéro dépendance npm ajoutée côté app.
 
-**Effort / compromis** : élevé — dépendance externe, coût de traitement par
-page, gestion de la qualité variable de l'OCR.
+**Solution implémentée** :
+- **`ocr-service/`** (nouveau, déployé sur le VPS, pas sur Vercel) :
+  serveur HTTP Node natif (`server.js`, zéro dépendance npm), `Dockerfile`
+  base `node:20-slim` avec `tesseract-ocr`, `tesseract-ocr-fra`,
+  `poppler-utils`. Détection de format par signature binaire (magic bytes :
+  `%PDF`, PNG, JPEG, WebP) plutôt que par `Content-Type` déclaré par le
+  client. PDF : rasterisation page par page (`pdftoppm`) puis OCR
+  (`tesseract`, `fra+eng`) sur chaque page, texte concaténé — plafonné à 50
+  pages. Image (PNG/JPG/WebP) : OCR direct sur un seul appel `tesseract`,
+  sans passage par `pdftoppm`. Protégé par un secret partagé (`Authorization:
+  Bearer`, même pattern que `CRON_SECRET`), `execFile` (jamais `exec`) pour
+  tout appel à un binaire externe, plafond de taille de requête (20 Mo).
+- **Routage VPS** : réutilise Caddy (déjà en place pour Elasticsearch) pour
+  la terminaison TLS. Le VPS n'a qu'un hostname auto-généré par OVH
+  (`vps-xxxxx.vps.ovh.ca`), pas de domaine personnalisé permettant des
+  sous-domaines arbitraires — routage par **port** plutôt que par
+  sous-domaine (`{$ES_DOMAIN}:8443` → service `ocr`), sans dépendance DNS
+  supplémentaire. Repasser en sous-domaine (`ocr.<domaine>`) reste possible
+  le jour où un domaine personnalisé est acheté (item 42).
+- **`lib/ocrService.ts`** (`runOcr`) : `null` si `OCR_SERVICE_URL` non
+  configuré (dev local sans le VPS, fallback silencieux) ; sinon appel HTTP
+  avec timeout (120s), lève `OcrServiceError` sur échec.
+- **`lib/extract.ts`** : la branche PDF scanné et une nouvelle branche
+  `image` (détection par extension `.png`/`.jpg`/`.jpeg`/`.webp`) passent
+  toutes les deux par `runOcr` avant d'abandonner — texte retourné si
+  au-dessus d'un seuil minimal de caractères, sinon
+  `UnsupportedDocumentError` avec message mis à jour.
+- **Upload direct d'image** : `DocumentUploader.tsx` et le message d'erreur
+  de format acceptent maintenant `.png`/`.jpg`/`.jpeg`/`.webp` en plus des
+  formats documents — un visiteur peut uploader directement une capture
+  d'écran sans la convertir en PDF.
+
+**Bug trouvé et corrigé en prod pendant la validation** : un nom de fichier
+avec accent/apostrophe/espaces (`Capture d'écran ....png`) faisait échouer
+l'upload (`Invalid key` côté Supabase Storage, qui rejette ces caractères
+dans un chemin). Corrigé en réutilisant `sanitizeFilenameForPath`
+(`lib/visitorFileRules.ts`, déjà utilisé par le flux de fichiers du widget
+visiteur) pour le chemin de stockage, en gardant le nom d'origine intact
+pour l'affichage. À cette occasion, les messages d'erreur de
+`app/api/documents/upload/route.ts` ont aussi été génériqués côté client
+(détail technique conservé uniquement dans les logs via `logError`).
+
+**Effort réel** : élevé, confirmé — nouveau service à opérer (Docker +
+Caddy sur le VPS), mais zéro dépendance ajoutée côté app Vercel.
+
+**Validé en prod (2026-10-28)** : PDF scanné et image (PNG) uploadés
+directement, OCR réussi, document passé à `indexed`, texte exploitable en
+conversation.
 
 ### 8. Formats CSV / Excel — ✅ Fait
 
