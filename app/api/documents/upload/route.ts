@@ -6,6 +6,7 @@ import { createClient } from '@/lib/supabase/server';
 import { detectFileType } from '@/lib/extract';
 import { processDocument } from '@/lib/ingest';
 import { logWarn, logError } from '@/lib/logger';
+import { sanitizeFilenameForPath } from '@/lib/visitorFileRules';
 
 // Ingestion (extraction/chunking/embeddings/indexing) runs in the background
 // after the response is sent — see the waitUntil call below — so this only
@@ -57,7 +58,12 @@ export async function POST(request: Request) {
       );
     }
 
-    const storagePath = `${chatbot.organization_id}/${chatbot.id}/${uuidv4()}-${file.name}`;
+    // sanitizeFilenameForPath strips accents/spaces/apostrophes etc. —
+    // Supabase Storage's object key validation rejects some of these
+    // (seen in prod with an accented filename: "Invalid key"), so the raw
+    // file.name can't be used directly here. The original name is kept
+    // as-is in the `filename` column below for display.
+    const storagePath = `${chatbot.organization_id}/${chatbot.id}/${uuidv4()}-${sanitizeFilenameForPath(file.name)}`;
     const buffer = Buffer.from(await file.arrayBuffer());
 
     const { error: uploadError } = await supabase.storage
@@ -72,7 +78,7 @@ export async function POST(request: Request) {
         error: uploadError.message,
       });
       return NextResponse.json(
-        { error: `Upload échoué: ${uploadError.message}` },
+        { error: "Échec de l'upload. Réessayez, ou contactez le support si ça persiste." },
         { status: 500 }
       );
     }
@@ -97,7 +103,7 @@ export async function POST(request: Request) {
         error: insertError?.message,
       });
       return NextResponse.json(
-        { error: `Enregistrement échoué: ${insertError?.message}` },
+        { error: "Échec de l'enregistrement. Réessayez, ou contactez le support si ça persiste." },
         { status: 500 }
       );
     }
@@ -135,6 +141,9 @@ export async function POST(request: Request) {
       error: message,
       stack: err instanceof Error ? err.stack : undefined,
     });
-    return NextResponse.json({ error: `Erreur serveur: ${message}` }, { status: 500 });
+    return NextResponse.json(
+      { error: "Erreur serveur lors de l'upload. Réessayez, ou contactez le support si ça persiste." },
+      { status: 500 }
+    );
   }
 }
