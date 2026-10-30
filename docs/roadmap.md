@@ -2097,3 +2097,54 @@ toujours exactes, sans appel supplémentaire :
 Testé : types propres. **Pas encore testé dans un navigateur ni en prod.**
 
 **Effort** : faible-moyen.
+
+---
+
+### 52. Séparer dans le dashboard "chatbot widget site" et "second cerveau" — ✅ Fait
+
+**Idée (2026-10-30)** : jusqu'ici tous les chatbots vivaient dans la même
+liste du dashboard (`app/dashboard/chatbots/page.tsx`), qu'ils soient pensés
+pour être embarqués sur un site (widget public, embed code) ou pour un usage
+interne type "second cerveau" (pas de diffusion publique, juste une base de
+connaissances à interroger). Deux usages très différents, mêmes réglages
+affichés pour les deux (ex. section "Widget / embed" pertinente pour l'un,
+pas pour l'autre).
+
+**Constat en creusant le code avant de s'y mettre** : la logique
+RAG/chat/ingestion ne bouge pas (déjà partagée, aucune raison de la
+dupliquer). Rien dans le modèle ne distinguait les deux cas : la distinction
+Chatbot documentaire / Second cerveau / Support client n'existait que comme
+texte marketing sur la landing (Catalogue), jamais persistée en base.
+
+**Implémenté** :
+- Migration `0021_chatbot_use_case.sql` : `chatbots.use_case text` (défaut
+  `'site_widget'`, rétrocompatible — tous les chatbots existants restent
+  dans l'interface "Chatbots"), contrainte `in ('site_widget',
+  'second_cerveau')`.
+- `app/api/chatbots/route.ts` : accepte `useCase` à la création, retombe sur
+  `'site_widget'` si absent/invalide.
+- **Pas de sélecteur affiché à l'utilisateur** : `CreateChatbotForm` reçoit
+  un prop `useCase` fixé par la page appelante (`site_widget` depuis
+  `/dashboard/chatbots` et la vue d'ensemble, `second_cerveau` depuis la
+  nouvelle page) — chaque interface crée le bon type sans choix
+  supplémentaire à faire à l'utilisateur.
+- **Nouvelle page** `app/dashboard/second-cerveau/page.tsx` : même structure
+  que la page Chatbots, filtrée sur `use_case = 'second_cerveau'`. Nouvelle
+  entrée dans `components/Sidebar.tsx` ("Second cerveau", icône `index`) ;
+  "Chatbots" renommé "Chatbots (site)" pour la distinction.
+- `app/dashboard/chatbots/[id]/page.tsx` : lit `use_case`, masque la section
+  "Widget (accès public, apparence, embed)" (et le toggle upload visiteur)
+  pour un second cerveau — pas de notion de widget public pour cet usage.
+  Lien "retour" et wording de la section Conversations adaptés selon le
+  type.
+
+Testé : `tsc --noEmit` propre, 165 tests au vert (pas de nouveau test — que
+du filtrage de requête et de l'affichage conditionnel, rien de nouveau à
+tester unitairement).
+
+**Pas encore testé en conditions réelles** : créer un chatbot depuis chaque
+interface et vérifier qu'il apparaît au bon endroit, et que la page détail
+masque bien la section Widget pour un second cerveau.
+
+**Effort** : faible-moyen (1 colonne + 1 nouvelle page + affichage
+conditionnel dans la page détail).

@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { PROMPT_TEMPLATES } from '@/lib/prompts';
 import { Button } from '@/components/ui/Button';
 import { Card, Input, Label } from '@/components/ui/Card';
+import type { ChatbotUseCase } from '@/types/database';
 
 interface CustomTemplate {
   id: string;
@@ -15,9 +16,14 @@ interface CustomTemplate {
 export default function CreateChatbotForm({
   organizationId,
   customTemplates = [],
+  useCase,
 }: {
   organizationId: string;
   customTemplates?: CustomTemplate[];
+  // Fixe dès la création selon l'interface d'où vient le formulaire
+  // (page "Chatbots" ou page "Second cerveau") — pas un choix affiché à
+  // l'utilisateur, voir docs/roadmap.md item 52.
+  useCase: ChatbotUseCase;
 }) {
   const router = useRouter();
   const [name, setName] = useState('');
@@ -48,6 +54,7 @@ export default function CreateChatbotForm({
         name,
         systemPromptTemplate: resolveTemplateText(templateKey),
         useDocuments,
+        useCase,
       }),
     });
 

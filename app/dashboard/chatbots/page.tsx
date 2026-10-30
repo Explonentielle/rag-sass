@@ -16,6 +16,7 @@ export default async function ChatbotsPage() {
       .from('chatbots')
       .select('id, name, created_at')
       .eq('organization_id', org.id)
+      .eq('use_case', 'site_widget')
       .order('created_at', { ascending: false }),
     supabase
       .from('custom_templates')
@@ -42,11 +43,15 @@ export default async function ChatbotsPage() {
         <div>
           <h1 className="text-2xl font-semibold tracking-tight text-slate-900">Chatbots</h1>
           <p className="mt-1 text-sm text-slate-500">
-            {(chatbots ?? []).length} chatbot{(chatbots ?? []).length > 1 ? 's' : ''} dans{' '}
-            {org.name}
+            {(chatbots ?? []).length} chatbot{(chatbots ?? []).length > 1 ? 's' : ''} à embarquer
+            sur un site, dans {org.name}
           </p>
         </div>
-        <CreateChatbotForm organizationId={org.id} customTemplates={customTemplates ?? []} />
+        <CreateChatbotForm
+          organizationId={org.id}
+          customTemplates={customTemplates ?? []}
+          useCase="site_widget"
+        />
       </div>
 
       {(chatbots ?? []).length === 0 ? (

@@ -93,7 +93,11 @@ export default async function DashboardPage() {
           <h1 className="text-2xl font-semibold tracking-tight text-slate-900">{org.name}</h1>
           <p className="mt-1 text-sm text-slate-500">Vue d'ensemble de votre espace</p>
         </div>
-        <CreateChatbotForm organizationId={org.id} customTemplates={customTemplates ?? []} />
+        <CreateChatbotForm
+          organizationId={org.id}
+          customTemplates={customTemplates ?? []}
+          useCase="site_widget"
+        />
       </div>
 
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">

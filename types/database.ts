@@ -8,6 +8,7 @@ export type MessageRole = 'user' | 'assistant';
 export type OrgPlan = 'solo' | 'pme' | 'metier';
 export type OrgOverageMode = 'block' | 'auto_bill';
 export type OverageChargeStatus = 'succeeded' | 'failed';
+export type ChatbotUseCase = 'site_widget' | 'second_cerveau';
 
 export interface Database {
   public: {
@@ -79,6 +80,7 @@ export interface Database {
           allow_visitor_uploads: boolean;
           show_loading_steps: boolean;
           loading_messages: string[] | null;
+          use_case: ChatbotUseCase;
           created_at: string;
         };
         Insert: {
@@ -95,6 +97,7 @@ export interface Database {
           allow_visitor_uploads?: boolean;
           show_loading_steps?: boolean;
           loading_messages?: string[] | null;
+          use_case?: ChatbotUseCase;
           created_at?: string;
         };
         Update: {
@@ -111,6 +114,7 @@ export interface Database {
           allow_visitor_uploads?: boolean;
           show_loading_steps?: boolean;
           loading_messages?: string[] | null;
+          use_case?: ChatbotUseCase;
           created_at?: string;
         };
       };

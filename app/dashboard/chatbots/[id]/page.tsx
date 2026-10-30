@@ -27,13 +27,17 @@ export default async function ChatbotPage({ params }: { params: { id: string } }
   const { data: chatbotData, error: chatbotError } = await supabase
     .from('chatbots')
     .select(
-      'id, name, system_prompt_template, organization_id, is_public, allowed_origins, use_documents, use_ai_indexing, allow_email_tool, notification_email, allow_visitor_uploads, show_loading_steps, loading_messages'
+      'id, name, system_prompt_template, organization_id, is_public, allowed_origins, use_documents, use_ai_indexing, allow_email_tool, notification_email, allow_visitor_uploads, show_loading_steps, loading_messages, use_case'
     )
     .eq('id', params.id)
     .single();
   const chatbot = logQueryError('chatbot_page.chatbot_failed', { chatbotId: params.id }, chatbotData, chatbotError);
 
   if (!chatbot) notFound();
+
+  const isSecondCerveau = chatbot.use_case === 'second_cerveau';
+  const backHref = isSecondCerveau ? '/dashboard/second-cerveau' : '/dashboard/chatbots';
+  const backLabel = isSecondCerveau ? '← Second cerveau' : '← Chatbots';
 
   const [documentsResult, customTemplatesResult, orgResult, conversations] = await Promise.all([
     supabase
@@ -80,11 +84,8 @@ export default async function ChatbotPage({ params }: { params: { id: string } }
         <div className="flex items-center gap-4">
           <IconBadge spacing="">{ICONS.chat}</IconBadge>
           <div>
-            <Link
-              href="/dashboard/chatbots"
-              className="text-sm text-slate-500 hover:text-slate-700"
-            >
-              ← Chatbots
+            <Link href={backHref} className="text-sm text-slate-500 hover:text-slate-700">
+              {backLabel}
             </Link>
             <h1 className="mt-1 text-2xl font-semibold tracking-tight text-slate-900">
               {chatbot.name}
@@ -176,30 +177,32 @@ export default async function ChatbotPage({ params }: { params: { id: string } }
             Conversations
           </h2>
           <p className="mt-1 text-sm text-slate-500">
-            Toutes les conversations de ce chatbot, côté équipe et côté visiteurs
-            (widget public). Utile pour retrouver et supprimer la conversation d'un visiteur sur
-            demande RGPD.
+            {isSecondCerveau
+              ? "Toutes les conversations de ce second cerveau, côté équipe."
+              : "Toutes les conversations de ce chatbot, côté équipe et côté visiteurs (widget public). Utile pour retrouver et supprimer la conversation d'un visiteur sur demande RGPD."}
           </p>
         </div>
         <ConversationsPanel chatbotId={chatbot.id} initialConversations={conversations} />
       </section>
 
-      <section className="space-y-3">
-        <h2 className="flex items-center gap-2 font-semibold text-slate-900">
-          <Icon className="h-4 w-4 text-brand-600">{ICONS.globe}</Icon>
-          Widget (accès public, apparence, embed)
-        </h2>
-        <EmbedSettingsForm
-          chatbotId={chatbot.id}
-          initialIsPublic={chatbot.is_public}
-          initialAllowedOrigins={chatbot.allowed_origins}
-        />
-        <VisitorUploadsToggle
-          chatbotId={chatbot.id}
-          initialValue={chatbot.allow_visitor_uploads}
-          emailNotificationsReady={chatbot.allow_email_tool && !!chatbot.notification_email}
-        />
-      </section>
+      {!isSecondCerveau && (
+        <section className="space-y-3">
+          <h2 className="flex items-center gap-2 font-semibold text-slate-900">
+            <Icon className="h-4 w-4 text-brand-600">{ICONS.globe}</Icon>
+            Widget (accès public, apparence, embed)
+          </h2>
+          <EmbedSettingsForm
+            chatbotId={chatbot.id}
+            initialIsPublic={chatbot.is_public}
+            initialAllowedOrigins={chatbot.allowed_origins}
+          />
+          <VisitorUploadsToggle
+            chatbotId={chatbot.id}
+            initialValue={chatbot.allow_visitor_uploads}
+            emailNotificationsReady={chatbot.allow_email_tool && !!chatbot.notification_email}
+          />
+        </section>
+      )}
 
       <section className="space-y-3">
         <h2 className="flex items-center gap-2 font-semibold text-slate-900">

@@ -9,7 +9,8 @@ import OrgSwitcher from '@/components/OrgSwitcher';
 
 const NAV_ITEMS = [
   { href: '/dashboard', label: "Vue d'ensemble", icon: ICONS.grid },
-  { href: '/dashboard/chatbots', label: 'Chatbots', icon: ICONS.chat },
+  { href: '/dashboard/chatbots', label: 'Chatbots (site)', icon: ICONS.chat },
+  { href: '/dashboard/second-cerveau', label: 'Second cerveau', icon: ICONS.index },
   { href: '/dashboard/documents', label: 'Documents', icon: ICONS.document },
   { href: '/dashboard/templates', label: 'Templates', icon: ICONS.layers },
   { href: '/dashboard/docs', label: 'Documentation', icon: ICONS.book },

@@ -1,6 +1,9 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { PROMPT_TEMPLATES } from '@/lib/prompts';
+import type { ChatbotUseCase } from '@/types/database';
+
+const USE_CASES: ChatbotUseCase[] = ['site_widget', 'second_cerveau'];
 
 export async function POST(request: Request) {
   const supabase = createClient();
@@ -21,6 +24,13 @@ export async function POST(request: Request) {
   // documents). false = "prompt-only" chatbot, no retrieval at all — see
   // docs/roadmap.md item 23.
   const useDocuments: boolean = body?.useDocuments !== false;
+  // 'site_widget' (défaut, rétrocompatible) = chatbot pensé pour être
+  // embarqué sur un site public ; 'second_cerveau' = usage interne, pas de
+  // widget/embed (docs/roadmap.md item 52).
+  const useCaseInput: string | undefined = body?.useCase;
+  const useCase: ChatbotUseCase = USE_CASES.includes(useCaseInput as ChatbotUseCase)
+    ? (useCaseInput as ChatbotUseCase)
+    : 'site_widget';
 
   if (!organizationId || !name) {
     return NextResponse.json({ error: 'organizationId et name sont requis.' }, { status: 400 });
@@ -35,6 +45,7 @@ export async function POST(request: Request) {
       name,
       system_prompt_template: systemPromptTemplate || PROMPT_TEMPLATES[0].template,
       use_documents: useDocuments,
+      use_case: useCase,
     })
     .select('id')
     .single();
