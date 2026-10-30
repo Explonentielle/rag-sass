@@ -188,6 +188,16 @@ synchronisé avec ce qui se passe côté Stripe :
 - **Manuel, via Payment Link** (toujours possible) : voir plus bas,
   utile pour un client qui ne passe pas par le flux normal de l'app.
 
+Une fois abonnée, une org gère elle-même son abonnement (changer de
+palier, mettre à jour sa carte, annuler) via le bouton "Gérer mon
+abonnement" (Paramètres > Organisation), qui ouvre le **portail client
+Stripe** (`lib/stripe.ts` `createBillingPortalSession`). **Configuration
+à faire une fois dans Stripe** (mode test, puis à refaire en mode live) :
+Dashboard → Settings → Billing → Customer portal → active "Update
+subscription" et sélectionne les prix Solo/PME comme destinations de
+changement autorisées — sans ça, le portail ne propose que
+l'annulation/moyen de paiement, pas le changement de palier.
+
 **Dépassement de quota (docs/roadmap.md items 17/36)** : chaque org
 choisit elle-même, dans Paramètres > Organisation, d'être bloquée au
 quota de son plan ou débitée automatiquement par tranche de dépassement

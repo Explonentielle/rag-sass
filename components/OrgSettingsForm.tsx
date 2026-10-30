@@ -6,6 +6,7 @@ import { createClient } from '@/lib/supabase/client';
 import { Button } from '@/components/ui/Button';
 import { Input, Label } from '@/components/ui/Card';
 import SubscribeButton from '@/components/SubscribeButton';
+import ManageBillingButton from '@/components/ManageBillingButton';
 import { PLAN_LABELS, PLAN_LIMITS, PLAN_PRICE_LABELS, OVERAGE_MODE_LABELS } from '@/lib/plans';
 import type { OrgPlan, OrgOverageMode } from '@/types/database';
 
@@ -102,9 +103,13 @@ export default function OrgSettingsForm({
                 );
               })}
             </div>
-            <p className="text-xs text-slate-400">
-              Géré par votre abonnement Stripe — contactez le support pour changer de palier.
-            </p>
+            <div className="flex flex-wrap items-center gap-3">
+              <ManageBillingButton organizationId={orgId} />
+              <p className="text-xs text-slate-400">
+                Changez de palier, votre moyen de paiement ou annulez depuis ce portail Stripe
+                sécurisé.
+              </p>
+            </div>
           </>
         ) : (
           <>

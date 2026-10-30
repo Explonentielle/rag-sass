@@ -123,3 +123,24 @@ export async function createCheckoutSession(
     ...(customerId ? { customer: customerId } : customerEmail ? { customer_email: customerEmail } : {}),
   });
 }
+
+/**
+ * Stripe's hosted "Manage subscription" page for an org that already has
+ * a paying customer — lets them switch plan, update their payment
+ * method, or cancel, without us building any of that UI. Needs the
+ * portal's default configuration set up once in the Stripe Dashboard
+ * (Settings > Billing > Customer portal, test mode too) with "Update
+ * subscription" enabled and the Solo/PME prices allowed as switch
+ * targets — otherwise the portal only offers cancel/payment-method
+ * update, not plan switching. See docs/deployment.md §4.
+ */
+export async function createBillingPortalSession(
+  stripe: Stripe,
+  params: { customerId: string; returnUrl: string }
+): Promise<Stripe.BillingPortal.Session> {
+  const { customerId, returnUrl } = params;
+  return stripe.billingPortal.sessions.create({
+    customer: customerId,
+    return_url: returnUrl,
+  });
+}

@@ -61,6 +61,7 @@ fixe — sert de mémoire centralisée plutôt que de planning strict.
 | 52 | Compte | Séparer dashboard "chatbot widget site" / "assistant interne" | Faible-moyen | ✅ Fait |
 | 53 | Pricing | Souscription self-service (Stripe Checkout) depuis l'app | Moyen | ✅ Fait et testé en mode test Stripe |
 | 54 | Compte | Mini tuto d'onboarding à la première arrivée sur le dashboard | Faible-moyen | ✅ Fait |
+| 55 | Pricing | Changer de palier / gérer son abonnement une fois abonné (portail Stripe) | Faible | ✅ Fait — config portail Stripe à faire côté dashboard |
 
 ---
 
@@ -2260,3 +2261,44 @@ qu'il ne revient pas, vérifier qu'un compte avec des chatbots existants
 ne le voit jamais, et tester le bouton "Revoir la présentation".
 
 **Effort** : faible-moyen.
+
+---
+
+### 55. Changer de palier une fois abonné (portail Stripe) — ✅ Fait
+
+**Signalé (2026-10-30)**, en testant la souscription self-service
+(item 53) : une fois abonné, le sélecteur de plan devient lecture seule
+avec la note "contactez le support pour changer de palier" — aucun moyen
+réel pour un client de changer de palier, mettre à jour sa carte ou
+annuler lui-même. Confirmé explicitement nécessaire : "pour moi un user
+qui veut changer de plan doit pouvoir le faire".
+
+**Implémenté** : le **portail client Stripe** (hébergé par Stripe,
+aucune UI à construire) plutôt qu'un système de changement de palier
+maison :
+- `lib/stripe.ts` `createBillingPortalSession` :
+  `stripe.billingPortal.sessions.create({ customer, return_url })`.
+- `app/api/billing/portal/route.ts` : authentifie, vérifie
+  l'appartenance à l'org via le `select` RLS normal (même pattern que
+  `app/api/billing/checkout/route.ts`), retourne l'URL du portail.
+  `return_url` vers `/dashboard/settings`.
+- `components/ManageBillingButton.tsx` : bouton "Gérer mon abonnement",
+  redirige vers l'URL retournée.
+- `components/OrgSettingsForm.tsx` : affiché dans la section Plan quand
+  `hasStripeSubscription`, à la place de l'ancienne note "contactez le
+  support".
+
+**Configuration Stripe requise (hors code, à faire une fois par mode
+test/live)** : Dashboard → Settings → Billing → Customer portal → activer
+"Update subscription" et sélectionner les prix Solo/PME comme
+destinations de changement autorisées — sinon le portail n'offre que
+annulation/moyen de paiement par défaut, pas le changement de palier
+demandé. Voir `docs/deployment.md` §4.
+
+Testé : `tsc --noEmit` propre, 169 tests au vert (1 nouveau test pour
+`createBillingPortalSession`). **Pas encore testé en conditions
+réelles** : il faut d'abord faire la configuration du portail ci-dessus
+dans Stripe avant qu'un changement de palier via le bouton ne fonctionne
+vraiment.
+
+**Effort** : faible (portail entièrement hébergé par Stripe).

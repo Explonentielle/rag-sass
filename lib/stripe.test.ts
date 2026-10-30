@@ -5,7 +5,7 @@
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import type Stripe from 'stripe';
-import { planForPriceId, chargeOverage, createCheckoutSession } from './stripe';
+import { planForPriceId, chargeOverage, createCheckoutSession, createBillingPortalSession } from './stripe';
 
 const ORIGINAL_ENV = { ...process.env };
 
@@ -43,12 +43,14 @@ function fakeStripe(overrides: {
   paymentMethodsList?: ReturnType<typeof vi.fn>;
   paymentIntentsCreate?: ReturnType<typeof vi.fn>;
   checkoutSessionsCreate?: ReturnType<typeof vi.fn>;
+  billingPortalSessionsCreate?: ReturnType<typeof vi.fn>;
 }) {
   return {
     subscriptions: { retrieve: overrides.subscriptionsRetrieve ?? vi.fn() },
     paymentMethods: { list: overrides.paymentMethodsList ?? vi.fn() },
     paymentIntents: { create: overrides.paymentIntentsCreate ?? vi.fn() },
     checkout: { sessions: { create: overrides.checkoutSessionsCreate ?? vi.fn() } },
+    billingPortal: { sessions: { create: overrides.billingPortalSessionsCreate ?? vi.fn() } },
   } as unknown as Stripe;
 }
 
@@ -194,5 +196,25 @@ describe('createCheckoutSession', () => {
     const call = checkoutSessionsCreate.mock.calls[0][0];
     expect(call).not.toHaveProperty('customer');
     expect(call).not.toHaveProperty('customer_email');
+  });
+});
+
+describe('createBillingPortalSession', () => {
+  it('creates a portal session for the given customer and return url', async () => {
+    const billingPortalSessionsCreate = vi
+      .fn()
+      .mockResolvedValue({ id: 'bps_1', url: 'https://billing.stripe.com/session/bps_1' });
+    const stripe = fakeStripe({ billingPortalSessionsCreate });
+
+    const result = await createBillingPortalSession(stripe, {
+      customerId: 'cus_1',
+      returnUrl: 'https://app/dashboard/settings',
+    });
+
+    expect(result).toEqual({ id: 'bps_1', url: 'https://billing.stripe.com/session/bps_1' });
+    expect(billingPortalSessionsCreate).toHaveBeenCalledWith({
+      customer: 'cus_1',
+      return_url: 'https://app/dashboard/settings',
+    });
   });
 });
