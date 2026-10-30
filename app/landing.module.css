@@ -302,7 +302,7 @@
 .testiGrid { display: grid; gap: 16px; }
 @media (min-width: 780px) { .testiGrid { grid-template-columns: repeat(3, 1fr); } }
 .testiGridSolo { grid-template-columns: 1fr !important; max-width: 520px; margin: 0 auto; }
-.testiCard { background: var(--card); border: 1px solid var(--line); border-radius: 20px; padding: 22px; box-shadow: var(--shadow); }
+.testiCard { background: var(--card); border: 1px solid var(--line); border-radius: 20px; padding: 22px; box-shadow: var(--shadow); display: flex; flex-direction: column; justify-content: space-between; }
 .testiGridSolo .testiCard { padding: 32px; }
 .testiGridSolo .testiQuote { font-size: 16px; }
 .testiQuote { margin: 0; font-size: 14px; font-style: italic; color: var(--inkSoft); line-height: 1.6; }
