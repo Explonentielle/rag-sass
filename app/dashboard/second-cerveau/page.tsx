@@ -41,10 +41,11 @@ export default async function SecondCerveauPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight text-slate-900">Second cerveau</h1>
+          <h1 className="text-2xl font-semibold tracking-tight text-slate-900">Assistant interne</h1>
           <p className="mt-1 text-sm text-slate-500">
             Usage interne : interroger vos propres documents, pas de diffusion publique. {(chatbots ?? []).length}{' '}
-            base{(chatbots ?? []).length > 1 ? 's' : ''} de connaissances dans {org.name}
+            assistant{(chatbots ?? []).length > 1 ? 's' : ''} interne{(chatbots ?? []).length > 1 ? 's' : ''} dans{' '}
+            {org.name}
           </p>
         </div>
         <CreateChatbotForm
@@ -56,7 +57,7 @@ export default async function SecondCerveauPage() {
 
       {(chatbots ?? []).length === 0 ? (
         <Card className="flex flex-col items-center justify-center gap-2 border-dashed p-16 text-center">
-          <p className="text-sm font-medium text-slate-600">Aucun second cerveau pour l'instant</p>
+          <p className="text-sm font-medium text-slate-600">Aucun assistant interne pour l'instant</p>
           <p className="text-sm text-slate-400">
             Créez-en un pour centraliser et interroger vos propres documents.
           </p>

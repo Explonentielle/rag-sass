@@ -21,7 +21,7 @@ export default function CreateChatbotForm({
   organizationId: string;
   customTemplates?: CustomTemplate[];
   // Fixe dès la création selon l'interface d'où vient le formulaire
-  // (page "Chatbots" ou page "Second cerveau") — pas un choix affiché à
+  // (page "Chatbots" ou page "Assistant interne") — pas un choix affiché à
   // l'utilisateur, voir docs/roadmap.md item 52.
   useCase: ChatbotUseCase;
 }) {

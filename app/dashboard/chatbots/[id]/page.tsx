@@ -37,7 +37,7 @@ export default async function ChatbotPage({ params }: { params: { id: string } }
 
   const isSecondCerveau = chatbot.use_case === 'second_cerveau';
   const backHref = isSecondCerveau ? '/dashboard/second-cerveau' : '/dashboard/chatbots';
-  const backLabel = isSecondCerveau ? '← Second cerveau' : '← Chatbots';
+  const backLabel = isSecondCerveau ? '← Assistant interne' : '← Chatbots';
 
   const [documentsResult, customTemplatesResult, orgResult, conversations] = await Promise.all([
     supabase
@@ -178,7 +178,7 @@ export default async function ChatbotPage({ params }: { params: { id: string } }
           </h2>
           <p className="mt-1 text-sm text-slate-500">
             {isSecondCerveau
-              ? "Toutes les conversations de ce second cerveau, côté équipe."
+              ? "Toutes les conversations de cet assistant interne, côté équipe."
               : "Toutes les conversations de ce chatbot, côté équipe et côté visiteurs (widget public). Utile pour retrouver et supprimer la conversation d'un visiteur sur demande RGPD."}
           </p>
         </div>
