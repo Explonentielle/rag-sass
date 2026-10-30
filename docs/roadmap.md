@@ -1069,6 +1069,14 @@ le widget web — pour les commerces sans présence web. Chantier à part
 entière (intégration téléphonie/WhatsApp Business API), pas une extension
 mineure du chat actuel.
 
+**Piste technique notée (2026-10-30)** : pour la partie reconnaissance
+vocale (speech-to-text) du canal téléphonique, Whisper (OpenAI,
+open-source, gratuit, auto-hébergeable) est un candidat — même logique
+d'architecture que le service OCR Tesseract déjà déployé sur le VPS
+(item 7) : un petit service interne plutôt qu'une API tierce payante.
+Note seulement, pas de décision/implémentation avant que ce chantier soit
+repris explicitement.
+
 ### 26. Agent de veille & synthèse
 
 **Idée** : surveille un corpus interne ou externe, pousse un résumé
@@ -1802,6 +1810,13 @@ suppose une intégration téléphonie/WhatsApp Business API (canal hors
 web) ; celui-ci reste dans le widget web existant (iframe), juste une
 modalité d'entrée/sortie différente — pas de nouveau canal de
 distribution, "seulement" de l'audio en plus du texte.
+
+**Piste technique notée (2026-10-30)** : même piste Whisper que l'item 25
+pour le speech-to-text (gratuit, open-source, auto-hébergeable — pattern
+service VPS déjà prouvé avec l'OCR). Reste à regarder côté synthèse
+vocale (text-to-speech) une option équivalente gratuite/auto-hébergeable
+le moment venu. Note seulement, pas de décision avant reprise explicite
+de ce chantier.
 
 **Pas chiffré, gros morceau pas détaillé encore** : speech-to-text côté
 visiteur (micro navigateur, streaming), text-to-speech côté réponse

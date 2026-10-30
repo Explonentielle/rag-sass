@@ -338,18 +338,19 @@ interface CatalogueEntry {
 }
 
 function Catalogue() {
+  // Cas d'usage par métier volontairement retirés d'ici (2026-10-30) — liste
+  // à part, générale par capacité plutôt que par secteur : le détail par
+  // industrie (santé, immobilier, vente, conformité...) ira sur une page
+  // dédiée plus tard, pas ici.
   const available: CatalogueEntry[] = [
+    { title: 'Chatbot documentaire', body: 'Répond aux questions à partir de vos documents (PDF natifs ou scannés, images), sources citées à chaque réponse.', who: 'Tout le monde' },
     { title: 'Second cerveau', body: 'Déposez vos notes et supports, retrouvez-les en langage naturel, pour vous seul.', who: 'Indépendants, coachs, consultants' },
     { title: 'Assistant sans documents', body: 'Le savoir tient dans quelques consignes : zéro upload, zéro indexation, en ligne en minutes.', who: 'Indépendants, artisans' },
-    { title: 'Cabinet de santé', body: "Horaires, tarifs, prise de rendez-vous : répond aux questions pratiques, jamais d'avis médical.", who: 'Professionnels de santé, secrétariat' },
-    { title: 'Chatbot documentaire', body: 'Répond aux questions à partir de vos documents, sources citées à chaque réponse.', who: 'Tout le monde' },
-    { title: 'Agence immobilière', body: "Procédures de visite, mandats, pièces à fournir : un modèle prêt à l'emploi.", who: 'Agences, indépendants immo' },
-    { title: 'Copilote commercial', body: 'Argumentaires et réponses aux objections retrouvés en quelques secondes, en plein appel.', who: 'Équipes vente structurées' },
-    { title: 'Assistant conformité', body: '« Puis-je faire X ? » posé directement sur vos politiques internes.', who: 'Secteurs réglementés' },
+    { title: 'Support client', body: 'Réponses immédiates à partir de vos FAQ, procédures et guides, sourcées comme le reste.', who: 'Infopreneurs, SaaS, équipes support' },
+    { title: 'Indexation assistée par IA', body: 'Déposez un document brut, sans rien préparer : une IA nettoie et structure le contenu avant indexation.', who: 'Tout document mal formaté' },
   ];
 
   const roadmap: CatalogueEntry[] = [
-    { title: 'Indexation assistée par IA', body: 'Uploadez un document brut ou une URL, sans rien préparer : une IA nettoie et structure le contenu.', who: 'Tout document mal formaté' },
     { title: 'Agent de qualification', body: 'Engage un visiteur, pose les bonnes questions, score et route le contact.', who: 'B2B à cycle de vente long' },
     { title: 'Brouillon de réponse email', body: 'Rédige une réponse client à partir de la base de connaissance, à valider avant envoi.', who: 'Support à fort volume' },
     { title: 'Analyseur de contrats', body: "Dépose un contrat, obtiens l'extraction des clauses clés et pose tes questions dessus.", who: 'PME sans juriste interne' },
