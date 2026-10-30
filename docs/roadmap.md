@@ -60,6 +60,7 @@ fixe — sert de mémoire centralisée plutôt que de planning strict.
 | 38 | Qualité | Aucune page dashboard n'a de gestion d'erreur (try/catch) | Moyen | ✅ Fait |
 | 52 | Compte | Séparer dashboard "chatbot widget site" / "assistant interne" | Faible-moyen | ✅ Fait |
 | 53 | Pricing | Souscription self-service (Stripe Checkout) depuis l'app | Moyen | ✅ Fait et testé en mode test Stripe |
+| 54 | Compte | Mini tuto d'onboarding à la première arrivée sur le dashboard | Faible-moyen | ✅ Fait |
 
 ---
 
@@ -2216,3 +2217,46 @@ conversion landing → paiement se fasse en un clic sans repasser par
 Paramètres.
 
 **Effort** : moyen.
+
+---
+
+### 54. Mini tuto d'onboarding à la première arrivée sur le dashboard — ✅ Fait
+
+**Besoin (2026-10-30)** : un nouvel utilisateur qui crée son organisation
+(`components/CreateOrgForm.tsx`) arrivait sur `/dashboard` sans aucune
+explication — juste des états vides génériques ("Aucun chatbot pour
+l'instant"). Rien n'expliquait la distinction Chatbots (widget site) /
+Assistant interne ajoutée le jour même (item 52), ni le chemin normal
+pour démarrer.
+
+**Implémenté** :
+- `components/OnboardingTour.tsx` (client) : modale à 4 écrans courts
+  (Bienvenue, Deux usages Chatbots/Assistant interne, Comment démarrer,
+  Paramètres & facturation), navigation Passer/Précédent/Suivant/Terminer
+  + points de progression. Même modèle de modale que
+  `CreateChatbotForm.tsx` (overlay + `Card`), aucune nouvelle dépendance
+  (pas de lib de "tour" type react-joyride/shepherd).
+- **Déclenchement** (`app/dashboard/page.tsx`) : affiché seulement si
+  `stats.chatbots === 0` **et** `!user.user_metadata.onboarding_dismissed`
+  — combiner les deux évite que les utilisateurs pilotes déjà actifs le
+  voient apparaître par surprise au déploiement (pas de backfill
+  nécessaire pour le flag).
+- **Persistance** : `supabase.auth.updateUser({ data: {
+  onboarding_dismissed: true } })` — flag sur le compte utilisateur
+  (`user_metadata`), pas de nouvelle table/migration pour un seul
+  booléen.
+- `components/ReplayOnboardingButton.tsx` + bouton "Revoir la
+  présentation" sur `/dashboard/docs` : redéclenche la même modale à la
+  demande, indépendamment de la condition "0 chatbot".
+
+Testé : `tsc --noEmit` propre, 168 tests au vert (pas de nouveau test —
+composant d'interface pur, même traitement que
+`CreateChatbotForm`/`OrgSettingsForm`, non testés unitairement dans ce
+projet).
+
+**Pas encore testé en conditions réelles** : créer un compte neuf et
+vérifier l'apparition du tuto, le fermer et recharger pour confirmer
+qu'il ne revient pas, vérifier qu'un compte avec des chatbots existants
+ne le voit jamais, et tester le bouton "Revoir la présentation".
+
+**Effort** : faible-moyen.

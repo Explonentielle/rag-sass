@@ -3,6 +3,7 @@ import { createClient } from '@/lib/supabase/server';
 import { getCurrentOrg } from '@/lib/org';
 import CreateOrgForm from '@/components/CreateOrgForm';
 import CreateChatbotForm from '@/components/CreateChatbotForm';
+import OnboardingTour from '@/components/OnboardingTour';
 import { DocumentStatusBadge } from '@/components/DocumentStatusBadge';
 import { Card } from '@/components/ui/Card';
 import { IconBadge, ICONS } from '@/components/icons';
@@ -20,6 +21,9 @@ export default async function DashboardPage() {
   }
 
   const supabase = createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
 
   const [
     chatbotsResult,
@@ -85,6 +89,11 @@ export default async function DashboardPage() {
       .length,
     errors: allDocuments.filter((d) => d.status === 'error').length,
   };
+  // Only a brand-new org (no chatbot yet) and only once per user — see
+  // docs/roadmap.md's onboarding tour entry. Gating on chatbots.length
+  // means existing pilot orgs never see this pop up retroactively, no
+  // backfill needed for the user_metadata flag.
+  const showOnboarding = stats.chatbots === 0 && !user?.user_metadata?.onboarding_dismissed;
 
   return (
     <div className="space-y-10">
@@ -204,6 +213,8 @@ export default async function DashboardPage() {
           <span className="text-sm font-medium text-brand-700">Explorer →</span>
         </Card>
       </Link>
+
+      {showOnboarding && <OnboardingTour />}
     </div>
   );
 }
