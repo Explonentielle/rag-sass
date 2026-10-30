@@ -6,6 +6,8 @@ export type DocumentStatus = 'pending' | 'processing' | 'indexed' | 'error';
 export type OrgRole = 'owner' | 'admin' | 'member';
 export type MessageRole = 'user' | 'assistant';
 export type OrgPlan = 'solo' | 'pme' | 'metier';
+export type OrgOverageMode = 'block' | 'auto_bill';
+export type OverageChargeStatus = 'succeeded' | 'failed';
 
 export interface Database {
   public: {
@@ -15,6 +17,7 @@ export interface Database {
           id: string;
           name: string;
           plan: OrgPlan;
+          overage_mode: OrgOverageMode;
           stripe_customer_id: string | null;
           stripe_subscription_id: string | null;
           stripe_subscription_status: string | null;
@@ -24,6 +27,7 @@ export interface Database {
           id?: string;
           name: string;
           plan?: OrgPlan;
+          overage_mode?: OrgOverageMode;
           stripe_customer_id?: string | null;
           stripe_subscription_id?: string | null;
           stripe_subscription_status?: string | null;
@@ -33,6 +37,7 @@ export interface Database {
           id?: string;
           name?: string;
           plan?: OrgPlan;
+          overage_mode?: OrgOverageMode;
           stripe_customer_id?: string | null;
           stripe_subscription_id?: string | null;
           stripe_subscription_status?: string | null;
@@ -254,6 +259,38 @@ export interface Database {
           filename?: string;
           size_bytes?: number;
           storage_path?: string;
+          created_at?: string;
+        };
+      };
+      overage_charges: {
+        Row: {
+          id: string;
+          organization_id: string;
+          period_start: string;
+          blocks_charged: number;
+          amount_cents: number;
+          stripe_payment_intent_id: string | null;
+          status: OverageChargeStatus;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          organization_id: string;
+          period_start: string;
+          blocks_charged: number;
+          amount_cents: number;
+          stripe_payment_intent_id?: string | null;
+          status: OverageChargeStatus;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          organization_id?: string;
+          period_start?: string;
+          blocks_charged?: number;
+          amount_cents?: number;
+          stripe_payment_intent_id?: string | null;
+          status?: OverageChargeStatus;
           created_at?: string;
         };
       };

@@ -1,5 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
-import type { Database } from '@/types/database';
+import type { Database, OrgPlan, OrgOverageMode } from '@/types/database';
+import { PLAN_LIMITS } from '@/lib/plans';
 import { logError } from '@/lib/logger';
 
 /**
@@ -13,6 +14,14 @@ import { logError } from '@/lib/logger';
 function startOfCurrentMonthUtc(): string {
   const now = new Date();
   return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1)).toISOString();
+}
+
+/** Date-only (YYYY-MM-DD) form of the same month boundary, for matching
+ * `overage_charges.period_start` (a `date` column) — shared by the
+ * reconciliation cron and the dashboard's overage display so both agree
+ * on the exact same value. */
+export function startOfCurrentMonthDate(): string {
+  return startOfCurrentMonthUtc().slice(0, 10);
 }
 
 /** Assistant messages sent this month across every chatbot of an org — the
@@ -36,4 +45,25 @@ export async function getMonthlyMessageCount(
     throw error;
   }
   return count ?? 0;
+}
+
+/**
+ * Real enforcement hook (docs/roadmap.md items 17/36) — reused by both
+ * chat routes (app/api/chat/route.ts, app/api/public-chat/route.ts).
+ * `block`: refuse once the plan's included quota is reached (`null`
+ * limit, i.e. "Métier sur devis", is never blocked). `auto_bill`: never
+ * blocked here — the overage is billed after the fact by
+ * app/api/cron/charge-overage/route.ts, not checked synchronously on the
+ * hot chat path.
+ */
+export async function checkQuota(
+  supabase: SupabaseClient<Database>,
+  params: { organizationId: string; plan: OrgPlan; overageMode: OrgOverageMode }
+): Promise<{ blocked: boolean; messagesThisMonth: number }> {
+  const { organizationId, plan, overageMode } = params;
+  const messagesThisMonth = await getMonthlyMessageCount(supabase, organizationId);
+  const limit = PLAN_LIMITS[plan];
+
+  const blocked = overageMode === 'block' && limit !== null && messagesThisMonth >= limit;
+  return { blocked, messagesThisMonth };
 }

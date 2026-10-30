@@ -18,6 +18,15 @@ export default async function SettingsPage() {
     data: { user },
   } = await supabase.auth.getUser();
 
+  // Not part of CurrentOrg (lib/org.ts) on purpose — those billing fields
+  // are only needed on this one page, no reason to widen a type read by
+  // every dashboard page for it.
+  const { data: billing } = await supabase
+    .from('organizations')
+    .select('overage_mode, stripe_customer_id, stripe_subscription_id')
+    .eq('id', org.id)
+    .single();
+
   const roleLabels: Record<string, string> = {
     owner: 'Propriétaire',
     admin: 'Administrateur',
@@ -35,7 +44,14 @@ export default async function SettingsPage() {
         <h2 className="font-semibold text-slate-900">Organisation</h2>
         {org.role === 'owner' || org.role === 'admin' ? (
           <Card className="p-6">
-            <OrgSettingsForm orgId={org.id} initialName={org.name} initialPlan={org.plan} />
+            <OrgSettingsForm
+              orgId={org.id}
+              initialName={org.name}
+              initialPlan={org.plan}
+              initialOverageMode={billing?.overage_mode ?? 'block'}
+              hasStripeCustomer={Boolean(billing?.stripe_customer_id)}
+              hasStripeSubscription={Boolean(billing?.stripe_subscription_id)}
+            />
           </Card>
         ) : (
           <Card className="divide-y divide-slate-100">

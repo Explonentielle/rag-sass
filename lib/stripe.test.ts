@@ -3,8 +3,9 @@
 // testé ici : juste un singleton paresseux, même genre que getEsClient/
 // getOpenAiClient, qui lève une erreur explicite si la clé API manque.
 
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { planForPriceId } from './stripe';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import type Stripe from 'stripe';
+import { planForPriceId, chargeOverage } from './stripe';
 
 const ORIGINAL_ENV = { ...process.env };
 
@@ -34,5 +35,98 @@ describe('planForPriceId', () => {
     // price_id vide ne doit jamais matcher accidentellement cette entrée.
     delete process.env.STRIPE_PRICE_METIER;
     expect(planForPriceId('')).toBeNull();
+  });
+});
+
+function fakeStripe(overrides: {
+  subscriptionsRetrieve?: ReturnType<typeof vi.fn>;
+  paymentMethodsList?: ReturnType<typeof vi.fn>;
+  paymentIntentsCreate?: ReturnType<typeof vi.fn>;
+}) {
+  return {
+    subscriptions: { retrieve: overrides.subscriptionsRetrieve ?? vi.fn() },
+    paymentMethods: { list: overrides.paymentMethodsList ?? vi.fn() },
+    paymentIntents: { create: overrides.paymentIntentsCreate ?? vi.fn() },
+  } as unknown as Stripe;
+}
+
+describe('chargeOverage', () => {
+  it("uses the subscription's default payment method when set (string id)", async () => {
+    const paymentIntentsCreate = vi.fn().mockResolvedValue({ id: 'pi_1' });
+    const stripe = fakeStripe({
+      subscriptionsRetrieve: vi.fn().mockResolvedValue({ default_payment_method: 'pm_sub' }),
+      paymentIntentsCreate,
+    });
+
+    const result = await chargeOverage(stripe, {
+      customerId: 'cus_1',
+      subscriptionId: 'sub_1',
+      amountCents: 500,
+    });
+
+    expect(result).toEqual({ id: 'pi_1' });
+    expect(paymentIntentsCreate).toHaveBeenCalledWith({
+      customer: 'cus_1',
+      amount: 500,
+      currency: 'eur',
+      payment_method: 'pm_sub',
+      off_session: true,
+      confirm: true,
+    });
+  });
+
+  it("uses the subscription's default payment method when set (expanded object)", async () => {
+    const paymentIntentsCreate = vi.fn().mockResolvedValue({ id: 'pi_2' });
+    const stripe = fakeStripe({
+      subscriptionsRetrieve: vi.fn().mockResolvedValue({ default_payment_method: { id: 'pm_obj' } }),
+      paymentIntentsCreate,
+    });
+
+    await chargeOverage(stripe, { customerId: 'cus_1', subscriptionId: 'sub_1', amountCents: 500 });
+
+    expect(paymentIntentsCreate).toHaveBeenCalledWith(
+      expect.objectContaining({ payment_method: 'pm_obj' })
+    );
+  });
+
+  it('falls back to the customer\'s saved card when the subscription has none', async () => {
+    const paymentIntentsCreate = vi.fn().mockResolvedValue({ id: 'pi_3' });
+    const stripe = fakeStripe({
+      subscriptionsRetrieve: vi.fn().mockResolvedValue({ default_payment_method: null }),
+      paymentMethodsList: vi.fn().mockResolvedValue({ data: [{ id: 'pm_card_1' }] }),
+      paymentIntentsCreate,
+    });
+
+    await chargeOverage(stripe, { customerId: 'cus_1', subscriptionId: 'sub_1', amountCents: 500 });
+
+    expect(paymentIntentsCreate).toHaveBeenCalledWith(
+      expect.objectContaining({ payment_method: 'pm_card_1' })
+    );
+  });
+
+  it('falls back directly to the saved card when no subscriptionId is given', async () => {
+    const paymentMethodsList = vi.fn().mockResolvedValue({ data: [{ id: 'pm_card_2' }] });
+    const subscriptionsRetrieve = vi.fn();
+    const stripe = fakeStripe({
+      subscriptionsRetrieve,
+      paymentMethodsList,
+      paymentIntentsCreate: vi.fn().mockResolvedValue({ id: 'pi_4' }),
+    });
+
+    await chargeOverage(stripe, { customerId: 'cus_1', subscriptionId: null, amountCents: 500 });
+
+    expect(subscriptionsRetrieve).not.toHaveBeenCalled();
+    expect(paymentMethodsList).toHaveBeenCalledWith({ customer: 'cus_1', type: 'card' });
+  });
+
+  it('throws a clear error when no payment method can be found at all', async () => {
+    const stripe = fakeStripe({
+      subscriptionsRetrieve: vi.fn().mockResolvedValue({ default_payment_method: null }),
+      paymentMethodsList: vi.fn().mockResolvedValue({ data: [] }),
+    });
+
+    await expect(
+      chargeOverage(stripe, { customerId: 'cus_1', subscriptionId: 'sub_1', amountCents: 500 })
+    ).rejects.toThrow(/Aucun moyen de paiement/);
   });
 });

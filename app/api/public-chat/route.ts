@@ -5,6 +5,7 @@ import { hybridSearch } from '@/lib/elasticsearch';
 import { buildSystemPrompt } from '@/lib/prompts';
 import { logInfo, logWarn, logError } from '@/lib/logger';
 import { checkPublicChatRateLimit, getClientIp } from '@/lib/rateLimit';
+import { checkQuota } from '@/lib/usage';
 import { getAccessibleChatbot, isValidVisitorId } from '@/lib/publicChatAccess';
 import { loadConversationAttachments, removeConversationFiles } from '@/lib/conversationFiles';
 import {
@@ -151,6 +152,19 @@ export async function POST(request: Request) {
     return new Response('Chatbot introuvable.', { status: 404 });
   }
   const { chatbot } = access;
+
+  const { blocked } = await checkQuota(admin, {
+    organizationId: chatbot.organization_id,
+    plan: chatbot.plan,
+    overageMode: chatbot.overage_mode,
+  });
+  if (blocked) {
+    logWarn('public-chat.quota_blocked', { chatbotId: chatbot.id });
+    return new Response(
+      "Ce chatbot a atteint son quota de messages pour ce mois. Merci de réessayer plus tard.",
+      { status: 402 }
+    );
+  }
 
   if (requestedConversationId) {
     const owned = await getConversationForIdentity(admin, requestedConversationId, {

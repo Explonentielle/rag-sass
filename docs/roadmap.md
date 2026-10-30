@@ -23,7 +23,7 @@ fixe — sert de mémoire centralisée plutôt que de planning strict.
 | 14 | Infra | Self-host Supabase (VPS) | Élevé | VPS provisionné |
 | 15 | Qualité | Tests automatisés | Élevé | ✅ Fait (fondations) — 10 modules purs couverts (dont `lib/ingest.ts`), routes API elles-mêmes encore ouvertes |
 | 16 | Qualité | Logs locaux (debug/incident) | Faible | ✅ Fait (voir note) |
-| 17 | Qualité | Suivi d'usage/coût par org | Moyen | Mesure + plan (étiquette) ✅ faits — Stripe ✅ terrain préparé (webhook + schéma), compte/produits/Payment Links à créer (hors code, `docs/deployment.md` §4) |
+| 17 | Qualité | Suivi d'usage/coût par org | Moyen | Mesure + plan + enforcement réel (item 36) ✅ faits — Stripe ✅ terrain préparé (webhook + schéma), compte/produits/Payment Links à créer (hors code, `docs/deployment.md` §4) |
 | 18 | Premium | Indexation assistée par IA (doc bruts + URL) | Élevé | ✅ Fait (docs uploadés + URL, entitlement par plan inclus) — mode validation humaine avant indexation explicitement hors scope, non fait |
 | 19 | Templates | Clarifier dans le front que les templates ne sont pas liés en live aux chatbots | Faible | ✅ Fait (déjà présent dans `SystemPromptEditor.tsx` depuis le 2026-09-09) |
 | 20 | RGPD | Plan d'action : rétention/purge, suppression à la demande, chiffrement, logs | Moyen (plan) | A+B+C+D ✅ faits (migrations 0004-0006 à appliquer) — E/F ✅ brouillon fait (`docs/rgpd-conformite.md`), relecture juridique pro encore à faire |
@@ -55,7 +55,7 @@ fixe — sert de mémoire centralisée plutôt que de planning strict.
 | 33 | Intégrations | Branchement sur plateformes tierces (calendrier, email) | Élevé | Étape 1 (pattern agentique, outil email) ✅ Fait — étape 2 (MCP) et étape 3 (UI config) restent backlog |
 | 34 | Pricing | Plan gratuit | Moyen | Item 17 (plan), item 10 (rate limiting déjà en place) |
 | 35 | Pricing | Calcul réel de coût/rentabilité par message | Moyen | Item 17 (comptage déjà fait) — bloqué sur le $/token réel du modèle |
-| 36 | Pricing | Comportement du plan Solo à la limite atteinte | Faible (décision) | Item 17, item 34 (le palier gratuit a le même besoin) |
+| 36 | Pricing | Comportement du plan Solo à la limite atteinte | Faible (décision) | ✅ Fait — choix par l'org (bloquer / débit automatique), montants placeholders à confirmer avant prod réelle |
 | 37 | Qualité | Résilience du déchiffrement (item 20-C) | Faible | ✅ Fait |
 | 38 | Qualité | Aucune page dashboard n'a de gestion d'erreur (try/catch) | Moyen | ✅ Fait |
 
@@ -848,10 +848,17 @@ pour un org, à travers `messages` → `conversations` → `chatbots`.
 (`PLAN_LIMITS`, `PLAN_LABELS`) associe une limite fixe par plan (300/1 500/
 `null` pour Métier), reprise des chiffres de la landing. Le dashboard
 (`UsageCard` dans `app/dashboard/page.tsx`) affiche "16 / 300", une barre de
-progression, et passe en rouge au-delà du seuil — mais **rien n'est
-bloqué** : c'est un affichage informatif, pas un garde-fou technique. Le
-plan n'est relié à aucun paiement réel — n'importe quel admin peut se
-mettre "Métier" sans que rien ne se passe derrière.
+progression, et passe en rouge au-delà du seuil.
+
+**Mise à jour (2026-10-30, item 36)** : ce qui suit décrivait un état où
+rien n'était réellement bloqué ni le plan protégé — ce n'est plus le cas.
+Le quota est maintenant réellement appliqué (`lib/usage.ts` `checkQuota`,
+voir item 36 pour le détail) et le sélecteur de plan se verrouille dès
+qu'un vrai abonnement Stripe existe — un admin ne peut plus se mettre
+"Métier" gratuitement une fois l'org facturée réellement. Reste vrai tant
+qu'aucun abonnement Stripe réel n'existe pour l'org (mode pilote facturé
+à la main) : le plan reste librement modifiable, par design, pour ne pas
+bloquer ce flux manuel.
 
 **Vraie facturation — ✅ terrain préparé (2026-10-05), intégration réelle pas
 encore branchée.** Décision explicite : préparer l'infra (schéma +
@@ -1406,36 +1413,57 @@ décision de pricing. Mieux vaut mesurer que deviner.
 **Effort** : moyen — surtout du plomberie (capturer/stocker des champs déjà
 renvoyés par l'API), pas de nouvelle dépendance.
 
-### 36. Comportement du plan Solo (et du futur plan gratuit) à la limite
+### 36. Comportement du plan Solo à la limite — ✅ Fait
 
-**Problème** : `UsageCard` (item 17) affiche un avertissement visuel au-delà
-du seuil, mais aucun message n'est aujourd'hui bloqué ou surfacturé — un org
-Solo à 400/300 messages continue de discuter normalement.
+**Décision (2026-10-30)** : au lieu de trancher nous-même entre blocage
+dur et dépassement facturé, **c'est l'org elle-même qui choisit** — un
+réglage par organisation plutôt qu'un comportement unique imposé.
 
-**Options, à trancher plus tard** (aucune implémentée) :
-- **Blocage dur** : simple à coder, protège la marge, mais mauvaise
-  expérience (coupure sans transition) — risque de churn sur un plan
-  d'entrée déjà à petit prix.
-- **Dépassement à la tranche** (même logique que le palier PME affiché sur
-  la landing, +2€/100 messages) : cohérent avec ce qui existe déjà pour
-  PME, mais suppose une vraie facturation à l'usage (Stripe metered billing
-  ou équivalent) — même blocage que le reste de l'item 17.
-- **Mur souple avec incitation à l'upgrade** (recommandé comme premher pas) :
-  bloque l'envoi de nouveaux messages une fois la limite dépassée, avec un
-  message explicite ("Vous avez atteint votre forfait Solo, passez au plan
-  PME pour continuer") plutôt qu'un silence ou une erreur générique — ne
-  nécessite pas de facturation à l'usage, juste une vérification du
-  comptage avant d'accepter un message (`getMonthlyMessageCount` déjà en
-  place) dans `app/api/chat/route.ts`/`app/api/public-chat/route.ts`.
-- **Dégradation gracieuse** (repli automatique en mode "sans documents",
-  item 32, moins coûteux) : créatif mais change silencieusement la qualité
-  des réponses sans que l'utilisateur comprenne pourquoi — écarté sauf si
-  clairement annoncé.
+**Implémenté** :
+- **Migration `0020_organization_overage.sql`** :
+  `organizations.overage_mode` (`'block' | 'auto_bill'`, défaut `'block'`)
+  + table `overage_charges` (ledger d'audit/idempotence : org, mois,
+  nombre de tranches facturées, montant, id du PaymentIntent Stripe,
+  statut).
+- **`lib/usage.ts` `checkQuota`** : bloque réellement (`app/api/chat/route.ts`,
+  `app/api/public-chat/route.ts`, réponse `402`) en mode `block` une fois
+  `getMonthlyMessageCount` ≥ la limite du plan (`PLAN_LIMITS`, jamais en
+  Métier/`null`). En mode `auto_bill`, ne bloque jamais — le dépassement
+  est facturé après coup, pas vérifié en synchrone sur le chemin critique
+  du chat.
+- **`lib/stripe.ts` `chargeOverage`** + **cron quotidien
+  `app/api/cron/charge-overage/route.ts`** (même pattern que
+  `purge-conversations`, `CRON_SECRET`) : recalcule chaque jour combien de
+  tranches de `OVERAGE_BLOCK_SIZE` messages (défaut 100, `lib/plans.ts`)
+  auraient dû être facturées ce mois-ci et ne débite que la différence
+  avec le ledger `overage_charges` — idempotent, pas de double facturation
+  même si le cron tourne plusieurs fois. Réutilise le moyen de paiement
+  déjà enregistré via l'abonnement Stripe Payment Link (pas de nouveau
+  formulaire de carte à construire).
+- **`components/OrgSettingsForm.tsx`** : nouveau réglage (Bloquer / Débit
+  automatique), `auto_bill` grisé tant que l'org n'a pas de
+  `stripe_customer_id` (jamais payé → pas de moyen de paiement à
+  débiter). **Corrige aussi une faille existante** : le sélecteur de plan
+  était librement modifiable par n'importe quel admin sans aucun paiement
+  réel derrière — maintenant verrouillé (lecture seule) dès qu'un vrai
+  abonnement Stripe existe (`stripe_subscription_id` non nul).
+- **`UsageCard`** (`app/dashboard/page.tsx`) : message adapté au mode
+  choisi, affiche le total déjà débité ce mois-ci si `auto_bill`.
 
-**Recommandation** : mur souple avec upgrade d'abord (le moins coûteux à
-construire, pas de dépendance à Stripe), tranche facturée en évolution une
-fois la facturation réelle existante. S'applique de la même façon au futur
-plan gratuit (item 34).
+**Montants = placeholders, à confirmer avant prod réelle** :
+`OVERAGE_BLOCK_SIZE = 100` messages, `OVERAGE_CHARGE_CENTS = 500` (5€) —
+valeurs explicitement non définitives (`lib/plans.ts`), à valider avec de
+vrais chiffres business et testées en mode test Stripe avant d'activer
+`auto_bill` sur un compte Stripe live.
+
+**Hors scope, pas fait** : self-service upgrade/downgrade via Stripe
+Billing Portal (le plan verrouillé n'a qu'une note informative, pas de
+bouton d'action) ; palier gratuit (item 34, reporté).
+
+Testé : `tsc --noEmit` propre, 165 tests au vert (9 nouveaux :
+`lib/usage.test.ts` pour `checkQuota`, `lib/stripe.test.ts` étendu pour
+`chargeOverage` — résolution du moyen de paiement, repli, erreur si
+aucun trouvé).
 
 ---
 

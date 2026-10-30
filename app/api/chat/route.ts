@@ -5,6 +5,7 @@ import { hybridSearch } from '@/lib/elasticsearch';
 import { buildSystemPrompt } from '@/lib/prompts';
 import { logInfo, logWarn, logError } from '@/lib/logger';
 import { checkRateLimit } from '@/lib/rateLimit';
+import { checkQuota } from '@/lib/usage';
 import {
   createConversation,
   listConversations,
@@ -132,13 +133,29 @@ export async function POST(request: Request) {
   // RLS scopes this to chatbots the caller's org owns.
   const { data: chatbot, error: chatbotError } = await supabase
     .from('chatbots')
-    .select('id, organization_id, system_prompt_template, use_documents, allow_email_tool, notification_email')
+    .select(
+      'id, organization_id, system_prompt_template, use_documents, allow_email_tool, notification_email, organizations!inner(plan, overage_mode)'
+    )
     .eq('id', chatbotId)
     .single();
 
   if (chatbotError || !chatbot) {
     logWarn('chat.chatbot_not_found', { userId: user.id, chatbotId, error: chatbotError?.message });
     return new Response('Chatbot introuvable.', { status: 404 });
+  }
+
+  const org = Array.isArray(chatbot.organizations) ? chatbot.organizations[0] : chatbot.organizations;
+  const { blocked } = await checkQuota(supabase, {
+    organizationId: chatbot.organization_id,
+    plan: org.plan,
+    overageMode: org.overage_mode,
+  });
+  if (blocked) {
+    logWarn('chat.quota_blocked', { userId: user.id, chatbotId: chatbot.id });
+    return new Response(
+      'Quota de messages atteint pour ce mois. Passez à un palier supérieur ou activez le débit automatique dans Paramètres > Organisation.',
+      { status: 402 }
+    );
   }
 
   if (requestedConversationId) {

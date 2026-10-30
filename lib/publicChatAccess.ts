@@ -1,4 +1,5 @@
 import type { getAdminClient } from '@/lib/supabase/admin';
+import type { OrgPlan, OrgOverageMode } from '@/types/database';
 import { getRequestOrigin, isOriginAllowed } from '@/lib/embedAccess';
 import { logError } from '@/lib/logger';
 
@@ -21,6 +22,8 @@ export type ChatbotAccessResult =
         allow_email_tool: boolean;
         notification_email: string | null;
         allow_visitor_uploads: boolean;
+        plan: OrgPlan;
+        overage_mode: OrgOverageMode;
       };
     }
   | { ok: false; reason: 'not_found' | 'private' | 'origin_blocked' };
@@ -46,7 +49,7 @@ export async function getAccessibleChatbot(
   const { data: chatbot, error } = await admin
     .from('chatbots')
     .select(
-      'id, organization_id, system_prompt_template, is_public, allowed_origins, use_documents, allow_email_tool, notification_email, allow_visitor_uploads'
+      'id, organization_id, system_prompt_template, is_public, allowed_origins, use_documents, allow_email_tool, notification_email, allow_visitor_uploads, organizations!inner(plan, overage_mode)'
     )
     .eq('id', chatbotId)
     .single();
@@ -66,5 +69,6 @@ export async function getAccessibleChatbot(
   const originOk = requestOrigin === selfOrigin || isOriginAllowed(requestOrigin, chatbot.allowed_origins);
   if (!originOk) return { ok: false, reason: 'origin_blocked' };
 
-  return { ok: true, chatbot };
+  const org = Array.isArray(chatbot.organizations) ? chatbot.organizations[0] : chatbot.organizations;
+  return { ok: true, chatbot: { ...chatbot, plan: org.plan, overage_mode: org.overage_mode } };
 }

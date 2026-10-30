@@ -1,4 +1,4 @@
-import type { OrgPlan } from '@/types/database';
+import type { OrgPlan, OrgOverageMode } from '@/types/database';
 
 /**
  * Plan constants only — deliberately split out of lib/usage.ts so this stays
@@ -30,3 +30,19 @@ export const PLAN_LABELS: Record<OrgPlan, string> = {
  * isn't billing-enforced yet).
  */
 export const AI_INDEXING_ALLOWED_PLANS: OrgPlan[] = ['pme', 'metier'];
+
+/**
+ * Overage billing (docs/roadmap.md items 17/36). Messages per block and
+ * price per block once a plan's included quota is exceeded in
+ * `overage_mode: 'auto_bill'` (see lib/usage.ts checkQuota, lib/stripe.ts
+ * chargeOverage) — PLACEHOLDER business values, explicitly not final
+ * (the user hasn't settled on an exact amount yet). Confirm real numbers
+ * before enabling auto_bill against a live (non-test) Stripe account.
+ */
+export const OVERAGE_BLOCK_SIZE = 100;
+export const OVERAGE_CHARGE_CENTS = 500;
+
+export const OVERAGE_MODE_LABELS: Record<OrgOverageMode, string> = {
+  block: 'Bloquer au quota',
+  auto_bill: 'Débit automatique',
+};

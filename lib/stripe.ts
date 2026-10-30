@@ -44,3 +44,48 @@ export function planForPriceId(priceId: string): OrgPlan | null {
   const found = entries.find(([envValue]) => envValue && envValue === priceId);
   return found?.[1] ?? null;
 }
+
+/**
+ * Off-session charge for a quota overage block (docs/roadmap.md items
+ * 17/36, `overage_mode: 'auto_bill'`). Called only from the daily
+ * reconciliation cron (app/api/cron/charge-overage/route.ts), never from
+ * a request a user is actively waiting on.
+ *
+ * Payment method resolution: tries the subscription's own default first
+ * (set when the org paid via a Stripe Payment Link in subscription
+ * mode), falls back to the customer's first saved card. Which of the two
+ * is actually populated after a Payment Link checkout isn't 100%
+ * guaranteed by Stripe's docs — verify empirically in test mode before
+ * relying on this in production.
+ */
+export async function chargeOverage(
+  stripe: Stripe,
+  params: { customerId: string; subscriptionId: string | null; amountCents: number }
+): Promise<Stripe.PaymentIntent> {
+  const { customerId, subscriptionId, amountCents } = params;
+
+  let paymentMethodId: string | null = null;
+  if (subscriptionId) {
+    const subscription = await stripe.subscriptions.retrieve(subscriptionId);
+    paymentMethodId =
+      typeof subscription.default_payment_method === 'string'
+        ? subscription.default_payment_method
+        : (subscription.default_payment_method?.id ?? null);
+  }
+  if (!paymentMethodId) {
+    const methods = await stripe.paymentMethods.list({ customer: customerId, type: 'card' });
+    paymentMethodId = methods.data[0]?.id ?? null;
+  }
+  if (!paymentMethodId) {
+    throw new Error(`Aucun moyen de paiement enregistré pour le client Stripe ${customerId}.`);
+  }
+
+  return stripe.paymentIntents.create({
+    customer: customerId,
+    amount: amountCents,
+    currency: 'eur',
+    payment_method: paymentMethodId,
+    off_session: true,
+    confirm: true,
+  });
+}

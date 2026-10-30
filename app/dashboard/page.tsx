@@ -7,7 +7,7 @@ import { DocumentStatusBadge } from '@/components/DocumentStatusBadge';
 import { Card } from '@/components/ui/Card';
 import { IconBadge, ICONS } from '@/components/icons';
 import { PROMPT_TEMPLATES } from '@/lib/prompts';
-import { getMonthlyMessageCount } from '@/lib/usage';
+import { getMonthlyMessageCount, startOfCurrentMonthDate } from '@/lib/usage';
 import { PLAN_LABELS, PLAN_LIMITS } from '@/lib/plans';
 import { logQueryError } from '@/lib/supabaseResult';
 import type { DocumentStatus } from '@/types/database';
@@ -21,25 +21,40 @@ export default async function DashboardPage() {
 
   const supabase = createClient();
 
-  const [chatbotsResult, documentsResult, customTemplatesResult, messagesThisMonth] =
-    await Promise.all([
-      supabase
-        .from('chatbots')
-        .select('id, name, created_at')
-        .eq('organization_id', org.id)
-        .order('created_at', { ascending: false }),
-      supabase
-        .from('documents')
-        .select('id, filename, status, chunk_count, uploaded_at, chatbot_id, chatbots!inner(id, name, organization_id)')
-        .eq('chatbots.organization_id', org.id)
-        .order('uploaded_at', { ascending: false }),
-      supabase
-        .from('custom_templates')
-        .select('id, label, template')
-        .eq('organization_id', org.id)
-        .order('created_at', { ascending: false }),
-      getMonthlyMessageCount(supabase, org.id),
-    ]);
+  const [
+    chatbotsResult,
+    documentsResult,
+    customTemplatesResult,
+    messagesThisMonth,
+    overageResult,
+    orgBillingResult,
+  ] = await Promise.all([
+    supabase
+      .from('chatbots')
+      .select('id, name, created_at')
+      .eq('organization_id', org.id)
+      .order('created_at', { ascending: false }),
+    supabase
+      .from('documents')
+      .select('id, filename, status, chunk_count, uploaded_at, chatbot_id, chatbots!inner(id, name, organization_id)')
+      .eq('chatbots.organization_id', org.id)
+      .order('uploaded_at', { ascending: false }),
+    supabase
+      .from('custom_templates')
+      .select('id, label, template')
+      .eq('organization_id', org.id)
+      .order('created_at', { ascending: false }),
+    getMonthlyMessageCount(supabase, org.id),
+    supabase
+      .from('overage_charges')
+      .select('amount_cents')
+      .eq('organization_id', org.id)
+      .eq('period_start', startOfCurrentMonthDate())
+      .eq('status', 'succeeded'),
+    supabase.from('organizations').select('overage_mode').eq('id', org.id).single(),
+  ]);
+  const overageChargedCents = (overageResult.data ?? []).reduce((sum, c) => sum + c.amount_cents, 0);
+  const overageMode = orgBillingResult.data?.overage_mode ?? 'block';
   const chatbots = logQueryError(
     'dashboard_page.chatbots_failed',
     { orgId: org.id },
@@ -93,7 +108,12 @@ export default async function DashboardPage() {
         <StatCard icon={ICONS.alert} tone="red" label="Erreurs" value={stats.errors} />
       </div>
 
-      <UsageCard plan={org.plan} messagesThisMonth={messagesThisMonth} />
+      <UsageCard
+        plan={org.plan}
+        messagesThisMonth={messagesThisMonth}
+        overageMode={overageMode}
+        overageChargedCents={overageChargedCents}
+      />
 
       <section className="space-y-3">
         <div className="flex items-center justify-between">
@@ -187,9 +207,13 @@ export default async function DashboardPage() {
 function UsageCard({
   plan,
   messagesThisMonth,
+  overageMode,
+  overageChargedCents,
 }: {
   plan: 'solo' | 'pme' | 'metier';
   messagesThisMonth: number;
+  overageMode: 'block' | 'auto_bill';
+  overageChargedCents: number;
 }) {
   const limit = PLAN_LIMITS[plan];
   const ratio = limit ? Math.min(messagesThisMonth / limit, 1) : 0;
@@ -224,8 +248,14 @@ function UsageCard({
           </div>
           {over && (
             <p className="mt-2 text-xs text-red-600">
-              Au-delà du forfait Solo/PME affiché sur la landing — pas encore facturé
-              automatiquement, aucun message n'est bloqué.
+              {overageMode === 'block'
+                ? 'Quota dépassé : le chat est bloqué jusqu\'au mois prochain, ou passez à un palier supérieur.'
+                : 'Quota dépassé : le chat continue, le dépassement est facturé automatiquement.'}
+            </p>
+          )}
+          {overageChargedCents > 0 && (
+            <p className="mt-1 text-xs text-slate-400">
+              Débité ce mois-ci pour le dépassement : {(overageChargedCents / 100).toFixed(2)} €
             </p>
           )}
         </>

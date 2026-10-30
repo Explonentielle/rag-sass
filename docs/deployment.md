@@ -176,12 +176,27 @@ Resend suffit pour les deux usages.
 
 ## 4. Stripe — facturation (optionnel pour un pilote facturé à la main)
 
-Groundwork seulement (docs/roadmap.md item 17) : l'app ne crée aucune
-session de paiement elle-même — le webhook (`app/api/webhooks/stripe/route.ts`)
-se contente de garder `organizations.plan` synchronisé avec ce qui se
-passe côté Stripe, quelle que soit la façon dont l'abonnement a été créé.
-Pas bloquant pour 2-3 clients pilotes facturés manuellement — à faire
-avant d'ouvrir plus largement.
+L'app ne crée aucune session de paiement elle-même — le webhook
+(`app/api/webhooks/stripe/route.ts`) se contente de garder
+`organizations.plan` synchronisé avec ce qui se passe côté Stripe, quelle
+que soit la façon dont l'abonnement a été créé. Pas bloquant pour 2-3
+clients pilotes facturés manuellement — à faire avant d'ouvrir plus
+largement.
+
+**Dépassement de quota (docs/roadmap.md items 17/36)** : chaque org
+choisit elle-même, dans Paramètres > Organisation, d'être bloquée au
+quota de son plan ou débitée automatiquement par tranche de dépassement
+(`lib/plans.ts` : `OVERAGE_BLOCK_SIZE`/`OVERAGE_CHARGE_CENTS` —
+**valeurs placeholder, à confirmer avant d'activer en mode Stripe live**).
+Le débit automatique réutilise le moyen de paiement déjà enregistré lors
+du paiement via Payment Link (`lib/stripe.ts` `chargeOverage`), facturé
+une fois par jour par le cron `app/api/cron/charge-overage/route.ts`
+(même mécanisme `CRON_SECRET` que `purge-conversations`, déjà dans
+`vercel.json`). Applique la migration
+`supabase/migrations/0020_organization_overage.sql` avant de l'activer.
+**Teste d'abord en mode test Stripe** (carte `4242 4242 4242 4242`) :
+vérifie qu'un débit automatique réussit bien et que `overage_charges`
+reçoit la ligne attendue, avant d'envisager un abonnement live.
 
 1. Créer un compte Stripe (mode test d'abord), un produit par plan
    (Solo/PME/Métier) avec un prix récurrent chacun.
