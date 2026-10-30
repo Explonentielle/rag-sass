@@ -22,6 +22,13 @@ export const PLAN_LABELS: Record<OrgPlan, string> = {
   metier: 'Métier',
 };
 
+// Display only (matches app/page.tsx's Pricing section) — the actual
+// amount charged lives in Stripe itself (STRIPE_PRICE_SOLO/PME).
+export const PLAN_PRICE_LABELS: Record<'solo' | 'pme', string> = {
+  solo: '9€ / mois',
+  pme: '49€ / mois',
+};
+
 /**
  * Plans entitled to AI-assisted indexing (docs/roadmap.md item 18) — a
  * premium feature with a real per-document LLM cost, unlike the rest of

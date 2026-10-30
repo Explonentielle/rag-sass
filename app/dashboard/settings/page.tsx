@@ -9,7 +9,11 @@ import DeleteOrgSection from '@/components/DeleteOrgSection';
 import { Badge, Card } from '@/components/ui/Card';
 import { PLAN_LABELS } from '@/lib/plans';
 
-export default async function SettingsPage() {
+export default async function SettingsPage({
+  searchParams,
+}: {
+  searchParams: { checkout?: string };
+}) {
   const org = await getCurrentOrg();
   if (!org) notFound();
 
@@ -39,6 +43,17 @@ export default async function SettingsPage() {
         <h1 className="text-2xl font-semibold tracking-tight text-slate-900">Paramètres</h1>
         <p className="mt-1 text-sm text-slate-500">Organisation et compte</p>
       </div>
+
+      {searchParams.checkout === 'success' && (
+        <div className="rounded-md border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-800">
+          Abonnement activé. Ça peut prendre quelques secondes pour apparaître ci-dessous.
+        </div>
+      )}
+      {searchParams.checkout === 'cancelled' && (
+        <div className="rounded-md border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
+          Paiement annulé, aucun changement n'a été fait.
+        </div>
+      )}
 
       <section className="space-y-3">
         <h2 className="font-semibold text-slate-900">Organisation</h2>

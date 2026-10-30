@@ -5,7 +5,7 @@
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import type Stripe from 'stripe';
-import { planForPriceId, chargeOverage } from './stripe';
+import { planForPriceId, chargeOverage, createCheckoutSession } from './stripe';
 
 const ORIGINAL_ENV = { ...process.env };
 
@@ -42,11 +42,13 @@ function fakeStripe(overrides: {
   subscriptionsRetrieve?: ReturnType<typeof vi.fn>;
   paymentMethodsList?: ReturnType<typeof vi.fn>;
   paymentIntentsCreate?: ReturnType<typeof vi.fn>;
+  checkoutSessionsCreate?: ReturnType<typeof vi.fn>;
 }) {
   return {
     subscriptions: { retrieve: overrides.subscriptionsRetrieve ?? vi.fn() },
     paymentMethods: { list: overrides.paymentMethodsList ?? vi.fn() },
     paymentIntents: { create: overrides.paymentIntentsCreate ?? vi.fn() },
+    checkout: { sessions: { create: overrides.checkoutSessionsCreate ?? vi.fn() } },
   } as unknown as Stripe;
 }
 
@@ -128,5 +130,69 @@ describe('chargeOverage', () => {
     await expect(
       chargeOverage(stripe, { customerId: 'cus_1', subscriptionId: 'sub_1', amountCents: 500 })
     ).rejects.toThrow(/Aucun moyen de paiement/);
+  });
+});
+
+describe('createCheckoutSession', () => {
+  it('reuses an existing Stripe customer when one is already on file', async () => {
+    const checkoutSessionsCreate = vi.fn().mockResolvedValue({ id: 'cs_1', url: 'https://checkout/cs_1' });
+    const stripe = fakeStripe({ checkoutSessionsCreate });
+
+    await createCheckoutSession(stripe, {
+      priceId: 'price_solo',
+      organizationId: 'org_1',
+      customerId: 'cus_existing',
+      customerEmail: 'ignored@example.com',
+      successUrl: 'https://app/success',
+      cancelUrl: 'https://app/cancel',
+    });
+
+    expect(checkoutSessionsCreate).toHaveBeenCalledWith({
+      mode: 'subscription',
+      line_items: [{ price: 'price_solo', quantity: 1 }],
+      client_reference_id: 'org_1',
+      success_url: 'https://app/success',
+      cancel_url: 'https://app/cancel',
+      customer: 'cus_existing',
+    });
+  });
+
+  it('prefills the email when there is no existing customer', async () => {
+    const checkoutSessionsCreate = vi.fn().mockResolvedValue({ id: 'cs_2', url: 'https://checkout/cs_2' });
+    const stripe = fakeStripe({ checkoutSessionsCreate });
+
+    await createCheckoutSession(stripe, {
+      priceId: 'price_pme',
+      organizationId: 'org_2',
+      customerId: null,
+      customerEmail: 'new@example.com',
+      successUrl: 'https://app/success',
+      cancelUrl: 'https://app/cancel',
+    });
+
+    expect(checkoutSessionsCreate).toHaveBeenCalledWith(
+      expect.objectContaining({ customer_email: 'new@example.com' })
+    );
+    expect(checkoutSessionsCreate).not.toHaveBeenCalledWith(
+      expect.objectContaining({ customer: expect.anything() })
+    );
+  });
+
+  it('omits both customer fields when neither is available', async () => {
+    const checkoutSessionsCreate = vi.fn().mockResolvedValue({ id: 'cs_3', url: 'https://checkout/cs_3' });
+    const stripe = fakeStripe({ checkoutSessionsCreate });
+
+    await createCheckoutSession(stripe, {
+      priceId: 'price_pme',
+      organizationId: 'org_3',
+      customerId: null,
+      customerEmail: null,
+      successUrl: 'https://app/success',
+      cancelUrl: 'https://app/cancel',
+    });
+
+    const call = checkoutSessionsCreate.mock.calls[0][0];
+    expect(call).not.toHaveProperty('customer');
+    expect(call).not.toHaveProperty('customer_email');
   });
 });

@@ -23,7 +23,7 @@ fixe — sert de mémoire centralisée plutôt que de planning strict.
 | 14 | Infra | Self-host Supabase (VPS) | Élevé | VPS provisionné |
 | 15 | Qualité | Tests automatisés | Élevé | ✅ Fait (fondations) — 10 modules purs couverts (dont `lib/ingest.ts`), routes API elles-mêmes encore ouvertes |
 | 16 | Qualité | Logs locaux (debug/incident) | Faible | ✅ Fait (voir note) |
-| 17 | Qualité | Suivi d'usage/coût par org | Moyen | Mesure + plan + enforcement réel (item 36) ✅ faits — Stripe ✅ terrain préparé (webhook + schéma), compte/produits/Payment Links à créer (hors code, `docs/deployment.md` §4) |
+| 17 | Qualité | Suivi d'usage/coût par org | Moyen | Mesure + plan + enforcement réel (item 36) ✅ faits — Stripe ✅ compte test créé, souscription self-service testée en conditions réelles (item 53), prix placeholders à confirmer avant mode live |
 | 18 | Premium | Indexation assistée par IA (doc bruts + URL) | Élevé | ✅ Fait (docs uploadés + URL, entitlement par plan inclus) — mode validation humaine avant indexation explicitement hors scope, non fait |
 | 19 | Templates | Clarifier dans le front que les templates ne sont pas liés en live aux chatbots | Faible | ✅ Fait (déjà présent dans `SystemPromptEditor.tsx` depuis le 2026-09-09) |
 | 20 | RGPD | Plan d'action : rétention/purge, suppression à la demande, chiffrement, logs | Moyen (plan) | A+B+C+D ✅ faits (migrations 0004-0006 à appliquer) — E/F ✅ brouillon fait (`docs/rgpd-conformite.md`), relecture juridique pro encore à faire |
@@ -38,8 +38,8 @@ fixe — sert de mémoire centralisée plutôt que de planning strict.
 | 47 | Chat | Indicateur de chargement du chat trop statique (points fixes) | Faible-moyen | ✅ Fait (rotation animée + personnalisable par chatbot) |
 | 48 | Chat | Envoi de fichiers par le visiteur dans le widget (réglable par chatbot) | Moyen-élevé | ✅ Fait (stockage + téléchargement dashboard + pièce jointe de l'email + purge de rétention à 90 jours via Vercel Cron) |
 | 49 | Chat | Analyse IA du fichier envoyé (interpréter le contenu et répondre directement) | Élevé | Noté, pas implémenté — dépend de l'item 48 (et de l'OCR, item 7, pour scans/images) |
-| 50 | Ingestion | Le scan d'URL ne lit qu'une page, pas le site entier | Moyen | ✅ Fait (option "Tout le site", une page = un document) — pas encore testé en prod |
-| 51 | Chat | Messages d'attente contextuels (étapes réelles avec le sujet de la question) | Faible-moyen | ✅ Fait (choix par chatbot, désactivé par défaut) — pas encore testé en prod |
+| 50 | Ingestion | Le scan d'URL ne lit qu'une page, pas le site entier | Moyen | ✅ Fait et testé en prod (option "Tout le site", une page = un document) |
+| 51 | Chat | Messages d'attente contextuels (étapes réelles avec le sujet de la question) | Faible-moyen | ✅ Fait et testé en prod (choix par chatbot, désactivé par défaut) |
 | 21 | Catalogue | Agent de qualification de leads | Élevé | Item 3 (agent) |
 | 22 | Catalogue | Brouillon de réponse email | Moyen | — |
 | 23 | Catalogue | Analyseur de contrats (extraction de clauses) | Moyen | — |
@@ -58,6 +58,8 @@ fixe — sert de mémoire centralisée plutôt que de planning strict.
 | 36 | Pricing | Comportement du plan Solo à la limite atteinte | Faible (décision) | ✅ Fait — choix par l'org (bloquer / débit automatique), montants placeholders à confirmer avant prod réelle |
 | 37 | Qualité | Résilience du déchiffrement (item 20-C) | Faible | ✅ Fait |
 | 38 | Qualité | Aucune page dashboard n'a de gestion d'erreur (try/catch) | Moyen | ✅ Fait |
+| 52 | Compte | Séparer dashboard "chatbot widget site" / "assistant interne" | Faible-moyen | ✅ Fait |
+| 53 | Pricing | Souscription self-service (Stripe Checkout) depuis l'app | Moyen | ✅ Fait et testé en mode test Stripe |
 
 ---
 
@@ -2049,8 +2051,8 @@ document.
   fragment, sans query string et sans `/` final, pour dédoublonner.
 
 Testé : 10 tests unitaires (`lib/siteLinks.test.ts`), types propres ; la
-logique de liens appliquée au vrai site trouve bien ses 7 pages. **Pas encore
-testé de bout en bout** (route + UI + indexation des pages) en prod.
+logique de liens appliquée au vrai site trouve bien ses 7 pages. **Testé de
+bout en bout en prod (2026-10-30)**, confirmé par l'utilisateur.
 
 **Limites connues** : profondeur 2 sans sitemap (une page enfouie plus loin
 n'est trouvée que via le sitemap) ; les sites dont les liens ne sont générés
@@ -2094,7 +2096,8 @@ toujours exactes, sans appel supplémentaire :
   chatbots sans documents n'ont pas d'étape de recherche : rotation, puis
   "Je rédige la réponse…".
 
-Testé : types propres. **Pas encore testé dans un navigateur ni en prod.**
+Testé : types propres. **Testé en prod (2026-10-30)**, confirmé par
+l'utilisateur.
 
 **Effort** : faible-moyen.
 
@@ -2148,3 +2151,68 @@ masque bien la section Widget pour un second cerveau.
 
 **Effort** : faible-moyen (1 colonne + 1 nouvelle page + affichage
 conditionnel dans la page détail).
+
+---
+
+### 53. Souscription self-service (Stripe Checkout) depuis l'app — ✅ Fait
+
+**Constat (2026-10-30)**, en testant l'intégration Stripe tout juste
+branchée (compte test créé, webhook configuré, premier paiement validé
+via un Payment Link partagé à la main, voir item 17) : aucun moyen de
+payer **depuis l'app elle-même**. Les boutons "Commencer gratuitement" de
+la landing n'amènent qu'à l'inscription ; le seul chemin de paiement
+existant demandait de créer un Payment Link dans le Dashboard Stripe et
+d'y ajouter `?client_reference_id=<organization_id>` à la main — viable
+pour 2-3 clients pilotes facturés un par un, pas crédible si un client
+pilote veut souscrire tout seul juste après avoir testé l'outil.
+
+**Implémenté** :
+- `lib/stripe.ts` `createCheckoutSession` : crée une vraie session Stripe
+  Checkout (`mode: 'subscription'`) avec `client_reference_id` posé
+  automatiquement sur l'id de l'organisation connectée — produit
+  exactement le même événement `checkout.session.completed` qu'un
+  paiement via Payment Link, donc **aucun changement nécessaire côté
+  webhook** (`app/api/webhooks/stripe/route.ts`). Réutilise le
+  `stripe_customer_id` existant de l'org s'il y en a déjà un (évite un
+  doublon de client Stripe), sinon préremplit l'email de l'utilisateur
+  connecté.
+- Nouvelle route `app/api/billing/checkout/route.ts` : authentifie
+  l'utilisateur, résout le prix (`STRIPE_PRICE_SOLO`/`_PME`) depuis le
+  plan demandé (`solo`/`pme` seulement — Métier reste sur devis, pas de
+  self-service), vérifie l'appartenance à l'org via le `select` RLS
+  normal (pas besoin de check manuel), renvoie l'URL de la session
+  Stripe à rediriger. `success_url`/`cancel_url` pointent vers
+  `/dashboard/settings?checkout=success|cancelled`.
+- `components/SubscribeButton.tsx` : bouton client, appelle la route puis
+  `window.location.href = url`.
+- `components/OrgSettingsForm.tsx` : la section Plan change de nature
+  selon l'état de l'org. **Avant** (`!hasStripeSubscription`) : affiche
+  le plan actuel (étiquette informative) + deux `SubscribeButton`
+  (Solo/PME) + note "Métier sur devis, contactez-nous" — **le sélecteur
+  radio libre (plan réglable gratuitement sans payer) a été retiré**, il
+  n'existait que comme "étiquette informative" avant Stripe et n'a plus
+  de raison d'être maintenant qu'un vrai paiement est possible. **Après**
+  (`hasStripeSubscription`) : affichage verrouillé inchangé (item 52's
+  travail du jour, pas retouché).
+- `lib/plans.ts` : nouveau `PLAN_PRICE_LABELS` (`9€ / mois` / `49€ /
+  mois`) pour garder un seul endroit où ces montants d'affichage sont
+  écrits — la landing (`app/page.tsx`) reste indépendante en texte libre,
+  pas encore branchée sur cette constante.
+- `app/dashboard/settings/page.tsx` : bannière de confirmation/annulation
+  selon `?checkout=success|cancelled` dans l'URL au retour de Stripe.
+
+**Testé en conditions réelles (2026-10-30, mode test Stripe)** : paiement
+Solo via le bouton "Souscrire" depuis `/dashboard/settings`, webhook reçu,
+`organizations.plan`/`stripe_customer_id` mis à jour automatiquement,
+confirmé par l'utilisateur dans Supabase. `tsc --noEmit` propre, 168
+tests au vert (3 nouveaux pour `createCheckoutSession` : réutilisation du
+client existant, préremplissage email, aucun des deux champs si rien de
+disponible).
+
+**Hors scope pour l'instant** : les CTA de la landing (`app/page.tsx`
+`Pricing()`) ne déclenchent pas encore ce flux pour un visiteur connecté
+— ils renvoient toujours vers `/dashboard`. À brancher si on veut que la
+conversion landing → paiement se fasse en un clic sans repasser par
+Paramètres.
+
+**Effort** : moyen.

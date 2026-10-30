@@ -89,3 +89,37 @@ export async function chargeOverage(
     confirm: true,
   });
 }
+
+/**
+ * Self-service subscription checkout (docs/roadmap.md item 17) — the
+ * in-app alternative to manually sharing a Stripe Payment Link with
+ * ?client_reference_id appended. Produces the exact same
+ * `checkout.session.completed` event the webhook already handles, so no
+ * webhook change was needed to support this.
+ */
+export async function createCheckoutSession(
+  stripe: Stripe,
+  params: {
+    priceId: string;
+    organizationId: string;
+    // Reuse the existing Stripe customer if this org already has one
+    // (e.g. a past manual Payment Link payment) rather than letting
+    // Checkout create a duplicate; otherwise prefill the signed-in user's
+    // email so Stripe creates (and remembers) one for next time.
+    customerId: string | null;
+    customerEmail: string | null;
+    successUrl: string;
+    cancelUrl: string;
+  }
+): Promise<Stripe.Checkout.Session> {
+  const { priceId, organizationId, customerId, customerEmail, successUrl, cancelUrl } = params;
+
+  return stripe.checkout.sessions.create({
+    mode: 'subscription',
+    line_items: [{ price: priceId, quantity: 1 }],
+    client_reference_id: organizationId,
+    success_url: successUrl,
+    cancel_url: cancelUrl,
+    ...(customerId ? { customer: customerId } : customerEmail ? { customer_email: customerEmail } : {}),
+  });
+}

@@ -5,12 +5,13 @@ import { getAdminClient } from '@/lib/supabase/admin';
 import { logInfo, logWarn, logError } from '@/lib/logger';
 
 /**
- * Stripe webhook (docs/roadmap.md item 17). Deliberately the only Stripe
- * touchpoint in this app for now — no Checkout session creation here,
- * see lib/stripe.ts's comment. Keeps `organizations.plan` (and the new
- * stripe_* columns, migration 0011) in sync with whatever happens on
- * Stripe's side (a Payment Link payment, a cancellation, a failed
- * renewal), regardless of how the subscription was actually created.
+ * Stripe webhook (docs/roadmap.md item 17). Keeps `organizations.plan`
+ * (and the stripe_* columns, migration 0011) in sync with whatever
+ * happens on Stripe's side (a payment, a cancellation, a failed
+ * renewal), regardless of how the subscription was created — a manually
+ * shared Payment Link, or the in-app self-service Checkout
+ * (createCheckoutSession, lib/stripe.ts) both fire the same
+ * `checkout.session.completed` event handled below, no branching needed.
  *
  * Needs the RAW request body (not JSON-parsed) for signature
  * verification — Next.js doesn't parse the body for us unless we call

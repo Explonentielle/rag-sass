@@ -176,12 +176,17 @@ Resend suffit pour les deux usages.
 
 ## 4. Stripe — facturation (optionnel pour un pilote facturé à la main)
 
-L'app ne crée aucune session de paiement elle-même — le webhook
-(`app/api/webhooks/stripe/route.ts`) se contente de garder
-`organizations.plan` synchronisé avec ce qui se passe côté Stripe, quelle
-que soit la façon dont l'abonnement a été créé. Pas bloquant pour 2-3
-clients pilotes facturés manuellement — à faire avant d'ouvrir plus
-largement.
+Deux façons de souscrire, toutes les deux aboutissent au même webhook
+(`app/api/webhooks/stripe/route.ts`), qui garde `organizations.plan`
+synchronisé avec ce qui se passe côté Stripe :
+- **Self-service, depuis l'app** (2026-10-30) : bouton "Souscrire" dans
+  Paramètres > Organisation (`components/SubscribeButton.tsx` →
+  `POST /api/billing/checkout` → `createCheckoutSession`,
+  `lib/stripe.ts`) — crée une vraie session Stripe Checkout avec le bon
+  `client_reference_id` injecté automatiquement (l'id de l'org
+  connectée), pas besoin de lien à partager à la main.
+- **Manuel, via Payment Link** (toujours possible) : voir plus bas,
+  utile pour un client qui ne passe pas par le flux normal de l'app.
 
 **Dépassement de quota (docs/roadmap.md items 17/36)** : chaque org
 choisit elle-même, dans Paramètres > Organisation, d'être bloquée au
@@ -200,13 +205,14 @@ reçoit la ligne attendue, avant d'envisager un abonnement live.
 
 1. Créer un compte Stripe (mode test d'abord), un produit par plan
    (Solo/PME/Métier) avec un prix récurrent chacun.
-2. Pour chaque prix, créer un **Payment Link** (Stripe Dashboard →
-   Payment Links, aucun code requis) — c'est le lien à donner au client
-   pour payer. **Important** : en partageant le lien avec un client
-   précis, ajouter `?client_reference_id=<organization_id>` à l'URL (l'id
-   de son organisation, visible dans l'URL du dashboard Corpus.ai) — c'est
-   ce qui permet au webhook de savoir quel org vient de payer, sans aucun
-   code de notre côté.
+2. *(Optionnel, le bouton "Souscrire" dans l'app suffit pour l'usage
+   normal)* Pour chaque prix, un **Payment Link** (Stripe Dashboard →
+   Payment Links, aucun code requis) peut aussi être créé — utile pour un
+   client à qui on envoie un lien directement (hors flux normal de
+   l'app). **Important** : en partageant ce lien avec un client précis,
+   ajouter `?client_reference_id=<organization_id>` à l'URL (l'id de son
+   organisation, visible dans Supabase → table `organizations`) — c'est
+   ce qui permet au webhook de savoir quel org vient de payer.
 3. Récupérer les ids de prix (`price_...`, pas les ids de produit
    `prod_...`) et les mettre dans les variables d'environnement Vercel :
    `STRIPE_PRICE_SOLO`, `STRIPE_PRICE_PME`, `STRIPE_PRICE_METIER`.
@@ -217,9 +223,11 @@ reçoit la ligne attendue, avant d'envisager un abonnement live.
    écouter : `checkout.session.completed`, `customer.subscription.updated`,
    `customer.subscription.deleted`. Récupérer le "Signing secret" généré →
    `STRIPE_WEBHOOK_SECRET`.
-6. Tester : payer via un Payment Link avec une carte de test Stripe
+6. Tester : depuis Paramètres > Organisation, clique "Souscrire" (ou paie
+   via un Payment Link) avec la carte de test Stripe
    (`4242 4242 4242 4242`), vérifier dans Supabase que l'organisation a
-   bien `plan` et `stripe_customer_id` mis à jour.
+   bien `plan` et `stripe_customer_id` mis à jour. Confirmé fonctionnel en
+   mode test le 2026-10-30 (les deux flux).
 
 ---
 

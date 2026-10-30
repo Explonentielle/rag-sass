@@ -5,7 +5,8 @@ import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { Button } from '@/components/ui/Button';
 import { Input, Label } from '@/components/ui/Card';
-import { PLAN_LABELS, PLAN_LIMITS, OVERAGE_MODE_LABELS } from '@/lib/plans';
+import SubscribeButton from '@/components/SubscribeButton';
+import { PLAN_LABELS, PLAN_LIMITS, PLAN_PRICE_LABELS, OVERAGE_MODE_LABELS } from '@/lib/plans';
 import type { OrgPlan, OrgOverageMode } from '@/types/database';
 
 const PLAN_OPTIONS: OrgPlan[] = ['solo', 'pme', 'metier'];
@@ -33,7 +34,10 @@ export default function OrgSettingsForm({
 }) {
   const router = useRouter();
   const [name, setName] = useState(initialName);
-  const [plan, setPlan] = useState<OrgPlan>(initialPlan);
+  // Not settable from this form anymore — real plan changes only happen
+  // via SubscribeButton (Stripe Checkout) or the webhook, see the Plan
+  // section below.
+  const plan = initialPlan;
   const [overageMode, setOverageMode] = useState<OrgOverageMode>(initialOverageMode);
   const [saved, setSaved] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -45,15 +49,10 @@ export default function OrgSettingsForm({
     setError(null);
 
     const supabase = createClient();
-    const update: { name: string; plan?: OrgPlan; overage_mode: OrgOverageMode } = {
-      name,
-      overage_mode: overageMode,
-    };
-    // Plan is locked once a real subscription exists — see the note in
-    // the Plan section below.
-    if (!hasStripeSubscription) update.plan = plan;
-
-    const { error } = await supabase.from('organizations').update(update).eq('id', orgId);
+    const { error } = await supabase
+      .from('organizations')
+      .update({ name, overage_mode: overageMode })
+      .eq('id', orgId);
 
     setSaving(false);
     if (error) {
@@ -81,44 +80,55 @@ export default function OrgSettingsForm({
 
       <div className="space-y-1.5">
         <Label>Plan</Label>
-        <div className="flex flex-wrap gap-2">
-          {PLAN_OPTIONS.map((p) => {
-            const limit = PLAN_LIMITS[p];
-            return (
-              <label
-                key={p}
-                className={`flex items-center gap-2 rounded-md border px-3 py-2 text-sm ${
-                  hasStripeSubscription ? 'cursor-default opacity-60' : 'cursor-pointer'
-                } ${
-                  plan === p
-                    ? 'border-brand-500 bg-brand-50 text-brand-900'
-                    : 'border-slate-300 text-slate-700 hover:border-slate-400'
-                }`}
-              >
-                <input
-                  type="radio"
-                  name="plan"
-                  className="sr-only"
-                  checked={plan === p}
-                  disabled={hasStripeSubscription}
-                  onChange={() => {
-                    setPlan(p);
-                    setSaved(false);
-                  }}
-                />
-                <span className="font-medium">{PLAN_LABELS[p]}</span>
-                <span className="text-xs text-slate-400">
-                  {limit === null ? 'sur devis' : `${limit} msg/mois`}
-                </span>
-              </label>
-            );
-          })}
-        </div>
-        <p className="text-xs text-slate-400">
-          {hasStripeSubscription
-            ? 'Géré par votre abonnement Stripe — contactez le support pour changer de palier.'
-            : 'Étiquette informative, réglable librement — pas encore reliée à un vrai paiement.'}
-        </p>
+        {hasStripeSubscription ? (
+          <>
+            <div className="flex flex-wrap gap-2">
+              {PLAN_OPTIONS.map((p) => {
+                const limit = PLAN_LIMITS[p];
+                return (
+                  <span
+                    key={p}
+                    className={`flex items-center gap-2 rounded-md border px-3 py-2 text-sm opacity-60 ${
+                      plan === p
+                        ? 'border-brand-500 bg-brand-50 text-brand-900'
+                        : 'border-slate-300 text-slate-700'
+                    }`}
+                  >
+                    <span className="font-medium">{PLAN_LABELS[p]}</span>
+                    <span className="text-xs text-slate-400">
+                      {limit === null ? 'sur devis' : `${limit} msg/mois`}
+                    </span>
+                  </span>
+                );
+              })}
+            </div>
+            <p className="text-xs text-slate-400">
+              Géré par votre abonnement Stripe — contactez le support pour changer de palier.
+            </p>
+          </>
+        ) : (
+          <>
+            <p className="text-xs text-slate-400">
+              Actuellement : <span className="font-medium text-slate-600">{PLAN_LABELS[plan]}</span>{' '}
+              (aucun abonnement actif)
+            </p>
+            <div className="flex flex-wrap gap-2">
+              <SubscribeButton
+                organizationId={orgId}
+                plan="solo"
+                label={`Souscrire Solo — ${PLAN_PRICE_LABELS.solo}`}
+              />
+              <SubscribeButton
+                organizationId={orgId}
+                plan="pme"
+                label={`Souscrire PME — ${PLAN_PRICE_LABELS.pme}`}
+              />
+            </div>
+            <p className="text-xs text-slate-400">
+              Palier Métier : sur devis, contactez-nous directement.
+            </p>
+          </>
+        )}
       </div>
 
       <div className="space-y-1.5">
