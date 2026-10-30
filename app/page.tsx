@@ -490,15 +490,30 @@ function Pricing({ isLoggedIn }: { isLoggedIn: boolean }) {
 }
 
 function Testimonials() {
-  // Real person (the user's own business advisor), quote still a placeholder
-  // pending his own wording. Only one entry for now, deliberately not
-  // padded out with invented people.
+  // TEMPORARY: entries below are invented placeholders (fake names/quotes),
+  // added only to visualize the section with several cards while the
+  // product isn't commercialized yet (no domain, pas de vrais clients
+  // pilotes pour l'instant). Willy's entry is the one real person so far
+  // (quote still pending his own wording). Replace the placeholders with
+  // real testimonials before any public launch.
   const quotes = [
     {
       quote:
-        "Je retrouve mes notes clients et mes process en quelques secondes, sans fouiller dans mes dossiers. C'est devenu mon second cerveau pour mon activité d'accompagnement.",
-      name: 'Willy',
+        "Mes notes clients et mes process sont accessibles en quelques secondes, sans avoir à fouiller dans mes dossiers : c’est devenu mon second cerveau pour mon activité d’accompagnement. J’ai même pu ajouter un chatbot commercial à mon site web en quelques clics.",
+      name: 'Willy Duong',
       role: 'Accompagnateur business, indépendant',
+    },
+    {
+      quote:
+        "Nos Patiens obtiennent des réponses précises à toute heure, tirées directement de nos documentation. Nous avons nettement réduit le temps passé sur les questions répétitives.",
+      name: 'Gros Véronique',
+      role: 'Fondatrice du pôle podologie, Maison de santé Carnot',
+    },
+    {
+      quote:
+        "Installé en deux heures le chatbot cite les passages de nos contrats et rassure nos prospects avant même le premier appel.",
+      name: 'Laurent Martin',
+      role: 'Responsable commercial chez Speedmedia Services',
     },
   ];
   return (
@@ -506,7 +521,7 @@ function Testimonials() {
       <div className={styles.wrap}>
         <div className={`${styles.sectionHead} ${styles.sectionHeadCenter}`}>
           <span className={styles.sectionLabel}>Avis</span>
-          <h2>Ce qu&apos;en dit un premier utilisateur</h2>
+          <h2>Ce qu&apos;en disent nos utilisateurs</h2>
         </div>
         <div className={`${styles.testiGrid} ${quotes.length === 1 ? styles.testiGridSolo : ''}`}>
           {quotes.map((t) => (
@@ -563,6 +578,17 @@ function Faq() {
             <div className={styles.faqContact}>
               <strong>Une autre question ?</strong>
               <span>Écrivez-nous, on vous répond rapidement.</span>
+              <a href="tel:+33744847992" className={styles.faqContactLink}>
+                07 44 84 79 92
+              </a>
+              <a
+                href="https://wa.me/33744847992"
+                target="_blank"
+                rel="noopener noreferrer"
+                className={styles.faqContactLink}
+              >
+                WhatsApp
+              </a>
             </div>
           </div>
           <div className={styles.faqList}>
@@ -631,6 +657,9 @@ function Footer() {
             <Link href="/signup">Essayer gratuitement</Link>
           </div>
         </div>
+      </div>
+      <div className={styles.footerDivider} />
+      <div className={styles.wrap}>
         <div className={styles.footerBottom}>
           <p>© {new Date().getFullYear()} Corpus.ai. Tous droits réservés.</p>
           <nav className={styles.footerLinks}>

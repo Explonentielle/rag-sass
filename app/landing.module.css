@@ -327,6 +327,8 @@
 }
 .faqContact strong { display: block; font-size: 14.5px; margin-bottom: 4px; }
 .faqContact span { display: block; font-size: 13px; color: #C7D9CC; }
+.faqContactLink { display: inline-block; margin-top: 10px; margin-right: 14px; font-size: 13px; color: #F3F7F2; text-decoration: underline; }
+.faqContactLink:hover { color: #9FCBB4; }
 
 .faqList { display: flex; flex-direction: column; gap: 10px; }
 .faqItem { background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 16px 20px; }
@@ -355,7 +357,8 @@
 
 /* ---------- footer: dark, three columns ---------- */
 .footer { background: var(--forestInk); color: #C7D9CC; padding: 56px 0 28px; }
-.footerGrid { display: grid; gap: 36px; padding-bottom: 32px; border-bottom: 1px solid rgba(255,255,255,0.1); }
+.footerGrid { display: grid; gap: 36px; padding-bottom: 32px; }
+.footerDivider { border-bottom: 1px solid rgba(255,255,255,0.1); }
 @media (min-width: 720px) { .footerGrid { grid-template-columns: 1.3fr 1fr 1fr; } }
 .footerBrand .logo { color: #F3F7F2; }
 .footerBrand p { margin: 10px 0 0; font-size: 13px; color: #BFCFC4; max-width: 260px; line-height: 1.6; }
