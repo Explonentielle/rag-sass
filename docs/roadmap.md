@@ -62,6 +62,7 @@ fixe — sert de mémoire centralisée plutôt que de planning strict.
 | 53 | Pricing | Souscription self-service (Stripe Checkout) depuis l'app | Moyen | ✅ Fait et testé en mode test Stripe |
 | 54 | Compte | Mini tuto d'onboarding à la première arrivée sur le dashboard | Faible-moyen | ✅ Fait |
 | 55 | Pricing | Changer de palier / gérer son abonnement une fois abonné (portail Stripe) | Faible | ✅ Fait — config portail Stripe à faire côté dashboard |
+| 56 | Pricing | Revoir les montants/quotas des paliers (Solo/PME) | Faible (décision) | Noté, pas tranché — dépend en partie de l'item 35 |
 
 ---
 
@@ -844,6 +845,25 @@ n'empêchait un org de dépasser son palier.
 **Mesure ✅ faite (2026-09-09)** : `lib/usage.ts`
 (`getMonthlyMessageCount`) compte les messages assistant du mois en cours
 pour un org, à travers `messages` → `conversations` → `chatbots`.
+
+**Idée d'optimisation notée (2026-11-02), pas nécessaire aujourd'hui** :
+`getMonthlyMessageCount` relance un `COUNT(*)` indexé (avec jointure) à
+chaque appel (à chaque message de chat, et sur le dashboard) plutôt que
+de maintenir un compteur incrémental. Volontaire : un `COUNT` direct sur
+la table source est plus simple et ne peut pas dériver (pas de risque de
+désynchronisation entre un compteur et la réalité) ; un compteur
+incrémental ajouterait de la complexité (incrémentation atomique, reset
+mensuel, réconciliation en cas de dérive) pour un gain qui ne se justifie
+qu'à un volume de messages bien plus élevé qu'aujourd'hui (phase pilote).
+À revisiter seulement si ce `COUNT` devient mesurablement lent.
+
+Au passage, discuté si un nettoyage périodique des vieux messages
+serait nécessaire à terme pour ne pas tout garder en base indéfiniment —
+**déjà le cas** : la purge RGPD existante (item 48, `purgeExpiredConversations`,
+Vercel Cron quotidien) supprime les conversations expirées (90 jours par
+défaut), et `messages.conversation_id` a `on delete cascade`
+(migration `0004_conversations.sql`) — les messages disparaissent donc
+automatiquement avec leur conversation, rien de plus à construire pour ça.
 
 **Plan (étiquette, pas facturation) ✅ fait (2026-09-09)** : colonne
 `organizations.plan` (`solo`/`pme`/`metier`, défaut `solo` — migration
@@ -2255,10 +2275,14 @@ composant d'interface pur, même traitement que
 `CreateChatbotForm`/`OrgSettingsForm`, non testés unitairement dans ce
 projet).
 
-**Pas encore testé en conditions réelles** : créer un compte neuf et
-vérifier l'apparition du tuto, le fermer et recharger pour confirmer
-qu'il ne revient pas, vérifier qu'un compte avec des chatbots existants
-ne le voit jamais, et tester le bouton "Revoir la présentation".
+**Testé en conditions réelles (2026-11-02)** : apparition confirmée pour
+un compte neuf. Retour utilisateur : **trop limité en l'état** — purement
+informatif, ne redirige pas vers les pages concernées pendant la visite
+(ex. le bouton "Suivant" ne t'emmène pas créer un chatbot), et n'explique
+pas vraiment Paramètres/facturation en détail. Amélioration reportée
+explicitement ("on poussera ça plus tard") — à revoir : probablement des
+liens d'action réels par écran (ex. "Créer mon premier chatbot" qui
+amène sur `/dashboard/chatbots`) plutôt que du texte seul.
 
 **Effort** : faible-moyen.
 
@@ -2302,3 +2326,34 @@ dans Stripe avant qu'un changement de palier via le bouton ne fonctionne
 vraiment.
 
 **Effort** : faible (portail entièrement hébergé par Stripe).
+
+---
+
+### 56. Revoir les montants/quotas des paliers (Solo/PME) — noté, pas tranché
+
+**Signalé (2026-11-02)**, en testant le changement de palier réel pour la
+première fois : les quotas actuels (Solo 9€ = 300 msg, PME 49€ = 1 500
+msg, voir `lib/plans.ts` `PLAN_LIMITS` et `app/page.tsx` `Pricing()`)
+semblent mal calibrés. Retour direct : le palier PME devrait plutôt
+tourner autour de **2 000 messages**, et inclure **des outils en plus**
+(pas juste plus de quota) pour mieux justifier l'écart avec Solo —
+exact détail des outils à définir.
+
+**Pourquoi pas tranché tout de suite** : un vrai calibrage fiable dépend
+en partie de l'item 35 (coût réel $/message, aujourd'hui pas mesuré) pour
+vérifier que les nouveaux quotas restent rentables, pas juste "plus
+généreux au doigt mouillé". Rien ne bloque pour autant un ajustement
+immédiat des chiffres si l'utilisateur tranche avant d'avoir ce calcul —
+`PLAN_LIMITS`/les prix affichés sur la landing sont de simples constantes
+à modifier (`lib/plans.ts`, `app/page.tsx`), pas une dépendance technique
+dure.
+
+**À trancher avant de modifier le code** : quota exact du palier PME
+(2 000 confirmé ou autre chiffre), quels "outils en plus" concrètement
+(parmi les features déjà livrées : indexation IA, CSV/Excel, templates
+illimités... ou quelque chose de nouveau), et si Solo (300 msg/9€) doit
+aussi bouger ou reste tel quel.
+
+**Effort** : faible une fois la décision prise (changer des constantes +
+le wording de la landing) — l'effort réel est dans la décision business,
+pas le code.

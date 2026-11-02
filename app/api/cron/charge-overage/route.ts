@@ -27,8 +27,12 @@ export const dynamic = 'force-dynamic';
  * day automatically, no separate retry/backoff logic needed).
  */
 export async function GET(request: Request) {
+  // Fails closed, unlike app/api/cron/purge-conversations/route.ts's
+  // optional check — that one is low-stakes (deletes old data a bit
+  // early at worst), this one moves real money, so a missing
+  // CRON_SECRET must deny access, not silently allow it.
   const expected = process.env.CRON_SECRET;
-  if (expected && request.headers.get('authorization') !== `Bearer ${expected}`) {
+  if (!expected || request.headers.get('authorization') !== `Bearer ${expected}`) {
     return NextResponse.json({ error: 'Non autorisé.' }, { status: 401 });
   }
 
