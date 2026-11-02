@@ -92,28 +92,19 @@ export default function OrgSettingsForm({
             // anyone chose or paid for, so it shouldn't look selected.
             const isActive = hasStripeSubscription && plan === p;
             return (
-              <div
+              <span
                 key={p}
-                className={`flex flex-col items-start gap-2 rounded-md border px-3 py-2 text-sm ${
+                className={`flex items-center gap-2 rounded-md border px-3 py-2 text-sm ${
                   isActive
                     ? 'border-brand-500 bg-brand-50 text-brand-900'
                     : 'border-slate-300 text-slate-700'
                 }`}
               >
-                <div className="flex items-center gap-2">
-                  <span className="font-medium">{PLAN_LABELS[p]}</span>
-                  <span className="text-xs text-slate-400">
-                    {limit === null ? 'sur devis' : `${limit} msg/mois`}
-                  </span>
-                </div>
-                {!hasStripeSubscription && (p === 'solo' || p === 'pme') && (
-                  <SubscribeButton
-                    organizationId={orgId}
-                    plan={p}
-                    label={`Souscrire — ${PLAN_PRICE_LABELS[p]}`}
-                  />
-                )}
-              </div>
+                <span className="font-medium">{PLAN_LABELS[p]}</span>
+                <span className="text-xs text-slate-400">
+                  {limit === null ? 'sur devis' : `${limit} msg/mois`}
+                </span>
+              </span>
             );
           })}
         </div>
@@ -126,9 +117,23 @@ export default function OrgSettingsForm({
             </p>
           </div>
         ) : (
-          <p className="text-xs text-slate-400">
-            Palier Métier : sur devis, contactez-nous directement.
-          </p>
+          <>
+            <div className="flex flex-wrap gap-2">
+              <SubscribeButton
+                organizationId={orgId}
+                plan="solo"
+                label={`Souscrire Solo — ${PLAN_PRICE_LABELS.solo}`}
+              />
+              <SubscribeButton
+                organizationId={orgId}
+                plan="pme"
+                label={`Souscrire PME — ${PLAN_PRICE_LABELS.pme}`}
+              />
+            </div>
+            <p className="text-xs text-slate-400">
+              Palier Métier : sur devis, contactez-nous directement.
+            </p>
+          </>
         )}
       </div>
 
