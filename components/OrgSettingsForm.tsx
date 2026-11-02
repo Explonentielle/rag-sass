@@ -81,58 +81,54 @@ export default function OrgSettingsForm({
 
       <div className="space-y-1.5">
         <Label>Plan</Label>
-        {hasStripeSubscription ? (
-          <>
-            <div className="flex flex-wrap gap-2">
-              {PLAN_OPTIONS.map((p) => {
-                const limit = PLAN_LIMITS[p];
-                return (
-                  <span
-                    key={p}
-                    className={`flex items-center gap-2 rounded-md border px-3 py-2 text-sm opacity-60 ${
-                      plan === p
-                        ? 'border-brand-500 bg-brand-50 text-brand-900'
-                        : 'border-slate-300 text-slate-700'
-                    }`}
-                  >
-                    <span className="font-medium">{PLAN_LABELS[p]}</span>
-                    <span className="text-xs text-slate-400">
-                      {limit === null ? 'sur devis' : `${limit} msg/mois`}
-                    </span>
+        {!hasStripeSubscription && (
+          <p className="text-xs text-slate-400">Aucun forfait payant actif pour l'instant.</p>
+        )}
+        <div className="flex flex-wrap gap-2">
+          {PLAN_OPTIONS.map((p) => {
+            const limit = PLAN_LIMITS[p];
+            // Only ever "active" once a real subscription backs it — a
+            // DB default of 'solo' with no subscription isn't a plan
+            // anyone chose or paid for, so it shouldn't look selected.
+            const isActive = hasStripeSubscription && plan === p;
+            return (
+              <div
+                key={p}
+                className={`flex flex-col items-start gap-2 rounded-md border px-3 py-2 text-sm ${
+                  isActive
+                    ? 'border-brand-500 bg-brand-50 text-brand-900'
+                    : 'border-slate-300 text-slate-700'
+                }`}
+              >
+                <div className="flex items-center gap-2">
+                  <span className="font-medium">{PLAN_LABELS[p]}</span>
+                  <span className="text-xs text-slate-400">
+                    {limit === null ? 'sur devis' : `${limit} msg/mois`}
                   </span>
-                );
-              })}
-            </div>
-            <div className="flex flex-wrap items-center gap-3">
-              <ManageBillingButton organizationId={orgId} />
-              <p className="text-xs text-slate-400">
-                Changez de palier, votre moyen de paiement ou annulez depuis ce portail Stripe
-                sécurisé.
-              </p>
-            </div>
-          </>
+                </div>
+                {!hasStripeSubscription && (p === 'solo' || p === 'pme') && (
+                  <SubscribeButton
+                    organizationId={orgId}
+                    plan={p}
+                    label={`Souscrire — ${PLAN_PRICE_LABELS[p]}`}
+                  />
+                )}
+              </div>
+            );
+          })}
+        </div>
+        {hasStripeSubscription ? (
+          <div className="flex flex-wrap items-center gap-3">
+            <ManageBillingButton organizationId={orgId} />
+            <p className="text-xs text-slate-400">
+              Changez de palier, votre moyen de paiement ou annulez depuis ce portail Stripe
+              sécurisé.
+            </p>
+          </div>
         ) : (
-          <>
-            <p className="text-xs text-slate-400">
-              Actuellement : <span className="font-medium text-slate-600">{PLAN_LABELS[plan]}</span>{' '}
-              (aucun abonnement actif)
-            </p>
-            <div className="flex flex-wrap gap-2">
-              <SubscribeButton
-                organizationId={orgId}
-                plan="solo"
-                label={`Souscrire Solo — ${PLAN_PRICE_LABELS.solo}`}
-              />
-              <SubscribeButton
-                organizationId={orgId}
-                plan="pme"
-                label={`Souscrire PME — ${PLAN_PRICE_LABELS.pme}`}
-              />
-            </div>
-            <p className="text-xs text-slate-400">
-              Palier Métier : sur devis, contactez-nous directement.
-            </p>
-          </>
+          <p className="text-xs text-slate-400">
+            Palier Métier : sur devis, contactez-nous directement.
+          </p>
         )}
       </div>
 
