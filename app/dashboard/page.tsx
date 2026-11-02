@@ -11,7 +11,7 @@ import { PROMPT_TEMPLATES } from '@/lib/prompts';
 import { getMonthlyMessageCount, startOfCurrentMonthDate } from '@/lib/usage';
 import { PLAN_LABELS, PLAN_LIMITS } from '@/lib/plans';
 import { logQueryError } from '@/lib/supabaseResult';
-import type { DocumentStatus } from '@/types/database';
+import type { DocumentStatus, OrgPlan, OrgOverageMode } from '@/types/database';
 
 export default async function DashboardPage() {
   const org = await getCurrentOrg();
@@ -225,9 +225,9 @@ function UsageCard({
   overageMode,
   overageChargedCents,
 }: {
-  plan: 'solo' | 'pme' | 'metier';
+  plan: OrgPlan;
   messagesThisMonth: number;
-  overageMode: 'block' | 'auto_bill';
+  overageMode: OrgOverageMode;
   overageChargedCents: number;
 }) {
   const limit = PLAN_LIMITS[plan];

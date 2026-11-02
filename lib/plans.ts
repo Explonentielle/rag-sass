@@ -10,13 +10,19 @@ import type { OrgPlan, OrgOverageMode } from '@/types/database';
  * breaks the build. See docs/roadmap.md item 17.
  */
 
+// 'free' (docs/roadmap.md item 34): the real default for any org with no
+// Stripe subscription — deliberately much lower than Solo's 300, so
+// paying for Solo actually buys something. PLACEHOLDER value (30),
+// trivial to change later.
 export const PLAN_LIMITS: Record<OrgPlan, number | null> = {
+  free: 30,
   solo: 300,
   pme: 1500,
   metier: null, // "sur devis" — no fixed quota to compare against
 };
 
 export const PLAN_LABELS: Record<OrgPlan, string> = {
+  free: 'Gratuit',
   solo: 'Solo',
   pme: 'PME',
   metier: 'Métier',

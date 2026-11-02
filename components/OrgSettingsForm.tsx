@@ -10,7 +10,7 @@ import ManageBillingButton from '@/components/ManageBillingButton';
 import { PLAN_LABELS, PLAN_LIMITS, PLAN_PRICE_LABELS, OVERAGE_MODE_LABELS } from '@/lib/plans';
 import type { OrgPlan, OrgOverageMode } from '@/types/database';
 
-const PLAN_OPTIONS: OrgPlan[] = ['solo', 'pme', 'metier'];
+const PLAN_OPTIONS: OrgPlan[] = ['free', 'solo', 'pme', 'metier'];
 const OVERAGE_MODE_OPTIONS: OrgOverageMode[] = ['block', 'auto_bill'];
 
 export default function OrgSettingsForm({
@@ -81,16 +81,10 @@ export default function OrgSettingsForm({
 
       <div className="space-y-1.5">
         <Label>Plan</Label>
-        {!hasStripeSubscription && (
-          <p className="text-xs text-slate-400">Aucun forfait payant actif pour l'instant.</p>
-        )}
         <div className="flex flex-wrap gap-2">
           {PLAN_OPTIONS.map((p) => {
             const limit = PLAN_LIMITS[p];
-            // Only ever "active" once a real subscription backs it — a
-            // DB default of 'solo' with no subscription isn't a plan
-            // anyone chose or paid for, so it shouldn't look selected.
-            const isActive = hasStripeSubscription && plan === p;
+            const isActive = plan === p;
             return (
               <span
                 key={p}

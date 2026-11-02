@@ -61,4 +61,14 @@ describe('checkQuota', () => {
     });
     expect(result.blocked).toBe(false);
   });
+
+  it('blocks a "free" org at its own (lower) limit in "block" mode', async () => {
+    const supabase = fakeSupabaseWithCount(30);
+    const result = await checkQuota(supabase, {
+      organizationId: 'org-1',
+      plan: 'free',
+      overageMode: 'block',
+    });
+    expect(result).toEqual({ blocked: true, messagesThisMonth: 30 });
+  });
 });

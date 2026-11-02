@@ -53,7 +53,7 @@ fixe — sert de mémoire centralisée plutôt que de planning strict.
 | 31 | Sécurité | Restriction de domaine + toggle "chatbot public/privé" pour les embeds | Moyen | ✅ Fait — couvre la limite notée à l'item 29 |
 | 32 | RAG | Mode "prompt seul" (chatbot sans document obligatoire) | Faible-moyen | ✅ Fait — même besoin identifié indépendamment côté landing (item 21bis "Assistant sans documents") |
 | 33 | Intégrations | Branchement sur plateformes tierces (calendrier, email) | Élevé | Étape 1 (pattern agentique, outil email) ✅ Fait — étape 2 (MCP) et étape 3 (UI config) restent backlog |
-| 34 | Pricing | Plan gratuit | Moyen | Item 17 (plan), item 10 (rate limiting déjà en place) |
+| 34 | Pricing | Plan gratuit | Moyen | ✅ Fait (palier `free`, 30 msg/mois) — restrictions fonctionnelles par palier pas encore faites |
 | 35 | Pricing | Calcul réel de coût/rentabilité par message | Moyen | Item 17 (comptage déjà fait) — bloqué sur le $/token réel du modèle |
 | 36 | Pricing | Comportement du plan Solo à la limite atteinte | Faible (décision) | ✅ Fait — choix par l'org (bloquer / débit automatique), montants placeholders à confirmer avant prod réelle |
 | 37 | Qualité | Résilience du déchiffrement (item 20-C) | Faible | ✅ Fait |
@@ -1375,7 +1375,7 @@ besoin de sélection).
 
 ## 13. Pricing — suite de l'item 17
 
-### 34. Plan gratuit
+### 34. Plan gratuit — ✅ Fait (palier réel + quota, pas encore les restrictions fonctionnelles)
 
 **Idée (2026-09-09)** : la landing promet déjà implicitement du gratuit
 ("Pilote gratuit pour les premières entreprises", "sans carte bancaire pour
@@ -1400,6 +1400,52 @@ palier gratuit rendrait pertinent d'y appliquer aussi un plafond mensuel
 **Dépend de** : item 36 (comportement à la limite) — un palier gratuit a
 exactement le même besoin qu'un Solo qui déborde, juste avec un seuil plus
 bas.
+
+**Retour (2026-11-02)**, qui a déclenché le travail ci-dessous : constat
+en testant l'app qu'une org non payée tournait avec `plan = 'solo'` par
+défaut — **le même quota (300 msg/mois) qu'un vrai client Solo
+payant**, aucune incitation réelle à payer. Confirme la direction du
+09/09 côté quota (30-50 messages/mois) ; veut aussi, à terme, limiter
+**toutes les fonctionnalités** du palier gratuit, pas juste le nombre de
+messages (ex. 1 seul chatbot, pas de CSV/Excel...) — **pas fait dans ce
+passage**, détail exact encore à définir, hors scope explicitement
+reporté ("on vois l'affichage après").
+
+**Implémenté (2026-11-02)** — palier `free` réel avec son propre quota :
+- `types/database.ts` : `OrgPlan` devient `'free' | 'solo' | 'pme' |
+  'metier'`.
+- Migration `0022_organization_free_plan.sql` : défaut de
+  `organizations.plan` passé de `'solo'` à `'free'`, contrainte `check`
+  étendue. **Backfill ciblé** : seules les orgs à `plan = 'solo'` **sans**
+  `stripe_subscription_id` (le vrai cas de bug : jamais payé, jamais
+  choisi) basculent vers `'free'` — les orgs mises manuellement en
+  PME/Métier par un admin avant Stripe (flux "pilote facturé à la main",
+  toujours supporté) ne sont pas touchées.
+- `lib/plans.ts` : `PLAN_LIMITS.free = 30` (placeholder, 30 ou 50 à
+  trancher définitivement — trivial à changer), `PLAN_LABELS.free =
+  'Gratuit'`. `AI_INDEXING_ALLOWED_PLANS` reste `['pme', 'metier']` —
+  `free` en était déjà exclu, aucun changement nécessaire là.
+- `components/OrgSettingsForm.tsx` : `'free'` ajouté aux cartes Plan,
+  mis en avant quand c'est le plan réel de l'org (plus besoin de
+  condition spéciale pour éviter de mettre "Solo" en avant à tort — avec
+  `free` comme vraie valeur honnête, `plan === p` suffit à nouveau).
+- `app/dashboard/page.tsx` : `UsageCard` passe sur le type `OrgPlan`
+  générique (acceptait avant seulement `'solo' | 'pme' | 'metier'`
+  codé en dur) — le quota "X / 30" s'affiche automatiquement pour un
+  org gratuit via `PLAN_LIMITS`, aucune autre page à toucher
+  (`checkQuota` était déjà générique sur `OrgPlan`).
+
+Testé : `tsc --noEmit` propre, 170 tests au vert (1 nouveau — `checkQuota`
+bloque bien un org `free` à son propre seuil de 30).
+
+**À appliquer en prod** : migration `0022_organization_free_plan.sql`
+(vérifier le backfill sur quelques orgs réelles après coup).
+
+**Rendu visuel pas retouché dans ce passage** ("on vois l'affichage
+après") — les cartes Plan et la landing n'ont pas été repensées pour
+mettre en avant ce nouveau palier gratuit. Direction déjà évoquée pour la
+suite : un flux "Upgrade mon plan" avec sa propre page dédiée plutôt que
+la section actuelle dans Paramètres.
 
 ### 35. Calcul réel de coût/rentabilité par message
 

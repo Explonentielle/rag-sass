@@ -5,7 +5,7 @@
 export type DocumentStatus = 'pending' | 'processing' | 'indexed' | 'error';
 export type OrgRole = 'owner' | 'admin' | 'member';
 export type MessageRole = 'user' | 'assistant';
-export type OrgPlan = 'solo' | 'pme' | 'metier';
+export type OrgPlan = 'free' | 'solo' | 'pme' | 'metier';
 export type OrgOverageMode = 'block' | 'auto_bill';
 export type OverageChargeStatus = 'succeeded' | 'failed';
 export type ChatbotUseCase = 'site_widget' | 'second_cerveau';
