@@ -79,7 +79,7 @@ export default function OrgSettingsForm({
             </span>
           </span>
           <ButtonLink href="/dashboard/plan" variant="secondary" size="sm">
-            {hasStripeCustomer ? 'Gérer mon abonnement' : 'Voir les paliers'}
+            Gérer mon abonnement
           </ButtonLink>
         </div>
       </div>
