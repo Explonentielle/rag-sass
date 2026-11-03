@@ -9,11 +9,7 @@ import DeleteOrgSection from '@/components/DeleteOrgSection';
 import { Badge, Card } from '@/components/ui/Card';
 import { PLAN_LABELS } from '@/lib/plans';
 
-export default async function SettingsPage({
-  searchParams,
-}: {
-  searchParams: { checkout?: string };
-}) {
+export default async function SettingsPage() {
   const org = await getCurrentOrg();
   if (!org) notFound();
 
@@ -22,12 +18,12 @@ export default async function SettingsPage({
     data: { user },
   } = await supabase.auth.getUser();
 
-  // Not part of CurrentOrg (lib/org.ts) on purpose — those billing fields
+  // Not part of CurrentOrg (lib/org.ts) on purpose — these billing fields
   // are only needed on this one page, no reason to widen a type read by
   // every dashboard page for it.
   const { data: billing } = await supabase
     .from('organizations')
-    .select('overage_mode, stripe_customer_id, stripe_subscription_id')
+    .select('overage_mode, stripe_customer_id')
     .eq('id', org.id)
     .single();
 
@@ -44,17 +40,6 @@ export default async function SettingsPage({
         <p className="mt-1 text-sm text-slate-500">Organisation et compte</p>
       </div>
 
-      {searchParams.checkout === 'success' && (
-        <div className="rounded-md border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-800">
-          Abonnement activé. Ça peut prendre quelques secondes pour apparaître ci-dessous.
-        </div>
-      )}
-      {searchParams.checkout === 'cancelled' && (
-        <div className="rounded-md border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
-          Paiement annulé, aucun changement n'a été fait.
-        </div>
-      )}
-
       <section className="space-y-3">
         <h2 className="font-semibold text-slate-900">Organisation</h2>
         {org.role === 'owner' || org.role === 'admin' ? (
@@ -65,7 +50,6 @@ export default async function SettingsPage({
               initialPlan={org.plan}
               initialOverageMode={billing?.overage_mode ?? 'block'}
               hasStripeCustomer={Boolean(billing?.stripe_customer_id)}
-              hasStripeSubscription={Boolean(billing?.stripe_subscription_id)}
             />
           </Card>
         ) : (

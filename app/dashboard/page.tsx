@@ -245,7 +245,7 @@ function UsageCard({
             Plan {PLAN_LABELS[plan]}
           </span>
         </div>
-        <Link href="/dashboard/settings" className="text-xs font-medium text-brand-700 hover:text-brand-800">
+        <Link href="/dashboard/plan" className="text-xs font-medium text-brand-700 hover:text-brand-800">
           Changer de plan →
         </Link>
       </div>

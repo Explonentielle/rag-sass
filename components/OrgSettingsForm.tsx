@@ -3,14 +3,11 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
-import { Button } from '@/components/ui/Button';
+import { Button, ButtonLink } from '@/components/ui/Button';
 import { Input, Label } from '@/components/ui/Card';
-import SubscribeButton from '@/components/SubscribeButton';
-import ManageBillingButton from '@/components/ManageBillingButton';
-import { PLAN_LABELS, PLAN_LIMITS, PLAN_PRICE_LABELS, OVERAGE_MODE_LABELS } from '@/lib/plans';
+import { PLAN_LABELS, PLAN_LIMITS, OVERAGE_MODE_LABELS } from '@/lib/plans';
 import type { OrgPlan, OrgOverageMode } from '@/types/database';
 
-const PLAN_OPTIONS: OrgPlan[] = ['free', 'solo', 'pme', 'metier'];
 const OVERAGE_MODE_OPTIONS: OrgOverageMode[] = ['block', 'auto_bill'];
 
 export default function OrgSettingsForm({
@@ -19,7 +16,6 @@ export default function OrgSettingsForm({
   initialPlan,
   initialOverageMode,
   hasStripeCustomer,
-  hasStripeSubscription,
 }: {
   orgId: string;
   initialName: string;
@@ -28,17 +24,9 @@ export default function OrgSettingsForm({
   // True once the org has paid at least once (stripe_customer_id set by
   // the webhook) — auto_bill needs a saved payment method to charge.
   hasStripeCustomer: boolean;
-  // True once a real Stripe subscription backs this org's plan — past
-  // that point the plan stops being a free self-service toggle (it used
-  // to let any admin set themselves to "Métier" for free).
-  hasStripeSubscription: boolean;
 }) {
   const router = useRouter();
   const [name, setName] = useState(initialName);
-  // Not settable from this form anymore — real plan changes only happen
-  // via SubscribeButton (Stripe Checkout) or the webhook, see the Plan
-  // section below.
-  const plan = initialPlan;
   const [overageMode, setOverageMode] = useState<OrgOverageMode>(initialOverageMode);
   const [saved, setSaved] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -81,54 +69,19 @@ export default function OrgSettingsForm({
 
       <div className="space-y-1.5">
         <Label>Plan</Label>
-        <div className="flex flex-wrap gap-2">
-          {PLAN_OPTIONS.map((p) => {
-            const limit = PLAN_LIMITS[p];
-            const isActive = plan === p;
-            return (
-              <span
-                key={p}
-                className={`flex items-center gap-2 rounded-md border px-3 py-2 text-sm ${
-                  isActive
-                    ? 'border-brand-500 bg-brand-50 text-brand-900'
-                    : 'border-slate-300 text-slate-700'
-                }`}
-              >
-                <span className="font-medium">{PLAN_LABELS[p]}</span>
-                <span className="text-xs text-slate-400">
-                  {limit === null ? 'sur devis' : `${limit} msg/mois`}
-                </span>
-              </span>
-            );
-          })}
+        <div className="flex flex-wrap items-center gap-3">
+          <span className="rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-700">
+            <span className="font-medium">{PLAN_LABELS[initialPlan]}</span>
+            <span className="ml-2 text-xs text-slate-400">
+              {PLAN_LIMITS[initialPlan] === null
+                ? 'sur devis'
+                : `${PLAN_LIMITS[initialPlan]} msg/mois`}
+            </span>
+          </span>
+          <ButtonLink href="/dashboard/plan" variant="secondary" size="sm">
+            Voir les paliers
+          </ButtonLink>
         </div>
-        {hasStripeSubscription ? (
-          <div className="flex flex-wrap items-center gap-3">
-            <ManageBillingButton organizationId={orgId} />
-            <p className="text-xs text-slate-400">
-              Changez de palier, votre moyen de paiement ou annulez depuis ce portail Stripe
-              sécurisé.
-            </p>
-          </div>
-        ) : (
-          <>
-            <div className="flex flex-wrap gap-2">
-              <SubscribeButton
-                organizationId={orgId}
-                plan="solo"
-                label={`Souscrire Solo — ${PLAN_PRICE_LABELS.solo}`}
-              />
-              <SubscribeButton
-                organizationId={orgId}
-                plan="pme"
-                label={`Souscrire PME — ${PLAN_PRICE_LABELS.pme}`}
-              />
-            </div>
-            <p className="text-xs text-slate-400">
-              Palier Métier : sur devis, contactez-nous directement.
-            </p>
-          </>
-        )}
       </div>
 
       <div className="space-y-1.5">

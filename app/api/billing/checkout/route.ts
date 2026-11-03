@@ -53,8 +53,8 @@ export async function POST(request: Request) {
       organizationId,
       customerId: org.stripe_customer_id,
       customerEmail: org.stripe_customer_id ? null : (user.email ?? null),
-      successUrl: `${origin}/dashboard/settings?checkout=success`,
-      cancelUrl: `${origin}/dashboard/settings?checkout=cancelled`,
+      successUrl: `${origin}/dashboard/plan?checkout=success`,
+      cancelUrl: `${origin}/dashboard/plan?checkout=cancelled`,
     });
 
     if (!session.url) {

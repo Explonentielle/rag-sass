@@ -1441,11 +1441,33 @@ bloque bien un org `free` à son propre seuil de 30).
 **À appliquer en prod** : migration `0022_organization_free_plan.sql`
 (vérifier le backfill sur quelques orgs réelles après coup).
 
-**Rendu visuel pas retouché dans ce passage** ("on vois l'affichage
-après") — les cartes Plan et la landing n'ont pas été repensées pour
-mettre en avant ce nouveau palier gratuit. Direction déjà évoquée pour la
-suite : un flux "Upgrade mon plan" avec sa propre page dédiée plutôt que
-la section actuelle dans Paramètres.
+**Rendu visuel revu (2026-11-03)**, après retour direct ("c'est
+horrible" sur les gros boutons "Souscrire" coincés dans les petites
+cartes de Paramètres) : plutôt que de continuer à retoucher la section
+compacte de Paramètres, nouvelle page dédiée **`app/dashboard/plan/page.tsx`**
+(`/dashboard/plan`) — grille des 4 paliers (Gratuit/Solo/PME/Métier) en
+vraies cartes `Card` avec assez d'espace pour nom, quota et action
+(badge "Actuel" sur le palier en cours, `SubscribeButton` sur
+Solo/PME si pas encore abonné, note "sur devis" pour Métier,
+`ManageBillingButton` une seule fois en bas si déjà abonné — pas
+dupliqué par carte).
+
+- `components/OrgSettingsForm.tsx` : la section Plan redevient un simple
+  résumé ("Palier actuel : X · quota") + lien "Voir les paliers" vers la
+  nouvelle page — tout le choix/action en a été retiré, ça allège
+  nettement le formulaire de Paramètres.
+- `app/api/billing/checkout/route.ts` / `app/api/billing/portal/route.ts` :
+  `success_url`/`cancel_url`/`return_url` redirigent maintenant vers
+  `/dashboard/plan` plutôt que `/dashboard/settings` — on revient
+  logiquement là où l'action a été lancée. La bannière de confirmation
+  post-paiement suit le même déplacement.
+- `app/dashboard/page.tsx` : le lien "Changer de plan →" de `UsageCard`
+  pointe maintenant directement vers `/dashboard/plan`.
+
+Testé : `tsc --noEmit` propre, 170 tests au vert (pas de nouveau test —
+uniquement de l'affichage/routage). **Pas encore testé en conditions
+réelles.** La landing (pricing public) n'a toujours pas été retouchée
+pour ce nouveau palier — hors scope de ce passage.
 
 ### 35. Calcul réel de coût/rentabilité par message
 
