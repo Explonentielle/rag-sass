@@ -89,7 +89,7 @@ export default async function DashboardPage() {
       .length,
     errors: allDocuments.filter((d) => d.status === 'error').length,
   };
-  // Only a brand-new org (no chatbot yet) and only once per user — see
+  // Only a brand-new org (no chatbot yet) and only once per user, see
   // docs/roadmap.md's onboarding tour entry. Gating on chatbots.length
   // means existing pilot orgs never see this pop up retroactively, no
   // backfill needed for the user_metadata flag.

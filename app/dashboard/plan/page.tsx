@@ -1,10 +1,11 @@
+import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
 import { getCurrentOrg } from '@/lib/org';
 import SubscribeButton from '@/components/SubscribeButton';
 import ManageBillingButton from '@/components/ManageBillingButton';
 import { Card, Badge } from '@/components/ui/Card';
-import { PLAN_LABELS, PLAN_LIMITS, PLAN_PRICE_LABELS } from '@/lib/plans';
+import { PLAN_LABELS, PLAN_LIMITS, PLAN_PRICE_LABELS, PLAN_FEATURES } from '@/lib/plans';
 import { logQueryError } from '@/lib/supabaseResult';
 import type { OrgPlan } from '@/types/database';
 
@@ -34,12 +35,12 @@ function PlanAction({
     return <p className="text-xs text-slate-400">Changez via "Gérer mon abonnement" ci-dessous.</p>;
   }
   // plan is narrowed to 'solo' | 'pme' here (the two branches above ruled
-  // out 'free'/'metier') — SubscribeButton only handles those two.
+  // out 'free'/'metier'), SubscribeButton only handles those two.
   return (
     <SubscribeButton
       organizationId={organizationId}
       plan={plan}
-      label={`Souscrire — ${PLAN_PRICE_LABELS[plan]}`}
+      label={`Souscrire · ${PLAN_PRICE_LABELS[plan]}`}
     />
   );
 }
@@ -69,7 +70,10 @@ export default async function PlanPage({
   return (
     <div className="max-w-4xl space-y-6">
       <div>
-        <h1 className="text-2xl font-semibold tracking-tight text-slate-900">Mon plan</h1>
+        <Link href="/dashboard/settings" className="text-sm text-slate-500 hover:text-slate-700">
+          ← Paramètres
+        </Link>
+        <h1 className="mt-2 text-2xl font-semibold tracking-tight text-slate-900">Mon plan</h1>
         <p className="mt-1 text-sm text-slate-500">
           Le changement de palier est pris en compte immédiatement.
         </p>
@@ -99,9 +103,17 @@ export default async function PlanPage({
                 <h2 className="font-semibold text-slate-900">{PLAN_LABELS[p]}</h2>
                 {isCurrent && <Badge tone="green">Actuel</Badge>}
               </div>
-              <p className="text-sm text-slate-500">
+              <p className="text-sm font-medium text-slate-700">
                 {limit === null ? 'Sur devis' : `${limit} messages / mois`}
               </p>
+              <ul className="space-y-1.5 text-sm text-slate-500">
+                {PLAN_FEATURES[p].map((f) => (
+                  <li key={f} className="flex gap-2">
+                    <span className="text-brand-600">✓</span>
+                    <span>{f}</span>
+                  </li>
+                ))}
+              </ul>
               <div className="mt-auto pt-1">
                 <PlanAction
                   plan={p}

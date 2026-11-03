@@ -22,7 +22,7 @@ export default function OrgSettingsForm({
   initialPlan: OrgPlan;
   initialOverageMode: OrgOverageMode;
   // True once the org has paid at least once (stripe_customer_id set by
-  // the webhook) — auto_bill needs a saved payment method to charge.
+  // the webhook), auto_bill needs a saved payment method to charge.
   hasStripeCustomer: boolean;
 }) {
   const router = useRouter();
@@ -79,7 +79,7 @@ export default function OrgSettingsForm({
             </span>
           </span>
           <ButtonLink href="/dashboard/plan" variant="secondary" size="sm">
-            Voir les paliers
+            {hasStripeCustomer ? 'Gérer mon abonnement' : 'Voir les paliers'}
           </ButtonLink>
         </div>
       </div>

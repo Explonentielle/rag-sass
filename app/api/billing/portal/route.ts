@@ -19,7 +19,7 @@ export async function POST(request: Request) {
   }
 
   // RLS (organizations_select: is_org_member) rejects this read if the
-  // signed-in user doesn't belong to this org — no extra check needed.
+  // signed-in user doesn't belong to this org, no extra check needed.
   const { data: org, error: orgError } = await supabase
     .from('organizations')
     .select('stripe_customer_id')

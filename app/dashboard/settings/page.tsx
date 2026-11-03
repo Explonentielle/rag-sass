@@ -18,7 +18,7 @@ export default async function SettingsPage() {
     data: { user },
   } = await supabase.auth.getUser();
 
-  // Not part of CurrentOrg (lib/org.ts) on purpose — these billing fields
+  // Not part of CurrentOrg (lib/org.ts) on purpose, these billing fields
   // are only needed on this one page, no reason to widen a type read by
   // every dashboard page for it.
   const { data: billing } = await supabase
