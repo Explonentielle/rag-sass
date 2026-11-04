@@ -63,6 +63,8 @@ fixe — sert de mémoire centralisée plutôt que de planning strict.
 | 54 | Compte | Mini tuto d'onboarding à la première arrivée sur le dashboard | Faible-moyen | ✅ Fait |
 | 55 | Pricing | Changer de palier / gérer son abonnement une fois abonné (portail Stripe) | Faible | ✅ Fait — config portail Stripe à faire côté dashboard |
 | 56 | Pricing | Revoir les montants/quotas des paliers (Solo/PME) | Faible (décision) | Noté, pas tranché — dépend en partie de l'item 35 |
+| 57 | Légal | Pages légales (mentions légales/CGU/confidentialité) | Faible | ✅ Fait (brouillon, `app/legal/[slug]/page.tsx`) — rappel : mettre à jour domaine et email une fois le nom de domaine acheté et le déploiement définitif en place (item 42) |
+| 58 | Méthode | Méthode de travail inspirée de Spec Kit (spec, clarification, plan avant de coder) + `CLAUDE.md` | Faible | ✅ Fait (`CLAUDE.md` créé) : étapes "clarifier" et "analyser" appliquées aux grosses features, outil Spec Kit non installé |
 
 ---
 
@@ -2425,3 +2427,57 @@ aussi bouger ou reste tel quel.
 **Effort** : faible une fois la décision prise (changer des constantes +
 le wording de la landing) — l'effort réel est dans la décision business,
 pas le code.
+
+---
+
+### 57. Pages légales (mentions légales/CGU/confidentialité) — ✅ Fait (brouillon)
+
+**Fait (2026-11-04)** : trois pages rédigées sur `app/legal/[slug]/page.tsx`
+(`/legal/mentions-legales`, `/legal/cgu`, `/legal/confidentialite`), déjà
+liées depuis le footer de la landing. Identité éditeur : Alexandre DE
+BONNIÈRES, entrepreneur individuel (micro-entreprise), SIRET
+820 451 656 00012. Bandeau "pas un avis juridique" affiché sur chaque
+page, à faire relire par un professionnel du droit avant une ouverture
+commerciale à grande échelle.
+
+**Rappel à traiter une fois le déploiement définitif en place** : mettre
+à jour dans ces pages l'URL du service (actuellement
+`rag-sass-seven.vercel.app`, en attendant l'achat du nom de domaine,
+item 42) et l'email de contact (actuellement `adv.dev.france@gmail.com`,
+temporaire, une vraie adresse pro doit le remplacer). Les deux valeurs
+sont des constantes en haut du fichier (`APP_URL`, `CONTACT_EMAIL`), un
+seul endroit à modifier pour chacune.
+
+---
+
+### 58. Méthode de travail inspirée de Spec Kit + `CLAUDE.md` : ✅ Fait
+
+**Contexte (2026-11-04)** : étude de Spec Kit (speckit.org, toolkit open
+source de GitHub pour le "Spec-Driven Development"). Principe : avant de
+laisser un agent IA coder, on passe par des étapes écrites
+(`/constitution`, `/specify`, `/clarify`, `/plan`, `/tasks`, `/analyze`,
+`/implement`), chacune produisant un fichier Markdown qui nourrit la
+suivante.
+
+**Ce qui est repris**, sans installer l'outil (jugé trop lourd pour les
+petits fix) :
+- **Constitution** : création de `CLAUDE.md` à la racine, avec les règles
+  non négociables du projet (secrets, git, actions externes, backlog,
+  rédaction) et les repères techniques.
+- **Clarifier avant de coder** : pour une feature moyenne ou grosse, lister
+  les zones floues et poser les questions avant d'écrire du code. Une
+  décision business non tranchée est notée "à trancher" ici plutôt que
+  devinée (comme pour l'item 56).
+- **Analyser la cohérence** : relire spec, plan et tâches ensemble avant
+  d'implémenter, pour éviter les oublis et le hors-scope.
+- **Cérémonie proportionnée** : un petit fix se code directement. Une
+  nouvelle table, une nouvelle route ou un impact pricing/RGPD/sécurité
+  passent par la méthode complète. La spec et le plan d'une grosse feature
+  peuvent vivre dans la section roadmap de l'item.
+
+**Pas repris** : la CLI `specify` et son arborescence `specs/NNN-feature/`,
+qui ferait doublon avec cette roadmap.
+
+**Piste ouverte** : si les grosses features se multiplient, réévaluer
+l'adoption de Spec Kit, ou de simples commandes slash maison
+(`.claude/commands/`) pour outiller les étapes spec, clarification et plan.

@@ -26,6 +26,7 @@ sous-traitants ultérieurs :
 | **OpenAI** | Génération d'embeddings et de réponses de chat | Contenu des questions/réponses et extraits de documents, envoyés à l'API à chaque requête | Hors UE (US) — OpenAI n'entraîne pas ses modèles sur les données envoyées via l'API par défaut, mais le **transfert** des données hors UE doit être documenté et couvert par les clauses contractuelles types (CCT) d'OpenAI (disponibles dans leur Data Processing Addendum) |
 | **Elasticsearch** | Index de recherche (chunks de texte + vecteurs) | Contenu des documents indexés | Sous contrôle direct — auto-hébergé sur un VPS choisi par Corpus.ai, donc région maîtrisée directement (voir `docs/deployment.md`) |
 | **Vercel** | Hébergement de l'application | Aucune donnée persistée côté Vercel (stateless, les données vivent dans Supabase/ES) — logs d'infra possibles | À vérifier selon la région de déploiement choisie |
+| **Stripe** | Paiement et gestion des abonnements (item 53/55) | Identité du client payeur, moyen de paiement (jamais stocké côté Corpus.ai, géré entièrement par Stripe) | UE/US selon traitement, couvert par les clauses contractuelles types de Stripe |
 
 **À faire avant le premier client pilote réel** :
 - Confirmer/choisir la région Supabase (UE si possible).
