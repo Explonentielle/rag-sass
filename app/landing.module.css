@@ -282,8 +282,9 @@
 
 /* ---------- pricing ---------- */
 .pricing { padding: 64px 0; border-bottom: 1px solid var(--line); }
-.priceGrid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
-@media (max-width: 780px) { .priceGrid { grid-template-columns: 1fr; } }
+.priceGrid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; }
+@media (max-width: 1080px) { .priceGrid { grid-template-columns: repeat(2, 1fr); } }
+@media (max-width: 560px) { .priceGrid { grid-template-columns: 1fr; } }
 .priceCard { background: var(--card); border: 1px solid var(--line); border-radius: 20px; padding: 26px 24px; display: flex; flex-direction: column; box-shadow: var(--shadow); }
 .priceCardFeatured { border: 1.5px solid var(--forest); box-shadow: var(--shadowGlow); position: relative; }
 .priceBadge { position: absolute; top: -12px; left: 22px; background: var(--forest); color: #F3F7F2; font-family: var(--font-label), monospace; font-size: 10.5px; letter-spacing: 0.05em; text-transform: uppercase; padding: 4px 10px; border-radius: 9999px; }

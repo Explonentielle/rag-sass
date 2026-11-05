@@ -11,14 +11,45 @@ import type { OrgPlan, OrgOverageMode } from '@/types/database';
  */
 
 // 'free' (docs/roadmap.md item 34): the real default for any org with no
-// Stripe subscription, deliberately much lower than Solo's 300, so
-// paying for Solo actually buys something. PLACEHOLDER value (30),
-// trivial to change later.
+// Stripe subscription, deliberately much lower than Solo's 400, so
+// paying for Solo actually buys something.
+//
+// Solo/PME recalibrated 2026-11-05 (item 56): a token-budget estimate
+// against gpt-5.6-luna's public pricing ($0.20/1M in, $1.20/1M out) and
+// text-embedding-3-small ($0.02/1M) puts the OpenAI cost of one grounded
+// chat message (query rewrite + embedding + rerank over 15 candidate
+// chunks + final answer) at roughly 0.003€, dominated by rerankChunks
+// sending the full 15-chunk candidate pool to the model. At these
+// quotas that's ~9€/month of OpenAI cost on PME (49€) and under 2€ on
+// Solo (9€), comfortable margin on both. PME's quota/price ratio is
+// deliberately higher than Solo's, not just the same ratio scaled up,
+// since token cost isn't the constraint: it makes PME look like the
+// better deal and nudges Solo orgs to upgrade. This is an estimate
+// from code constants and public pricing, not a measurement off real
+// OpenAI billing (see item 35, still open for that).
 export const PLAN_LIMITS: Record<OrgPlan, number | null> = {
   free: 30,
-  solo: 300,
-  pme: 1500,
+  solo: 400,
+  pme: 3000,
   metier: null, // "sur devis", no fixed quota to compare against
+};
+
+// Entitlement caps (docs/roadmap.md item 56), enforced at creation time
+// only (app/api/chatbots/route.ts, app/api/organizations/[id]/members/
+// route.ts): never retroactively removes an existing chatbot/member if
+// an org's plan changes. null = unlimited.
+export const PLAN_CHATBOT_LIMITS: Record<OrgPlan, number | null> = {
+  free: 1,
+  solo: 1,
+  pme: null,
+  metier: null,
+};
+
+export const PLAN_MEMBER_LIMITS: Record<OrgPlan, number | null> = {
+  free: 1,
+  solo: 1,
+  pme: null,
+  metier: null,
 };
 
 export const PLAN_LABELS: Record<OrgPlan, string> = {

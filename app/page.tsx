@@ -413,11 +413,21 @@ function Catalogue() {
 function Pricing({ isLoggedIn }: { isLoggedIn: boolean }) {
   const plans = [
     {
+      name: 'Gratuit',
+      who: 'Pour tester sans engagement',
+      price: '0€',
+      per: '',
+      included: '30 messages inclus / mois',
+      features: ['1 assistant, idéal pour tester', 'Widget intégrable sur votre site', 'Historique de conversation limité'],
+      cta: 'Commencer gratuitement',
+      featured: false,
+    },
+    {
       name: 'Solo',
       who: 'Indépendant, un seul assistant',
       price: '9€',
       per: '/ mois',
-      included: '300 messages inclus',
+      included: '400 messages inclus',
       features: ['1 assistant, avec ou sans documents', 'Widget intégrable sur votre site', 'Historique de conversation conservé'],
       cta: 'Commencer gratuitement',
       featured: false,
@@ -427,7 +437,7 @@ function Pricing({ isLoggedIn }: { isLoggedIn: boolean }) {
       who: 'Plusieurs assistants, équipe partagée',
       price: '49€',
       per: '/ mois',
-      included: '1 500 messages inclus · +2€ / 100 au-delà',
+      included: '3 000 messages inclus · +2€ / 100 au-delà',
       features: ['Assistants illimités', 'Formats étendus : CSV, Excel, multi-documents', "Membres d'équipe multiples"],
       cta: 'Commencer gratuitement',
       featured: true,
@@ -560,7 +570,7 @@ function Faq() {
     { q: 'Puis-je annuler à tout moment ?', a: 'Oui, sans engagement ni préavis.' },
     {
       q: 'Que se passe-t-il si je dépasse mon quota de messages ?',
-      a: "Le forfait Solo inclut 300 messages/mois, le forfait PME 1 500. Au-delà, la tranche supplémentaire de 100 messages est facturée 2€ plutôt que de couper le service.",
+      a: "Le forfait Gratuit inclut 30 messages/mois, Solo 400, PME 3 000. Au-delà, la tranche supplémentaire de 100 messages est facturée 2€ plutôt que de couper le service (sur Solo et PME).",
     },
     {
       q: "Puis-je changer de cas d'usage après coup ?",

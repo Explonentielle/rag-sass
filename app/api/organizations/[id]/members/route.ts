@@ -2,6 +2,8 @@ import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { getAdminClient } from '@/lib/supabase/admin';
 import { logError } from '@/lib/logger';
+import { PLAN_MEMBER_LIMITS, PLAN_LABELS } from '@/lib/plans';
+import type { OrgPlan } from '@/types/database';
 
 async function requireMembership(supabase: ReturnType<typeof createClient>, orgId: string, userId: string) {
   const { data } = await supabase
@@ -72,6 +74,40 @@ export async function POST(request: Request, { params }: { params: { id: string 
   const email: string | undefined = body?.email?.trim().toLowerCase();
   if (!email) {
     return NextResponse.json({ error: 'email est requis.' }, { status: 400 });
+  }
+
+  // Entitlement cap (docs/roadmap.md item 56): 1 membre (le propriétaire
+  // lui-même) sur free/solo, illimité sur pme/metier.
+  const { data: org, error: orgError } = await supabase
+    .from('organizations')
+    .select('plan')
+    .eq('id', params.id)
+    .single();
+  if (orgError || !org) {
+    return NextResponse.json({ error: 'Organisation introuvable.' }, { status: 404 });
+  }
+  // postgrest-js's type inference for a bare single-column .select('plan')
+  // doesn't narrow to the Row type here (pre-existing gap, see the same
+  // pattern in app/api/chatbots/[id]/route.ts): annotate explicitly.
+  const plan: OrgPlan = org.plan;
+
+  const memberLimit = PLAN_MEMBER_LIMITS[plan];
+  if (memberLimit !== null) {
+    const { count, error: countError } = await supabase
+      .from('users_organizations')
+      .select('user_id', { count: 'exact', head: true })
+      .eq('organization_id', params.id);
+    if (countError) {
+      return NextResponse.json({ error: countError.message }, { status: 400 });
+    }
+    if ((count ?? 0) >= memberLimit) {
+      return NextResponse.json(
+        {
+          error: `Le palier ${PLAN_LABELS[plan]} est limité à ${memberLimit} membre${memberLimit > 1 ? 's' : ''}. Passez à un palier supérieur pour inviter plus de monde.`,
+        },
+        { status: 403 }
+      );
+    }
   }
 
   const admin = getAdminClient();

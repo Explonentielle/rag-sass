@@ -53,7 +53,7 @@ fixe — sert de mémoire centralisée plutôt que de planning strict.
 | 31 | Sécurité | Restriction de domaine + toggle "chatbot public/privé" pour les embeds | Moyen | ✅ Fait — couvre la limite notée à l'item 29 |
 | 32 | RAG | Mode "prompt seul" (chatbot sans document obligatoire) | Faible-moyen | ✅ Fait — même besoin identifié indépendamment côté landing (item 21bis "Assistant sans documents") |
 | 33 | Intégrations | Branchement sur plateformes tierces (calendrier, email) | Élevé | Étape 1 (pattern agentique, outil email) ✅ Fait — étape 2 (MCP) et étape 3 (UI config) restent backlog |
-| 34 | Pricing | Plan gratuit | Moyen | ✅ Fait (palier `free`, 30 msg/mois) — restrictions fonctionnelles par palier pas encore faites |
+| 34 | Pricing | Plan gratuit | Moyen | ✅ Fait (palier `free`, 30 msg/mois, 1 assistant, 1 membre, voir item 56) |
 | 35 | Pricing | Calcul réel de coût/rentabilité par message | Moyen | Item 17 (comptage déjà fait) — bloqué sur le $/token réel du modèle |
 | 36 | Pricing | Comportement du plan Solo à la limite atteinte | Faible (décision) | ✅ Fait — choix par l'org (bloquer / débit automatique), montants placeholders à confirmer avant prod réelle |
 | 37 | Qualité | Résilience du déchiffrement (item 20-C) | Faible | ✅ Fait |
@@ -62,7 +62,7 @@ fixe — sert de mémoire centralisée plutôt que de planning strict.
 | 53 | Pricing | Souscription self-service (Stripe Checkout) depuis l'app | Moyen | ✅ Fait et testé en mode test Stripe |
 | 54 | Compte | Mini tuto d'onboarding à la première arrivée sur le dashboard | Faible-moyen | ✅ Fait |
 | 55 | Pricing | Changer de palier / gérer son abonnement une fois abonné (portail Stripe) | Faible | ✅ Fait — config portail Stripe à faire côté dashboard |
-| 56 | Pricing | Revoir les montants/quotas des paliers (Solo/PME) | Faible (décision) | Noté, pas tranché — dépend en partie de l'item 35 |
+| 56 | Pricing | Revoir les montants/quotas des paliers (Solo/PME) + restrictions fonctionnelles réelles | Faible à moyen | ✅ Fait (2026-11-05) |
 | 57 | Légal | Pages légales (mentions légales/CGU/confidentialité) | Faible | ✅ Fait (brouillon, `app/legal/[slug]/page.tsx`) — rappel : mettre à jour domaine et email une fois le nom de domaine acheté et le déploiement définitif en place (item 42) |
 | 58 | Méthode | Méthode de travail inspirée de Spec Kit (spec, clarification, plan avant de coder) + `CLAUDE.md` | Faible | ✅ Fait (`CLAUDE.md` créé) : étapes "clarifier" et "analyser" appliquées aux grosses features, outil Spec Kit non installé |
 
@@ -1507,6 +1507,10 @@ décision de pricing. Mieux vaut mesurer que deviner.
 **Effort** : moyen — surtout du plomberie (capturer/stocker des champs déjà
 renvoyés par l'API), pas de nouvelle dépendance.
 
+**Note (2026-11-05)** : une estimation par budget de tokens (pas une
+mesure réelle, cet item reste donc ouvert) a servi à calibrer les
+quotas Solo/PME, voir item 56 pour le détail et les hypothèses.
+
 ### 36. Comportement du plan Solo à la limite — ✅ Fait
 
 **Décision (2026-10-30)** : au lieu de trancher nous-même entre blocage
@@ -2399,34 +2403,54 @@ vraiment.
 
 ---
 
-### 56. Revoir les montants/quotas des paliers (Solo/PME) — noté, pas tranché
+### 56. Revoir les montants/quotas des paliers (Solo/PME) : ✅ Fait (2026-11-05)
 
 **Signalé (2026-11-02)**, en testant le changement de palier réel pour la
-première fois : les quotas actuels (Solo 9€ = 300 msg, PME 49€ = 1 500
-msg, voir `lib/plans.ts` `PLAN_LIMITS` et `app/page.tsx` `Pricing()`)
-semblent mal calibrés. Retour direct : le palier PME devrait plutôt
-tourner autour de **2 000 messages**, et inclure **des outils en plus**
-(pas juste plus de quota) pour mieux justifier l'écart avec Solo —
-exact détail des outils à définir.
+première fois : les quotas d'alors (Solo 9€ = 300 msg, PME 49€ = 1 500
+msg) semblaient mal calibrés, et le palier PME ne se différenciait de
+Solo que par le quota, pas par de vraies fonctionnalités en plus.
 
-**Pourquoi pas tranché tout de suite** : un vrai calibrage fiable dépend
-en partie de l'item 35 (coût réel $/message, aujourd'hui pas mesuré) pour
-vérifier que les nouveaux quotas restent rentables, pas juste "plus
-généreux au doigt mouillé". Rien ne bloque pour autant un ajustement
-immédiat des chiffres si l'utilisateur tranche avant d'avoir ce calcul —
-`PLAN_LIMITS`/les prix affichés sur la landing sont de simples constantes
-à modifier (`lib/plans.ts`, `app/page.tsx`), pas une dépendance technique
-dure.
+**Estimation de coût (2026-11-05)**, avant de trancher les chiffres : un
+calcul de coût réel mesuré (item 35, toujours ouvert) demande de
+capturer les tokens réels par appel OpenAI, ce qui n'est pas encore
+instrumenté. En attendant, estimation par budget de tokens à partir des
+constantes du code (`lib/elasticsearch.ts` `CANDIDATE_POOL_SIZE` = 15
+chunks candidats pour `rerankChunks`, `lib/openai.ts`
+`RERANK_MAX_CHUNKS` = 5 chunks dans le contexte final,
+`lib/chunking.ts` `TARGET_TOKENS` = 650 tokens/chunk) et du tarif public
+de `gpt-5.6-luna` (0,20 $/1M tokens en entrée, 1,20 $/1M en sortie,
+d'après plusieurs agrégateurs tiers suite à la baisse de prix de
+2026-07-30, à reconfirmer sur la page de tarification officielle
+OpenAI) + `text-embedding-3-small` (0,02 $/1M, confirmé). Un message
+type (réécriture de requête + embedding + rerank sur 15 chunks +
+réponse finale) consomme environ 14 500 tokens en entrée et 540 en
+sortie, soit ~0,003 €/message. Le poste le plus lourd est `rerankChunks`,
+qui envoie le contenu intégral des 15 chunks candidats au modèle.
 
-**À trancher avant de modifier le code** : quota exact du palier PME
-(2 000 confirmé ou autre chiffre), quels "outils en plus" concrètement
-(parmi les features déjà livrées : indexation IA, CSV/Excel, templates
-illimités... ou quelque chose de nouveau), et si Solo (300 msg/9€) doit
-aussi bouger ou reste tel quel.
+**Décision** : **Solo 9€ = 400 msg/mois**, **PME 49€ = 3 000 msg/mois**
+(`lib/plans.ts` `PLAN_LIMITS`). Le ratio quota/prix de PME est
+volontairement plus généreux que celui de Solo (pas juste le même
+ratio x5 remonté) : comme le coût OpenAI estimé reste sous 2€/mois sur
+Solo et sous 9€/mois sur PME (contre 49€ facturés), la rentabilité
+n'est pas la contrainte à ces niveaux, donc PME peut se permettre de
+paraître la meilleure affaire pour inciter à l'upgrade. Chiffre de coût
+encore estimé (pas mesuré sur la facturation réelle OpenAI, item 35
+reste ouvert pour ça), pas un calcul définitif.
 
-**Effort** : faible une fois la décision prise (changer des constantes +
-le wording de la landing) — l'effort réel est dans la décision business,
-pas le code.
+**"Outils en plus" PME, implémentés réellement** : en vérifiant le code,
+aucun des avantages déjà annoncés pour PME (assistants illimités,
+formats CSV/Excel, membres d'équipe multiples) n'était appliqué
+techniquement, la seule vraie limite de palier enforced restait
+l'indexation IA (item 18, `AI_INDEXING_ALLOWED_PLANS`). Plutôt que de
+garder un décalage marketing/code, deux nouvelles limites réelles
+(`lib/plans.ts` `PLAN_CHATBOT_LIMITS`, `PLAN_MEMBER_LIMITS`) : 1 chatbot
+et 1 membre sur free/solo, illimité sur pme/metier, vérifiées à la
+création (`app/api/chatbots/route.ts`, `app/api/organizations/[id]/
+members/route.ts`), jamais rétroactivement sur un org déjà au-dessus
+(pas de suppression surprise si un palier change).
+
+**Effort** : faible (constantes + deux checks d'entitlement à la
+création, pas de migration).
 
 ---
 

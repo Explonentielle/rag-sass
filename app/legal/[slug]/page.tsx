@@ -124,12 +124,12 @@ function CGU() {
             <tr className="border-b border-slate-100">
               <td className="py-1.5 pr-3">Solo</td>
               <td className="py-1.5 pr-3">9 € / mois</td>
-              <td className="py-1.5">300 messages / mois</td>
+              <td className="py-1.5">400 messages / mois</td>
             </tr>
             <tr className="border-b border-slate-100">
               <td className="py-1.5 pr-3">PME</td>
               <td className="py-1.5 pr-3">49 € / mois</td>
-              <td className="py-1.5">1 500 messages / mois, +2 € par tranche de 100 au-delà</td>
+              <td className="py-1.5">3 000 messages / mois, +2 € par tranche de 100 au-delà</td>
             </tr>
             <tr>
               <td className="py-1.5 pr-3">Métier</td>

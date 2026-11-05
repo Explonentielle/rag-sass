@@ -23,17 +23,17 @@ function fakeSupabaseWithCount(count: number): SupabaseClient<Database> {
 
 describe('checkQuota', () => {
   it('blocks in "block" mode once the plan limit is reached', async () => {
-    const supabase = fakeSupabaseWithCount(300);
+    const supabase = fakeSupabaseWithCount(400);
     const result = await checkQuota(supabase, {
       organizationId: 'org-1',
       plan: 'solo',
       overageMode: 'block',
     });
-    expect(result).toEqual({ blocked: true, messagesThisMonth: 300 });
+    expect(result).toEqual({ blocked: true, messagesThisMonth: 400 });
   });
 
   it('does not block in "block" mode below the plan limit', async () => {
-    const supabase = fakeSupabaseWithCount(299);
+    const supabase = fakeSupabaseWithCount(399);
     const result = await checkQuota(supabase, {
       organizationId: 'org-1',
       plan: 'solo',
