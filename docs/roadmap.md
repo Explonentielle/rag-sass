@@ -2360,6 +2360,34 @@ amène sur `/dashboard/chatbots`) plutôt que du texte seul.
 
 **Effort** : faible-moyen.
 
+**Refonte interactive (2026-11-06)** : suite au retour ci-dessus, le tuto
+déclenché au premier dashboard (`organizationId` fourni) fait maintenant
+réellement les actions au lieu de les décrire, en 6 écrans : Bienvenue,
+Deux usages (inchangés, informatifs), puis Créer son chatbot (formulaire
+intégré, vrai `POST /api/chatbots`), Ajouter un document (upload réel +
+polling de statut, étape facultative), Tester (`ChatWidget` embarqué sur
+le chatbot qui vient d'être créé), Code d'intégration (snippet avec le
+vrai `chatbotId`, lien vers Paramètres/`/dashboard/plan`). Le replay
+(`ReplayOnboardingButton`, sans `organizationId`) garde l'ancienne version
+purement informative à 4 écrans : rejouer un tuto de création alors qu'un
+chatbot existe déjà n'a pas de sens et buterait sur l'entitlement cap
+gratuit/solo (1 chatbot, item 56).
+
+Pas de mention des fonctionnalités réservées à PME (indexation IA...)
+dans les étapes interactives elles-mêmes : tout ce que fait le tuto doit
+marcher sur le palier Gratuit, pour ne pas transformer le premier succès
+de l'utilisateur en mur payant. Une seule mention, en note discrète sur
+le dernier écran, pointant vers `/dashboard/plan`.
+
+Pas de `router.refresh()` pendant le tuto (seulement à la fermeture) :
+en déclencher un dès la création du chatbot aurait fait repasser
+`stats.chatbots` à 1 côté serveur, donc `showOnboarding` à `false`, et
+démonté le composant en plein milieu des étapes suivantes.
+
+Vérifié : `tsc --noEmit` propre, 170 tests au vert (toujours pas de test
+unitaire pour ce composant, même traitement que le reste des formulaires
+du dashboard). Pas encore testé manuellement en conditions réelles.
+
 ---
 
 ### 55. Changer de palier une fois abonné (portail Stripe) — ✅ Fait

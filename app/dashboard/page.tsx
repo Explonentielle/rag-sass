@@ -214,7 +214,7 @@ export default async function DashboardPage() {
         </Card>
       </Link>
 
-      {showOnboarding && <OnboardingTour />}
+      {showOnboarding && <OnboardingTour organizationId={org.id} />}
     </div>
   );
 }
