@@ -13,78 +13,60 @@ import type { DocumentStatus } from '@/types/database';
 
 const POLL_INTERVAL_MS = 2000;
 const POLL_TIMEOUT_MS = 5 * 60 * 1000; // matches the upload route's maxDuration
+const TOTAL_STEPS = 6;
 
-// Recap mode (no organizationId, used by ReplayOnboardingButton once a
-// chatbot already exists): purely informational, same 4 slides regardless
-// of plan. Interactive mode (first-time trigger, see app/dashboard/page.tsx)
-// walks through actually creating the first chatbot instead.
-const RECAP_STEPS = [
-  {
-    icon: ICONS.bolt,
-    title: 'Bienvenue sur Corpus.ai',
-    body: "Transformez vos documents en chatbot IA en quelques clics. Voici les quelques points à connaître pour démarrer.",
-  },
-  {
-    icon: ICONS.chat,
-    title: "Deux façons de l'utiliser",
-    body: "Chatbots : un widget à embarquer sur votre site pour vos visiteurs. Assistant interne : pour vous ou votre équipe, sur vos propres documents, sans diffusion publique.",
-  },
-  {
-    icon: ICONS.document,
-    title: 'Comment démarrer',
-    body: "Créez un chatbot, ajoutez vos documents (PDF, site web...), testez-le directement dans le dashboard, puis copiez le code d'intégration pour l'ajouter à votre site.",
-  },
-  {
-    icon: ICONS.settings,
-    title: 'Paramètres & facturation',
-    body: "Gérez votre équipe, votre palier tarifaire et votre comportement en cas de dépassement de quota depuis Paramètres > Organisation, à tout moment.",
-  },
-];
-
-const INTERACTIVE_TOTAL_STEPS = 6;
+export interface OnboardingChatbot {
+  id: string;
+  name: string;
+}
 
 export default function OnboardingTour({
   organizationId,
+  existingChatbots = [],
   onClose,
 }: {
-  // Présent uniquement au premier déclenchement (0 chatbot), voir
-  // app/dashboard/page.tsx, bascule le tuto en mode interactif. Absent
-  // pour le replay (ReplayOnboardingButton) : à ce stade l'org a déjà un
-  // chatbot, créer "le premier" n'a plus de sens, et retenter l'appel
-  // buterait sur l'entitlement cap gratuit/solo (1 chatbot).
-  organizationId?: string;
+  organizationId: string;
+  // Chatbots 'site_widget' déjà existants dans l'org (docs/roadmap.md item
+  // 54) : vide au tout premier déclenchement (app/dashboard/page.tsx,
+  // stats.chatbots === 0), rempli au replay (ReplayOnboardingButton,
+  // app/dashboard/docs/page.tsx). L'étape "Créer" propose alors de
+  // continuer avec l'un d'eux plutôt que d'en créer un nouveau : recréer
+  // buterait sur l'entitlement cap gratuit/solo (1 chatbot, item 56), et
+  // la démo reste réelle de toute façon.
+  existingChatbots?: OnboardingChatbot[];
   onClose?: () => void;
 }) {
   const router = useRouter();
   const [open, setOpen] = useState(true);
   const [step, setStep] = useState(0);
-  const interactive = !!organizationId;
 
-  // Étape "créer" (interactive uniquement)
+  // Étape "créer / choisir"
   const [name, setName] = useState('');
   const [creating, setCreating] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
   const [chatbotId, setChatbotId] = useState<string | null>(null);
   const [chatbotName, setChatbotName] = useState('');
+  const [selectedExistingId, setSelectedExistingId] = useState(existingChatbots[0]?.id ?? '');
 
-  // Étape "document" (interactive uniquement)
+  // Étape "document"
   const inputRef = useRef<HTMLInputElement>(null);
   const [docFilename, setDocFilename] = useState('');
   const [docStatus, setDocStatus] = useState<'idle' | 'uploading' | DocumentStatus>('idle');
   const [docError, setDocError] = useState<string | null>(null);
 
-  const totalSteps = interactive ? INTERACTIVE_TOTAL_STEPS : RECAP_STEPS.length;
-  const isLast = step === totalSteps - 1;
-  // Tant que le chatbot n'est pas encore créé, "Suivant" n'a pas de sens :
-  // le formulaire de l'étape fait lui-même avancer au succès.
-  const isCreatePending = interactive && step === 2 && !chatbotId;
+  const isLast = step === TOTAL_STEPS - 1;
+  // Tant qu'aucun chatbot n'est créé/choisi, "Suivant" n'a pas de sens :
+  // le formulaire ou le sélecteur de l'étape fait lui-même avancer au
+  // succès.
+  const isCreatePending = step === 2 && !chatbotId;
 
   async function dismiss() {
     setOpen(false);
     onClose?.();
-    // Pas de router.refresh() pendant le tuto (voir handleCreate) : seulement
-    // ici, à la fermeture, pour que le dashboard reflète le chatbot/document
-    // créés sans risquer de démonter le tuto en cours de route.
+    // Pas de router.refresh() pendant le tuto (voir handleCreate) :
+    // seulement ici, à la fermeture, pour que le dashboard reflète le
+    // chatbot/document créés sans risquer de démonter le tuto en cours de
+    // route.
     router.refresh();
     const supabase = createClient();
     await supabase.auth.updateUser({ data: { onboarding_dismissed: true } });
@@ -92,7 +74,7 @@ export default function OnboardingTour({
 
   async function handleCreate(e: React.FormEvent) {
     e.preventDefault();
-    if (!name.trim() || !organizationId) return;
+    if (!name.trim()) return;
     setCreating(true);
     setCreateError(null);
 
@@ -113,9 +95,18 @@ export default function OnboardingTour({
     setChatbotId(body.id);
     setChatbotName(name.trim());
     // Pas de router.refresh() ici : le dashboard derrière la modale montre
-    // encore 0 chatbot le temps du tuto, ce qui est sans conséquence (il
-    // est masqué par l'overlay), et évite que showOnboarding repasse à
-    // false et démonte ce composant en plein milieu de l'étape suivante.
+    // encore l'ancien état le temps du tuto, ce qui est sans conséquence
+    // (masqué par l'overlay), et évite que le composant se démonte en
+    // plein milieu de l'étape suivante.
+    setStep(step + 1);
+  }
+
+  function handlePickExisting() {
+    const picked =
+      existingChatbots.find((c) => c.id === selectedExistingId) ?? existingChatbots[0];
+    if (!picked) return;
+    setChatbotId(picked.id);
+    setChatbotName(picked.name);
     setStep(step + 1);
   }
 
@@ -168,31 +159,55 @@ export default function OnboardingTour({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4">
       <Card className="w-full max-w-md p-6">
-        {!interactive && <RecapStepContent step={step} />}
-
-        {interactive && step === 0 && (
+        {step === 0 && (
           <InfoStep icon={ICONS.bolt} title="Bienvenue sur Corpus.ai">
-            Transformez vos documents en chatbot IA en quelques clics. On va créer votre premier
-            chatbot ensemble, ça prend deux minutes.
+            Transformez vos documents en chatbot IA en quelques clics. Voici comment un chatbot se
+            crée, se configure et s'intègre sur votre site, en quelques minutes.
           </InfoStep>
         )}
 
-        {interactive && step === 1 && (
+        {step === 1 && (
           <InfoStep icon={ICONS.chat} title="Deux façons de l'utiliser">
             Chatbots : un widget à embarquer sur votre site pour vos visiteurs. Assistant interne :
             pour vous ou votre équipe, sur vos propres documents, sans diffusion publique. On
-            démarre avec un chatbot classique, le plus courant.
+            continue avec un chatbot classique, le plus courant.
           </InfoStep>
         )}
 
-        {interactive && step === 2 && (
+        {step === 2 && (
           <div>
             <IconBadge spacing="mb-4">{ICONS.chat}</IconBadge>
-            <h2 className="text-lg font-semibold text-slate-900">Créez votre premier chatbot</h2>
+            <h2 className="text-lg font-semibold text-slate-900">
+              {chatbotId
+                ? 'Chatbot prêt'
+                : existingChatbots.length > 0
+                  ? 'Choisissez un chatbot'
+                  : 'Créez votre premier chatbot'}
+            </h2>
             {chatbotId ? (
               <p className="mt-2 text-sm leading-relaxed text-slate-600">
-                ✅ « {chatbotName} » est créé. Passons à la suite.
+                ✅ « {chatbotName} » est prêt. Passons à la suite.
               </p>
+            ) : existingChatbots.length > 0 ? (
+              <div className="mt-4 space-y-3">
+                <p className="text-sm leading-relaxed text-slate-600">
+                  On continue la démo avec l'un de vos chatbots existants :
+                </p>
+                <select
+                  value={selectedExistingId}
+                  onChange={(e) => setSelectedExistingId(e.target.value)}
+                  className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
+                >
+                  {existingChatbots.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.name}
+                    </option>
+                  ))}
+                </select>
+                <Button type="button" size="sm" onClick={handlePickExisting}>
+                  Continuer
+                </Button>
+              </div>
             ) : (
               <form onSubmit={handleCreate} className="mt-4 space-y-3">
                 <div className="space-y-1.5">
@@ -215,7 +230,7 @@ export default function OnboardingTour({
           </div>
         )}
 
-        {interactive && step === 3 && (
+        {step === 3 && (
           <div>
             <IconBadge spacing="mb-4">{ICONS.document}</IconBadge>
             <h2 className="text-lg font-semibold text-slate-900">Ajoutez un document</h2>
@@ -256,7 +271,7 @@ export default function OnboardingTour({
           </div>
         )}
 
-        {interactive && step === 4 && chatbotId && (
+        {step === 4 && chatbotId && (
           <div>
             <IconBadge spacing="mb-4">{ICONS.chat}</IconBadge>
             <h2 className="text-lg font-semibold text-slate-900">Testez votre chatbot</h2>
@@ -269,7 +284,7 @@ export default function OnboardingTour({
           </div>
         )}
 
-        {interactive && step === 5 && chatbotId && (
+        {step === 5 && chatbotId && (
           <div>
             <IconBadge spacing="mb-4">{ICONS.globe}</IconBadge>
             <h2 className="text-lg font-semibold text-slate-900">Code d'intégration</h2>
@@ -298,7 +313,7 @@ export default function OnboardingTour({
         )}
 
         <div className="mt-6 flex items-center justify-center gap-1.5">
-          {Array.from({ length: totalSteps }).map((_, i) => (
+          {Array.from({ length: TOTAL_STEPS }).map((_, i) => (
             <span
               key={i}
               className={`h-1.5 rounded-full transition-all ${
@@ -350,14 +365,5 @@ function InfoStep({
       <h2 className="text-lg font-semibold text-slate-900">{title}</h2>
       <p className="mt-2 text-sm leading-relaxed text-slate-600">{children}</p>
     </div>
-  );
-}
-
-function RecapStepContent({ step }: { step: number }) {
-  const current = RECAP_STEPS[step];
-  return (
-    <InfoStep icon={current.icon} title={current.title}>
-      {current.body}
-    </InfoStep>
   );
 }

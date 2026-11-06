@@ -1,8 +1,30 @@
+import { createClient } from '@/lib/supabase/server';
+import { getCurrentOrg } from '@/lib/org';
+import { logQueryError } from '@/lib/supabaseResult';
 import { Card } from '@/components/ui/Card';
 import { Icon, IconBadge, ICONS } from '@/components/icons';
 import ReplayOnboardingButton from '@/components/ReplayOnboardingButton';
 
-export default function DocsPage() {
+export default async function DocsPage() {
+  const org = await getCurrentOrg();
+
+  // Pour le replay du tuto (docs/roadmap.md item 54) : seuls les chatbots
+  // 'site_widget' conviennent (l'étape finale montre un code d'intégration
+  // public, absent des assistants internes). org peut être null si cette
+  // page est atteinte directement sans organisation encore créée.
+  let existingChatbots: { id: string; name: string }[] = [];
+  if (org) {
+    const supabase = createClient();
+    const { data, error } = await supabase
+      .from('chatbots')
+      .select('id, name')
+      .eq('organization_id', org.id)
+      .eq('use_case', 'site_widget')
+      .order('created_at', { ascending: false });
+    existingChatbots =
+      logQueryError('docs_page.chatbots_failed', { organizationId: org.id }, data, error) ?? [];
+  }
+
   return (
     <div className="max-w-3xl space-y-10">
       <div className="flex flex-wrap items-start justify-between gap-3">
@@ -13,7 +35,7 @@ export default function DocsPage() {
             question sur comment brancher ou déployer un chatbot.
           </p>
         </div>
-        <ReplayOnboardingButton />
+        {org && <ReplayOnboardingButton organizationId={org.id} existingChatbots={existingChatbots} />}
       </div>
 
       <section className="space-y-3">

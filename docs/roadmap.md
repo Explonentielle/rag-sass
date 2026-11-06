@@ -2388,6 +2388,23 @@ Vérifié : `tsc --noEmit` propre, 170 tests au vert (toujours pas de test
 unitaire pour ce composant, même traitement que le reste des formulaires
 du dashboard). Pas encore testé manuellement en conditions réelles.
 
+**Replay aussi interactif (2026-11-06)** : le bouton "Revoir la
+présentation" (`/dashboard/docs`) lançait encore l'ancienne version
+purement informative à 4 écrans. Remplacé par le même tuto interactif
+que le premier déclenchement, avec une différence à l'étape "Créer" :
+`app/dashboard/docs/page.tsx` passe la liste des chatbots `site_widget`
+déjà existants de l'org (`existingChatbots`), et si elle n'est pas vide,
+l'étape propose de continuer la démo avec l'un d'eux (sélecteur + bouton
+"Continuer", pas d'appel API) plutôt que d'en créer un nouveau, ce qui
+buterait sur l'entitlement cap gratuit/solo (1 chatbot, item 56). Filtré
+sur `use_case = 'site_widget'` : l'étape finale montre un code
+d'intégration public, qui n'a pas de sens pour un assistant interne. Le
+mode "4 écrans informatifs sans organisationId" a été supprimé du
+composant, il n'a plus d'appelant.
+
+Vérifié à nouveau : `tsc --noEmit`, 170 tests, et `npm run build` (build
+de production complet) tous propres. Pas encore testé manuellement.
+
 ---
 
 ### 55. Changer de palier une fois abonné (portail Stripe) — ✅ Fait

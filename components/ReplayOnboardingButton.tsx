@@ -2,9 +2,15 @@
 
 import { useState } from 'react';
 import { Button } from '@/components/ui/Button';
-import OnboardingTour from '@/components/OnboardingTour';
+import OnboardingTour, { type OnboardingChatbot } from '@/components/OnboardingTour';
 
-export default function ReplayOnboardingButton() {
+export default function ReplayOnboardingButton({
+  organizationId,
+  existingChatbots,
+}: {
+  organizationId: string;
+  existingChatbots: OnboardingChatbot[];
+}) {
   const [show, setShow] = useState(false);
 
   return (
@@ -12,7 +18,13 @@ export default function ReplayOnboardingButton() {
       <Button type="button" variant="secondary" size="sm" onClick={() => setShow(true)}>
         Revoir la présentation
       </Button>
-      {show && <OnboardingTour onClose={() => setShow(false)} />}
+      {show && (
+        <OnboardingTour
+          organizationId={organizationId}
+          existingChatbots={existingChatbots}
+          onClose={() => setShow(false)}
+        />
+      )}
     </>
   );
 }
