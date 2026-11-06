@@ -121,7 +121,7 @@ export default function SystemPromptEditor({
         )}
       </div>
       <p className="-mt-1 text-xs text-slate-400">
-        Appliquer un template copie son contenu ici — modifier le template plus tard ne mettra pas
+        Appliquer un template copie son contenu ici, modifier le template plus tard ne mettra pas
         à jour ce chatbot.
       </p>
 
@@ -151,7 +151,7 @@ export default function SystemPromptEditor({
           </span>
           <span className="block text-xs text-slate-400">
             Décoché, il répond uniquement à partir du prompt ci-dessus (aucune recherche dans des
-            documents) — utile pour un chatbot simple dont toutes les infos tiennent dans le prompt.
+            documents), utile pour un chatbot simple dont toutes les infos tiennent dans le prompt.
           </span>
         </span>
       </label>

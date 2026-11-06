@@ -123,7 +123,7 @@ export default function CreateChatbotForm({
                 Ce chatbot se base sur des documents à uploader
               </span>
               <span className="block text-xs text-slate-400">
-                Décocher si vous n'avez pas de documents — le chatbot répondra uniquement à partir
+                Décocher si vous n'avez pas de documents : le chatbot répondra uniquement à partir
                 du prompt ci-dessus (utilisez le template "Assistant simple (sans documents)" pour
                 y écrire directement vos infos/FAQ).
               </span>

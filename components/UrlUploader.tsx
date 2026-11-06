@@ -141,7 +141,7 @@ export default function UrlUploader({ chatbotId }: { chatbotId: string }) {
     setUrl('');
     router.refresh();
     if (failures.length > 0) {
-      setError(`${failures.length} page(s) non ajoutée(s) — ${failures.join(' · ')}`);
+      setError(`${failures.length} page(s) non ajoutée(s) : ${failures.join(' · ')}`);
     }
   }
 

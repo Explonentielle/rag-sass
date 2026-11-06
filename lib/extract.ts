@@ -345,7 +345,7 @@ async function fetchPublicHtml(rawUrl: string): Promise<{ html: string; url: URL
   const contentType = response.headers.get('content-type') || '';
   if (!contentType.includes('text/html')) {
     throw new UnsupportedDocumentError(
-      "Cette URL ne renvoie pas une page web (HTML) — seules les pages web sont supportées pour l'instant."
+      "Cette URL ne renvoie pas une page web (HTML), seules les pages web sont supportées pour l'instant."
     );
   }
   return { html: await readBoundedText(response), url };

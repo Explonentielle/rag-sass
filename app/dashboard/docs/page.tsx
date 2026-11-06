@@ -61,9 +61,9 @@ export default async function DocsPage() {
             <p className="mt-3 text-sm leading-relaxed text-slate-600">
               Affiche une bulle en bas à droite qui s'ouvre sur le chat au clic. Le script crée
               lui-même son iframe (pointant vers <code className="rounded bg-slate-100 px-1 py-0.5 text-xs">/embed/[chatbotId]?widget=1</code>) et la
-              redimensionne selon qu'elle est ouverte ou fermée — rien d'autre à écrire côté client.
+              redimensionne selon qu'elle est ouverte ou fermée, rien d'autre à écrire côté client.
               <code className="rounded bg-slate-100 px-1 py-0.5 text-xs">data-primary-color</code> (optionnel) : couleur hex appliquée au
-              bouton bulle, au bouton d'envoi et aux bulles de message du visiteur — pseudo marque
+              bouton bulle, au bouton d'envoi et aux bulles de message du visiteur, pseudo marque
               blanche pour matcher la charte du site client.
             </p>
           </div>
@@ -84,7 +84,7 @@ export default async function DocsPage() {
 ></iframe>`}
             </pre>
             <p className="mt-3 text-sm leading-relaxed text-slate-600">
-              Cette page (<code className="rounded bg-slate-100 px-1 py-0.5 text-xs">/embed/[chatbotId]</code> sans <code className="rounded bg-slate-100 px-1 py-0.5 text-xs">?widget=1</code>) n'a aucun chrome — elle
+              Cette page (<code className="rounded bg-slate-100 px-1 py-0.5 text-xs">/embed/[chatbotId]</code> sans <code className="rounded bg-slate-100 px-1 py-0.5 text-xs">?widget=1</code>) n'a aucun chrome : elle
               remplit exactement le cadre de l'iframe telle que dimensionnée par le client.
             </p>
           </div>
@@ -131,13 +131,13 @@ export default async function DocsPage() {
             </li>
           </ul>
           <p className="mt-3 text-sm text-slate-600">
-            Les deux sont opt-in (désactivés par défaut) — un chatbot existant reste accessible comme
+            Les deux sont opt-in (désactivés par défaut), un chatbot existant reste accessible comme
             avant tant que son propriétaire n'active pas la restriction.
           </p>
         </Card>
         <p className="text-sm text-emerald-700">
           <strong>Rate limiting : fait.</strong> 20 req/min par (chatbot, IP), blacklist automatique
-          24h en cas d'abus soutenu — voir <code className="rounded bg-slate-100 px-1 py-0.5 text-xs">lib/rateLimit.ts</code>.
+          24h en cas d'abus soutenu, voir <code className="rounded bg-slate-100 px-1 py-0.5 text-xs">lib/rateLimit.ts</code>.
           Contrôle *combien* d'accès, orthogonal aux deux points ci-dessus qui contrôlent *qui* accède.
         </p>
       </section>

@@ -133,7 +133,7 @@ export default async function ChatbotPage({ params }: { params: { id: string } }
         {!chatbot.use_documents && (
           <p className="text-xs text-amber-600">
             Ce chatbot répond uniquement à partir de son prompt (mode "sans documents" activé
-            ci-dessus) — les documents ajoutés ici ne seront pas utilisés tant que ce mode est actif.
+            ci-dessus) : les documents ajoutés ici ne seront pas utilisés tant que ce mode est actif.
           </p>
         )}
 

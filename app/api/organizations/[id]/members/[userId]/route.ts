@@ -141,7 +141,7 @@ export async function DELETE(
       return NextResponse.json(
         {
           error: isSelf
-            ? "Vous êtes le dernier propriétaire — attribuez le rôle à quelqu'un d'autre avant de quitter, ou supprimez l'organisation."
+            ? "Vous êtes le dernier propriétaire, attribuez le rôle à quelqu'un d'autre avant de quitter, ou supprimez l'organisation."
             : "Impossible : c'est le dernier propriétaire de l'organisation.",
         },
         { status: 409 }

@@ -32,7 +32,7 @@ export default function DashboardError({
         </IconBadge>
         <h1 className="text-lg font-semibold text-slate-900">Une erreur s'est produite</h1>
         <p className="mt-2 text-sm text-slate-500">
-          Cette page n'a pas pu s'afficher correctement. Réessayez — si le problème persiste,
+          Cette page n'a pas pu s'afficher correctement. Réessayez, et si le problème persiste,
           contactez le support avec la référence ci-dessous.
         </p>
         {error.digest && (

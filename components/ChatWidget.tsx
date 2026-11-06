@@ -684,7 +684,7 @@ export default function ChatWidget({
 
               {m.truncated && (
                 <p className="mt-1 text-xs text-amber-600">
-                  ⚠ Réponse tronquée (limite de longueur atteinte) — reformulez pour une réponse
+                  ⚠ Réponse tronquée (limite de longueur atteinte), reformulez pour une réponse
                   plus courte si besoin.
                 </p>
               )}
