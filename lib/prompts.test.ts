@@ -115,4 +115,33 @@ describe('buildSystemPrompt', () => {
     const prompt = buildSystemPrompt({ systemPromptTemplate: template, contextChunks: [] });
     expect(prompt).not.toContain('outil');
   });
+
+  // Même bug, même remède que les tests toolsNote ci-dessus : sans ce
+  // filesNote, un visiteur demandant "as-tu reçu mon fichier ?" se faisait
+  // répondre à partir du RAG (qui ne sait rien d'un fichier envoyé via le
+  // widget) au lieu que le modèle lise son propre historique de
+  // conversation, où le message "Fichier joint : ..." se trouve déjà.
+  it('appends filesNote after the grounding instruction when documents are used', () => {
+    const prompt = buildSystemPrompt({
+      systemPromptTemplate: template,
+      contextChunks: [],
+      filesNote: 'Un message "Fichier joint : X" signifie que X a bien été reçu.',
+    });
+
+    expect(prompt).toContain('UNIQUE source de vérité');
+    expect(prompt).toContain('Fichier joint : X');
+    expect(prompt.indexOf('UNIQUE source de vérité')).toBeLessThan(prompt.indexOf('Fichier joint : X'));
+  });
+
+  it('appends both toolsNote and filesNote together when both are provided', () => {
+    const prompt = buildSystemPrompt({
+      systemPromptTemplate: template,
+      contextChunks: [],
+      toolsNote: 'Tu peux aussi envoyer un email.',
+      filesNote: 'Un message "Fichier joint : X" signifie que X a bien été reçu.',
+    });
+
+    expect(prompt).toContain('Tu peux aussi envoyer un email.');
+    expect(prompt).toContain('Fichier joint : X');
+  });
 });

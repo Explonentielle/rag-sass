@@ -1121,9 +1121,33 @@ haut).
 
 Testé : `tsc --noEmit` propre, 176 tests au vert (6 nouveaux pour
 `extractContractClauses`), `npm run build` propre (routes `/dashboard/
-contrats` et `/dashboard/contrats/[id]` générées). **Pas encore testé en
-conditions réelles** (upload d'un vrai contrat, vérification manuelle du
-résumé produit).
+contrats` et `/dashboard/contrats/[id]` générées). **Testé en conditions
+réelles (2026-11-09)** : upload d'un vrai contrat (conditions de vente
+EGYPT NILE CRUISES), résumé produit jugé correct par l'utilisateur.
+Affinage suite au test : résumé affiché en accordéon repliable (un bloc
+fixe de 9 champs en entier était trop lourd visuellement) et titres de
+carte tronqués proprement au lieu de déborder.
+
+**Correctif de sécurité découvert en marge (2026-11-09)** : en expliquant
+pourquoi ce chatbot n'est pas embarquable, question posée par
+l'utilisateur, constat que `chatbots.is_public` vaut `true` par défaut au
+niveau colonne (migration 0007, pensé pour `site_widget`). Ni la création
+d'un `second_cerveau` (item 52) ni celle d'un `contract_analyzer`
+ci-dessus ne le mettaient explicitement à `false` : tout chatbot interne
+créé avant ce correctif était donc joignable via l'endpoint anonyme
+`/api/public-chat` par quiconque connaissait (ou devinait) son id, alors
+même que son interface ne propose jamais de bouton pour le rendre public.
+Corrigé à trois niveaux, pas seulement côté front comme demandé par
+l'utilisateur : `lib/publicChatAccess.ts` `getAccessibleChatbot` (le seul
+point de passage de tous les endpoints anonymes) rejette désormais tout
+`use_case` autre que `site_widget`, indépendamment de `is_public` ;
+`app/api/chatbots/route.ts` fixe `is_public` explicitement à la création
+au lieu de compter sur le défaut de colonne ; `app/api/chatbots/[id]/route.ts`
+refuse un `PATCH` qui tenterait de passer un chatbot interne en public.
+Migration `0024_private_internal_chatbots.sql` : bascule à `false` les
+lignes déjà existantes concernées. Testé : `tsc --noEmit` propre, 181
+tests au vert (5 nouveaux pour `getAccessibleChatbot`), `npm run build`
+propre.
 
 ### 24. Digitaliseur de paperasse
 
@@ -2118,6 +2142,36 @@ migrations 0014 à 0017, activer l'option, envoyer un fichier depuis le widget
 télécharger, vérifier la pièce jointe de l'email quand le visiteur demande à
 être recontacté, et vérifier que la suppression de la conversation retire bien
 l'objet de Storage.
+
+**Bug signalé en prod (2026-11-09)** : un visiteur de MonAcompagnateur a
+envoyé une capture d'écran puis demandé "tu as reçu mon document ?", le
+bot a répondu qu'il ne voyait aucun document, en décrivant à la place le
+processus d'upload du formulaire de contact du site (contenu indexé sans
+rapport avec le widget). Le fichier était pourtant bien enregistré et
+visible dans le dashboard.
+
+**Cause** : même angle mort que celui corrigé pour l'outil email (item
+33) : l'instruction de cadrage RAG ("N'utilise aucune connaissance
+externe à ces extraits") n'avait pas de dérogation pour le message
+"Fichier joint : nom" que `storeVisitorFile` écrit pourtant bien dans
+l'historique (la ligne "le contexte du LLM suit le mécanisme de
+conversation existant" plus haut était vraie pour le stockage, pas pour
+l'instruction donnée au modèle sur comment l'interpréter). Sans
+dérogation, le modèle traite la question comme n'importe quelle question
+cadrée : il cherche la réponse dans les extraits RAG récupérés plutôt que
+dans sa propre conversation, et peut se raccrocher à du contenu indexé
+sans rapport.
+
+**Corrigé** : `lib/conversationFiles.ts` exporte `VISITOR_FILE_PROMPT_NOTE`
+(même mécanisme que `NOTIFY_OWNER_PROMPT_NOTE`), passé à
+`buildSystemPrompt` (nouveau paramètre `filesNote`, `lib/prompts.ts`)
+depuis `app/api/public-chat/route.ts` quand `allow_visitor_uploads` est
+actif. Explique au modèle que "Fichier joint : nom" dans l'historique est
+un fait de la conversation (pas de la connaissance externe interdite), à
+confirmer par son nom exact sans jamais prétendre lire son contenu.
+Testé : `tsc --noEmit` propre, 183 tests au vert (2 nouveaux pour
+`filesNote`), `npm run build` propre. Pas encore revérifié en conditions
+réelles sur MonAcompagnateur.
 
 **Effort** : moyen-élevé (nouvelle table + bucket + route publique + UI widget
 + dashboard + pièce jointe email).

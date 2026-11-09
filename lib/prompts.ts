@@ -104,27 +104,31 @@ export function getPromptTemplate(id: string): PromptTemplate | undefined {
  * instruction would make the model refuse every question, since there are
  * never any chunks to ground it in.
  *
- * `toolsNote`, when given, is appended last regardless of `useDocuments`
- * (docs/roadmap.md item 33). Found the hard way: the "N'utilise aucune
- * connaissance externe..." instruction below (and every template's own
- * "réponds STRICTEMENT à partir des documents") reads to the model as
- * "never do anything beyond answering from documents" — without an
+ * `toolsNote`/`filesNote`, when given, are appended last regardless of
+ * `useDocuments` (docs/roadmap.md items 33 and 48). Found the hard way: the
+ * "N'utilise aucune connaissance externe..." instruction below (and every
+ * template's own "réponds STRICTEMENT à partir des documents") reads to the
+ * model as "never do anything beyond answering from documents" — without an
  * explicit carve-out, a chatbot with a tool enabled (e.g. send_follow_up_
  * email) just refuses to call it and apologizes instead, even though the
- * tool is technically available via the API's `tools` param. The note
- * has to say outright that using an offered tool isn't "external
- * knowledge" the grounding rule forbids.
+ * tool is technically available via the API's `tools` param; the same
+ * blind spot made a chatbot deny receiving a visitor-sent file that was
+ * sitting right there in its own conversation history. Each note has to say
+ * outright that the thing it describes isn't "external knowledge" the
+ * grounding rule forbids.
  */
 export function buildSystemPrompt(params: {
   systemPromptTemplate: string;
   contextChunks: { content: string; document_filename: string }[];
   useDocuments?: boolean;
   toolsNote?: string;
+  filesNote?: string;
 }): string {
-  const { systemPromptTemplate, contextChunks, useDocuments = true, toolsNote } = params;
+  const { systemPromptTemplate, contextChunks, useDocuments = true, toolsNote, filesNote } = params;
+  const notes = [toolsNote, filesNote].filter(Boolean).join('\n\n');
 
   if (!useDocuments) {
-    return toolsNote ? `${systemPromptTemplate}\n\n${toolsNote}` : systemPromptTemplate;
+    return notes ? `${systemPromptTemplate}\n\n${notes}` : systemPromptTemplate;
   }
 
   const context = contextChunks.length
@@ -143,5 +147,5 @@ ${context}
 
 N'utilise aucune connaissance externe à ces extraits pour répondre aux questions. Si la réponse n'y figure pas, dis-le clairement.`;
 
-  return toolsNote ? `${base}\n\n${toolsNote}` : base;
+  return notes ? `${base}\n\n${notes}` : base;
 }

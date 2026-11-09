@@ -7,7 +7,11 @@ import { logInfo, logWarn, logError } from '@/lib/logger';
 import { checkPublicChatRateLimit, getClientIp } from '@/lib/rateLimit';
 import { checkQuota } from '@/lib/usage';
 import { getAccessibleChatbot, isValidVisitorId } from '@/lib/publicChatAccess';
-import { loadConversationAttachments, removeConversationFiles } from '@/lib/conversationFiles';
+import {
+  loadConversationAttachments,
+  removeConversationFiles,
+  VISITOR_FILE_PROMPT_NOTE,
+} from '@/lib/conversationFiles';
 import {
   createConversation,
   listConversations,
@@ -236,6 +240,7 @@ export async function POST(request: Request) {
           contextChunks: chunks,
           useDocuments: chatbot.use_documents,
           toolsNote: notifyEmail ? NOTIFY_OWNER_PROMPT_NOTE : undefined,
+          filesNote: chatbot.allow_visitor_uploads ? VISITOR_FILE_PROMPT_NOTE : undefined,
         });
 
         controller.enqueue(encoder.encode(sseEvent('status', { step: 'writing' })));

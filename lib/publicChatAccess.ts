@@ -49,7 +49,7 @@ export async function getAccessibleChatbot(
   const { data: chatbot, error } = await admin
     .from('chatbots')
     .select(
-      'id, organization_id, system_prompt_template, is_public, allowed_origins, use_documents, allow_email_tool, notification_email, allow_visitor_uploads, organizations!inner(plan, overage_mode)'
+      'id, organization_id, system_prompt_template, is_public, allowed_origins, use_documents, use_case, allow_email_tool, notification_email, allow_visitor_uploads, organizations!inner(plan, overage_mode)'
     )
     .eq('id', chatbotId)
     .single();
@@ -62,6 +62,14 @@ export async function getAccessibleChatbot(
     logError('public_chat_access.query_failed', { chatbotId, error: error.message, code: error.code });
   }
   if (error || !chatbot) return { ok: false, reason: 'not_found' };
+  // Only a 'site_widget' chatbot is ever reachable anonymously — checked
+  // here (the one chokepoint shared by every anonymous endpoint) rather
+  // than relying on `is_public` alone: 'second_cerveau' and
+  // 'contract_analyzer' chatbots are meant to stay internal regardless of
+  // what `is_public`/`allowed_origins` happen to hold (their dashboard UI
+  // never exposes a way to change either), so this can't be bypassed by a
+  // stale row, a future UI bug, or a direct API call.
+  if (chatbot.use_case !== 'site_widget') return { ok: false, reason: 'private' };
   if (!chatbot.is_public) return { ok: false, reason: 'private' };
 
   const selfOrigin = new URL(request.url).origin;

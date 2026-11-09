@@ -128,6 +128,30 @@ export async function PATCH(request: Request, { params }: { params: { id: string
     }
   }
 
+  // A 'second_cerveau' or 'contract_analyzer' chatbot can never be made
+  // public from here — their dashboard UI has no "Widget" section to
+  // reach this in the first place (a defense-in-depth check: the real
+  // gate anonymous requests go through is lib/publicChatAccess.ts
+  // getAccessibleChatbot, which ignores is_public entirely for any
+  // use_case other than 'site_widget').
+  if (isPublic) {
+    const { data: chatbot } = await supabase
+      .from('chatbots')
+      .select('use_case')
+      .eq('id', params.id)
+      .single();
+
+    if (!chatbot) {
+      return NextResponse.json({ error: 'Chatbot introuvable.' }, { status: 404 });
+    }
+    if (chatbot.use_case !== 'site_widget') {
+      return NextResponse.json(
+        { error: 'Seul un chatbot de type "site" peut être rendu public.' },
+        { status: 403 }
+      );
+    }
+  }
+
   // RLS (chatbots_update: is_org_member) enforces tenant scoping.
   const { error } = await supabase
     .from('chatbots')

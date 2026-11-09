@@ -91,6 +91,12 @@ export async function POST(request: Request) {
       system_prompt_template: systemPromptTemplate || PROMPT_TEMPLATES[0].template,
       use_documents: useDocuments,
       use_case: useCase,
+      // chatbots.is_public defaults to true at the column level (migration
+      // 0007, meant for 'site_widget': no extra step to start embedding).
+      // Set explicitly here rather than relying on that default — it's
+      // also the real server-side gate (lib/publicChatAccess.ts
+      // getAccessibleChatbot), not just a UI convenience.
+      is_public: useCase === 'site_widget',
     })
     .select('id')
     .single();

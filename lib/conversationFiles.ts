@@ -33,6 +33,22 @@ export async function countConversationFiles(client: Client, conversationId: str
   return count ?? 0;
 }
 
+// Same literal text storeVisitorFile writes as the message's content below
+// — kept as one constant so VISITOR_FILE_PROMPT_NOTE's instructions to the
+// model describe exactly what it'll actually see in its own history, not a
+// copy that can drift out of sync with it.
+const ATTACHMENT_MESSAGE_PREFIX = 'Fichier joint : ';
+
+// Carve-out from buildSystemPrompt's "N'utilise aucune connaissance externe
+// à ces extraits" grounding rule (lib/prompts.ts), same lesson as
+// NOTIFY_OWNER_PROMPT_NOTE (docs/roadmap.md item 33): without this, a
+// visitor asking "did you get my file?" got answered purely from RAG
+// retrieval — which, finding nothing about the widget's own upload feature,
+// either said no or (worse) described an unrelated "contact form" upload
+// process some site happened to have indexed — instead of the model simply
+// reading its own conversation history, where the attachment already is.
+export const VISITOR_FILE_PROMPT_NOTE = `Quand l'historique de la conversation contient un message de l'interlocuteur commençant par "${ATTACHMENT_MESSAGE_PREFIX}", cela signifie qu'il a réellement envoyé ce fichier via le widget de chat : ce n'est pas une connaissance externe interdite par la règle ci-dessus, c'est un fait de la conversation en cours. Si on te demande si tu as bien reçu un document, confirme-le en citant son nom exact tel qu'il apparaît dans l'historique. Tu ne peux en revanche pas lire ni analyser son contenu : ne décris jamais ce qu'il contient, dis simplement qu'il a bien été reçu et transmis.`;
+
 /**
  * Stores the file, then records it in the conversation as a user message
  * ("Fichier joint : nom") plus a conversation_files row. If any step after
@@ -54,7 +70,7 @@ export async function storeVisitorFile(
   const filename = params.filename.slice(-MAX_STORED_FILENAME_CHARS);
   const fileId = crypto.randomUUID();
   const storagePath = `${organizationId}/${chatbotId}/${conversationId}/${fileId}-${sanitizeFilenameForPath(filename)}`;
-  const content = `Fichier joint : ${filename}`;
+  const content = `${ATTACHMENT_MESSAGE_PREFIX}${filename}`;
 
   const { error: uploadError } = await admin.storage
     .from(CONVERSATION_FILES_BUCKET)
