@@ -71,7 +71,12 @@ export const PLAN_PRICE_LABELS: Record<'solo' | 'pme', string> = {
 export const PLAN_FEATURES: Record<OrgPlan, string[]> = {
   free: ['1 assistant, idéal pour tester', 'Widget intégrable sur votre site', 'Historique de conversation limité'],
   solo: ['1 assistant, avec ou sans documents', 'Widget intégrable sur votre site', 'Historique de conversation conservé'],
-  pme: ['Assistants illimités', 'Formats étendus : CSV, Excel, multi-documents', "Membres d'équipe multiples"],
+  pme: [
+    'Assistants illimités',
+    'Formats étendus : CSV, Excel, multi-documents',
+    "Membres d'équipe multiples",
+    'Analyseur de contrats (IA)',
+  ],
   metier: ['Fonctionnalités de la feuille de route en priorité', 'Accompagnement à la mise en place', 'Facturation adaptée au volume réel'],
 };
 

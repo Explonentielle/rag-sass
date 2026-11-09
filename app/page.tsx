@@ -438,7 +438,12 @@ function Pricing({ isLoggedIn }: { isLoggedIn: boolean }) {
       price: '49€',
       per: '/ mois',
       included: '3 000 messages inclus · +2€ / 100 au-delà',
-      features: ['Assistants illimités', 'Formats étendus : CSV, Excel, multi-documents', "Membres d'équipe multiples"],
+      features: [
+        'Assistants illimités',
+        'Formats étendus : CSV, Excel, multi-documents',
+        "Membres d'équipe multiples",
+        'Analyseur de contrats (IA)',
+      ],
       cta: 'Commencer gratuitement',
       featured: true,
     },
