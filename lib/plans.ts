@@ -85,6 +85,13 @@ export const PLAN_FEATURES: Record<OrgPlan, string[]> = {
 export const AI_INDEXING_ALLOWED_PLANS: OrgPlan[] = ['pme', 'metier'];
 
 /**
+ * Plans entitled to the contract analyzer (docs/roadmap.md item 23), a
+ * premium feature for the same reason as AI indexing above (real per-document
+ * LLM cost). Enforced at creation time in app/api/chatbots/route.ts.
+ */
+export const CONTRACT_ANALYZER_ALLOWED_PLANS: OrgPlan[] = ['pme', 'metier'];
+
+/**
  * Overage billing (docs/roadmap.md items 17/36). Messages per block and
  * price per block once a plan's included quota is exceeded in
  * `overage_mode: 'auto_bill'` (see lib/usage.ts checkQuota, lib/stripe.ts

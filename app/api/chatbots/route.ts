@@ -1,10 +1,10 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { PROMPT_TEMPLATES } from '@/lib/prompts';
-import { PLAN_CHATBOT_LIMITS, PLAN_LABELS } from '@/lib/plans';
+import { PLAN_CHATBOT_LIMITS, PLAN_LABELS, CONTRACT_ANALYZER_ALLOWED_PLANS } from '@/lib/plans';
 import type { ChatbotUseCase, OrgPlan } from '@/types/database';
 
-const USE_CASES: ChatbotUseCase[] = ['site_widget', 'second_cerveau'];
+const USE_CASES: ChatbotUseCase[] = ['site_widget', 'second_cerveau', 'contract_analyzer'];
 
 export async function POST(request: Request) {
   const supabase = createClient();
@@ -54,6 +54,15 @@ export async function POST(request: Request) {
   // doesn't narrow to the Row type here (pre-existing gap, see the same
   // pattern in app/api/chatbots/[id]/route.ts): annotate explicitly.
   const plan: OrgPlan = org.plan;
+
+  // Premium entitlement (docs/roadmap.md item 23), checked at creation
+  // since (unlike AI indexing) there's no later toggle to gate instead.
+  if (useCase === 'contract_analyzer' && !CONTRACT_ANALYZER_ALLOWED_PLANS.includes(plan)) {
+    return NextResponse.json(
+      { error: "L'analyseur de contrats nécessite le plan PME ou Métier." },
+      { status: 403 }
+    );
+  }
 
   const chatbotLimit = PLAN_CHATBOT_LIMITS[plan];
   if (chatbotLimit !== null) {

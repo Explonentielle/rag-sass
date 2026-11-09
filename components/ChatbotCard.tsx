@@ -17,10 +17,16 @@ export default function ChatbotCard({
   id,
   name,
   createdAt,
+  icon = ICONS.chat,
+  href,
 }: {
   id: string;
   name: string;
   createdAt: string;
+  icon?: React.ReactNode;
+  // Defaults to the shared chatbot detail route — every use_case except
+  // 'contract_analyzer' (app/dashboard/contrats/page.tsx) is viewed there.
+  href?: string;
 }) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
@@ -29,7 +35,7 @@ export default function ChatbotCard({
     <button
       type="button"
       disabled={isPending}
-      onClick={() => startTransition(() => router.push(`/dashboard/chatbots/${id}`))}
+      onClick={() => startTransition(() => router.push(href ?? `/dashboard/chatbots/${id}`))}
       className="block w-full text-left"
     >
       <Card className="relative p-5 transition-shadow hover:shadow-md">
@@ -43,7 +49,7 @@ export default function ChatbotCard({
           </div>
         )}
         <IconBadge size="sm" spacing="mb-3">
-          {ICONS.chat}
+          {icon}
         </IconBadge>
         <p className="font-medium text-slate-900">{name}</p>
         <p className="mt-1 text-xs text-slate-400">Créé le {new Date(createdAt).toLocaleDateString('fr-FR')}</p>

@@ -2,9 +2,9 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import type { Database } from '@/types/database';
 import { extractText, extractFromUrl, UnsupportedDocumentError, type SupportedFileType } from '@/lib/extract';
 import { chunkText } from '@/lib/chunking';
-import { embedTexts, structureChunksWithAI } from '@/lib/openai';
+import { embedTexts, structureChunksWithAI, extractContractClauses } from '@/lib/openai';
 import { ensureChunksIndex, getEsClient, CHUNKS_INDEX, type ChunkDoc } from '@/lib/elasticsearch';
-import { logInfo, logError } from '@/lib/logger';
+import { logInfo, logError, logWarn } from '@/lib/logger';
 
 const EMBEDDING_BATCH_SIZE = 50;
 
@@ -122,6 +122,33 @@ async function resolveChunks(text: string, useAiIndexing: boolean | undefined): 
   };
 }
 
+// Contract clause extraction (docs/roadmap.md item 23) runs alongside
+// chunking, not inside runIngestion's own try/catch: a failure here must
+// never flip the document's status to 'error' — the chat Q&A works off the
+// indexed chunks regardless of whether a summary was produced. Writes
+// straight to chatbots.contract_summary rather than returning a value,
+// since it's run via Promise.all alongside resolveChunks (see
+// processDocument below) and has nothing to contribute to that result.
+async function analyzeAndStoreContract(
+  supabase: SupabaseClient<Database>,
+  chatbotId: string,
+  documentId: string,
+  text: string
+): Promise<void> {
+  try {
+    const summary = await extractContractClauses(text);
+    if (summary) {
+      await supabase.from('chatbots').update({ contract_summary: summary }).eq('id', chatbotId);
+    }
+  } catch (err) {
+    logWarn('contract_analysis.failed', {
+      chatbotId,
+      documentId,
+      error: err instanceof Error ? err.message : String(err),
+    });
+  }
+}
+
 export interface ProcessDocumentParams {
   documentId: string;
   chatbotId: string;
@@ -135,6 +162,10 @@ export interface ProcessDocumentParams {
   // off so every other call site (scripts/smoke-test.mts) keeps working
   // unchanged.
   useAiIndexing?: boolean;
+  // Premium (docs/roadmap.md item 23) — runs extractContractClauses on the
+  // extracted text and stores the result on chatbots.contract_summary.
+  // Caller resolves this from chatbots.use_case === 'contract_analyzer'.
+  analyzeContract?: boolean;
 }
 
 /**
@@ -149,7 +180,8 @@ export async function processDocument(
   supabase: SupabaseClient<Database>,
   params: ProcessDocumentParams
 ): Promise<{ status: 'indexed' | 'error'; errorMessage?: string; chunkCount?: number }> {
-  const { documentId, chatbotId, organizationId, storagePath, fileType, filename, useAiIndexing } = params;
+  const { documentId, chatbotId, organizationId, storagePath, fileType, filename, useAiIndexing, analyzeContract } =
+    params;
 
   return runIngestion(supabase, { documentId, chatbotId, organizationId, filename }, async () => {
     const { data: fileBlob, error: downloadError } = await supabase.storage
@@ -160,7 +192,16 @@ export async function processDocument(
     }
     const buffer = Buffer.from(await fileBlob.arrayBuffer());
     const text = await extractText(buffer, fileType);
-    return resolveChunks(text, useAiIndexing);
+
+    // Run together: by the time the document's status flips to 'indexed'
+    // below, contract_summary (if requested) has already been attempted —
+    // the detail page's poller (components/ContractStatusPoller.tsx)
+    // refreshes once on 'indexed' and expects the summary to be ready.
+    const [resolved] = await Promise.all([
+      resolveChunks(text, useAiIndexing),
+      analyzeContract ? analyzeAndStoreContract(supabase, chatbotId, documentId, text) : Promise.resolve(),
+    ]);
+    return resolved;
   });
 }
 

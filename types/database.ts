@@ -8,7 +8,13 @@ export type MessageRole = 'user' | 'assistant';
 export type OrgPlan = 'free' | 'solo' | 'pme' | 'metier';
 export type OrgOverageMode = 'block' | 'auto_bill';
 export type OverageChargeStatus = 'succeeded' | 'failed';
-export type ChatbotUseCase = 'site_widget' | 'second_cerveau';
+export type ChatbotUseCase = 'site_widget' | 'second_cerveau' | 'contract_analyzer';
+
+// Structured clause extraction (lib/openai.ts ContractSummary), stored as
+// jsonb on chatbots.contract_summary — kept loose here (not importing
+// lib/openai.ts's richer ContractSummary type into this file) since this
+// module only describes the DB shape, not the app-level contract.
+export type ContractSummaryJson = Record<string, string | null>;
 
 export interface Database {
   public: {
@@ -81,6 +87,7 @@ export interface Database {
           show_loading_steps: boolean;
           loading_messages: string[] | null;
           use_case: ChatbotUseCase;
+          contract_summary: ContractSummaryJson | null;
           created_at: string;
         };
         Insert: {
@@ -98,6 +105,7 @@ export interface Database {
           show_loading_steps?: boolean;
           loading_messages?: string[] | null;
           use_case?: ChatbotUseCase;
+          contract_summary?: ContractSummaryJson | null;
           created_at?: string;
         };
         Update: {
@@ -115,6 +123,7 @@ export interface Database {
           show_loading_steps?: boolean;
           loading_messages?: string[] | null;
           use_case?: ChatbotUseCase;
+          contract_summary?: ContractSummaryJson | null;
           created_at?: string;
         };
       };

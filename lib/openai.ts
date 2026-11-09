@@ -457,3 +457,127 @@ export async function structureChunksWithAI(rawText: string): Promise<string[] |
 
   return allChunks.length > 0 ? allChunks : null;
 }
+
+// ---------------------------------------------------------------------------
+// Contract clause extraction (docs/roadmap.md item 23, "Analyseur de
+// contrats"), premium (chatbots.use_case === 'contract_analyzer', gated by
+// CONTRACT_ANALYZER_ALLOWED_PLANS in lib/plans.ts). One structured-output
+// call over the contract's full text, run by lib/ingest.ts right after
+// extraction, in parallel with chunking. Same best-effort philosophy as
+// rewriteQuery/rerankChunks above: a failure leaves chatbots.contract_summary
+// null, the chat Q&A still works off the indexed chunks regardless.
+// ---------------------------------------------------------------------------
+
+// A contract rarely exceeds a few dozen pages; this is a generous cap
+// (same order of magnitude as AI_INDEXING_BATCH_CHARS) rather than a
+// measured limit. Unlike AI indexing, there's no batching here: merging
+// per-batch clause summaries into one coherent result isn't a simple
+// concatenation, so this MVP truncates instead (noted in docs/roadmap.md).
+const CONTRACT_SUMMARY_MAX_CHARS = 60_000;
+
+export interface ContractSummary {
+  parties: string;
+  objet: string;
+  dureeEtReconduction: string;
+  conditionsResiliation: string;
+  penalites: string;
+  modalitesPaiement: string;
+  clauseConfidentialite: string | null;
+  clauseNonConcurrence: string | null;
+  pointsNotables: string;
+}
+
+const CONTRACT_SUMMARY_REQUIRED_STRING_FIELDS: (keyof ContractSummary)[] = [
+  'parties',
+  'objet',
+  'dureeEtReconduction',
+  'conditionsResiliation',
+  'penalites',
+  'modalitesPaiement',
+  'pointsNotables',
+];
+
+const CONTRACT_SUMMARY_SYSTEM_PROMPT = `Tu analyses un contrat pour en extraire un résumé structuré à l'usage d'un responsable non-juriste qui veut comprendre rapidement ses engagements. Base-toi uniquement sur le texte fourni, n'invente rien.
+
+- Pour chaque champ, rédige une à deux phrases en français clair, en citant les éléments concrets du contrat (durées, montants, délais, parties nommées).
+- clauseConfidentialite et clauseNonConcurrence : renvoie null si le contrat ne contient aucune clause de ce type, sinon résume-la.
+- pointsNotables : tout élément important qui ne rentre pas dans les autres champs (clause inhabituelle, obligation spécifique, risque identifié).
+- Si une information est absente du contrat, dis-le explicitement plutôt que d'inventer (par exemple "Non précisé dans le document.").`;
+
+/**
+ * Extracts a structured clause summary from a contract's full text. Returns
+ * null on any failure (API error, unusable output) — lib/ingest.ts leaves
+ * chatbots.contract_summary null in that case rather than failing the
+ * document's ingestion over it.
+ */
+export async function extractContractClauses(rawText: string): Promise<ContractSummary | null> {
+  const text =
+    rawText.length > CONTRACT_SUMMARY_MAX_CHARS ? rawText.slice(0, CONTRACT_SUMMARY_MAX_CHARS) : rawText;
+
+  try {
+    const openai = getOpenAiClient();
+    const response = await openai.chat.completions.create({
+      model: DEFAULT_CHAT_MODEL,
+      max_completion_tokens: 1200,
+      response_format: {
+        type: 'json_schema',
+        json_schema: {
+          name: 'contract_summary',
+          strict: true,
+          schema: {
+            type: 'object',
+            properties: {
+              parties: { type: 'string' },
+              objet: { type: 'string' },
+              dureeEtReconduction: { type: 'string' },
+              conditionsResiliation: { type: 'string' },
+              penalites: { type: 'string' },
+              modalitesPaiement: { type: 'string' },
+              clauseConfidentialite: { type: ['string', 'null'] },
+              clauseNonConcurrence: { type: ['string', 'null'] },
+              pointsNotables: { type: 'string' },
+            },
+            required: [
+              'parties',
+              'objet',
+              'dureeEtReconduction',
+              'conditionsResiliation',
+              'penalites',
+              'modalitesPaiement',
+              'clauseConfidentialite',
+              'clauseNonConcurrence',
+              'pointsNotables',
+            ],
+            additionalProperties: false,
+          },
+        },
+      },
+      messages: [
+        { role: 'system', content: CONTRACT_SUMMARY_SYSTEM_PROMPT },
+        { role: 'user', content: text },
+      ],
+    });
+
+    const raw = response.choices[0]?.message?.content;
+    if (!raw) throw new Error('Réponse vide');
+
+    const parsed = JSON.parse(raw);
+    if (CONTRACT_SUMMARY_REQUIRED_STRING_FIELDS.some((key) => typeof parsed[key] !== 'string')) {
+      throw new Error('Champs manquants dans la sortie structurée');
+    }
+    if (
+      (parsed.clauseConfidentialite !== null && typeof parsed.clauseConfidentialite !== 'string') ||
+      (parsed.clauseNonConcurrence !== null && typeof parsed.clauseNonConcurrence !== 'string')
+    ) {
+      throw new Error('Champs de clause optionnelle invalides');
+    }
+
+    return parsed as ContractSummary;
+  } catch (err) {
+    logWarn('contract_summary.failed', {
+      textLength: text.length,
+      error: err instanceof Error ? err.message : String(err),
+    });
+    return null;
+  }
+}

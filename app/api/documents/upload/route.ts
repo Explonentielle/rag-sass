@@ -37,13 +37,33 @@ export async function POST(request: Request) {
     // from another tenant simply won't be found.
     const { data: chatbot, error: chatbotError } = await supabase
       .from('chatbots')
-      .select('id, organization_id, use_ai_indexing')
+      .select('id, organization_id, use_ai_indexing, use_case')
       .eq('id', chatbotId)
       .single();
 
     if (chatbotError || !chatbot) {
       logWarn('upload.chatbot_not_found', { userId: user.id, chatbotId, error: chatbotError?.message });
       return NextResponse.json({ error: 'Chatbot introuvable.' }, { status: 404 });
+    }
+
+    // Contract analyzer (docs/roadmap.md item 23): one contract per
+    // analysis by design (isolated, not mixed into a shared knowledge
+    // base) — the dedicated creation flow (components/CreateContractForm.tsx)
+    // never sends a second file, this guards direct API use.
+    if (chatbot.use_case === 'contract_analyzer') {
+      const { count, error: countError } = await supabase
+        .from('documents')
+        .select('id', { count: 'exact', head: true })
+        .eq('chatbot_id', chatbot.id);
+      if (countError) {
+        return NextResponse.json({ error: countError.message }, { status: 400 });
+      }
+      if ((count ?? 0) >= 1) {
+        return NextResponse.json(
+          { error: "Une analyse de contrat ne peut contenir qu'un seul document. Supprimez-la et recommencez pour en analyser un autre." },
+          { status: 400 }
+        );
+      }
     }
 
     const fileType = detectFileType(file.name);
@@ -123,6 +143,7 @@ export async function POST(request: Request) {
         fileType,
         filename: file.name,
         useAiIndexing: chatbot.use_ai_indexing,
+        analyzeContract: chatbot.use_case === 'contract_analyzer',
       }).catch((err) => {
         logError('upload.background_processing_uncaught', {
           documentId: document.id,

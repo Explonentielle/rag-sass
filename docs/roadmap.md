@@ -42,7 +42,7 @@ fixe — sert de mémoire centralisée plutôt que de planning strict.
 | 51 | Chat | Messages d'attente contextuels (étapes réelles avec le sujet de la question) | Faible-moyen | ✅ Fait et testé en prod (choix par chatbot, désactivé par défaut) |
 | 21 | Catalogue | Agent de qualification de leads | Élevé | Item 3 (agent) |
 | 22 | Catalogue | Brouillon de réponse email | Moyen | — |
-| 23 | Catalogue | Analyseur de contrats (extraction de clauses) | Moyen | — |
+| 23 | Catalogue | Analyseur de contrats (extraction de clauses) | Moyen | ✅ Fait (MVP, 2026-11-09) |
 | 24 | Catalogue | Digitaliseur de paperasse (factures, formulaires) | Élevé | Item 7 (OCR) |
 | 25 | Catalogue | Standard IA téléphone / WhatsApp | Élevé | Nouveau canal, hors chat web |
 | 26 | Catalogue | Agent de veille & synthèse | Élevé | Item 3 (agent) |
@@ -61,7 +61,7 @@ fixe — sert de mémoire centralisée plutôt que de planning strict.
 | 52 | Compte | Séparer dashboard "chatbot widget site" / "assistant interne" | Faible-moyen | ✅ Fait |
 | 53 | Pricing | Souscription self-service (Stripe Checkout) depuis l'app | Moyen | ✅ Fait et testé en mode test Stripe |
 | 54 | Compte | Mini tuto d'onboarding à la première arrivée sur le dashboard | Faible-moyen | ✅ Fait |
-| 55 | Pricing | Changer de palier / gérer son abonnement une fois abonné (portail Stripe) | Faible | ✅ Fait — config portail Stripe à faire côté dashboard |
+| 55 | Pricing | Changer de palier / gérer son abonnement une fois abonné (portail Stripe) | Faible | ✅ Fait, config portail Stripe (mode test) vérifiée faite, à refaire en mode live |
 | 56 | Pricing | Revoir les montants/quotas des paliers (Solo/PME) + restrictions fonctionnelles réelles | Faible à moyen | ✅ Fait (2026-11-05) |
 | 57 | Légal | Pages légales (mentions légales/CGU/confidentialité) | Faible | ✅ Fait (brouillon, `app/legal/[slug]/page.tsx`) — rappel : mettre à jour domaine et email une fois le nom de domaine acheté et le déploiement définitif en place (item 42) |
 | 58 | Méthode | Méthode de travail inspirée de Spec Kit (spec, clarification, plan avant de coder) + `CLAUDE.md` | Faible | ✅ Fait (`CLAUDE.md` créé) : étapes "clarifier" et "analyser" appliquées aux grosses features, outil Spec Kit non installé |
@@ -1082,12 +1082,48 @@ avant envoi. Proche techniquement du chat existant (même pipeline RAG),
 la différence est l'interface (email plutôt que widget) et le mode
 brouillon-à-valider plutôt que réponse directe.
 
-### 23. Analyseur de contrats
+### 23. Analyseur de contrats : ✅ Fait (MVP)
 
 **Idée** : upload d'un contrat, extraction des clauses clés (structured
 outputs, comme `rewriteQuery`), questions-réponses dessus. Peut réutiliser
-le pipeline RAG existant presque tel quel — la nouveauté est surtout
+le pipeline RAG existant presque tel quel, la nouveauté est surtout
 l'extraction structurée en amont.
+
+**Décisions prises (2026-11-09)**, avant de coder : un contrat analysé =
+une base isolée (pas mélangée avec d'autres contrats ni avec les autres
+documents de l'org), réservé au palier PME/Métier, MVP limité à
+l'extraction de clauses + chat (pas d'alertes de risque, pas de
+comparaison entre contrats).
+
+**Implémenté** : nouveau use_case `contract_analyzer` sur `chatbots`
+(migration `0023_contract_analyzer.sql`), capé à un seul document par
+analyse (vérifié côté serveur dans `app/api/documents/upload/route.ts`).
+Pipeline : `lib/openai.ts` `extractContractClauses` (sortie structurée,
+même pattern que `rewriteQuery`/`rerankChunks`, jamais bloquant : un échec
+laisse `contract_summary` à null, le chat reste utilisable) déclenchée
+depuis `lib/ingest.ts` `processDocument` en parallèle du chunking, de sorte
+que le résumé soit prêt au moment où le document passe à `indexed`.
+
+Nouvelle section dashboard `/dashboard/contrats` (liste, upsell si palier
+non éligible) et `/dashboard/contrats/[id]` (statut de traitement, fiche
+résumé des 9 champs, chat scopé au contrat, suppression). Création en un
+clic : `components/CreateContractForm.tsx` crée le chatbot puis uploade le
+fichier ; si l'upload échoue, le chatbot vide créé entre-temps est
+supprimé plutôt que laissé orphelin.
+
+**Limites connues du MVP** : le texte du contrat est tronqué à 60 000
+caractères avant extraction (pas de découpage en lots comme l'indexation
+IA, un résumé de clauses ne se fusionne pas lot par lot aussi simplement
+qu'une liste de chunks) ; largement suffisant pour un contrat classique,
+pas pour un document exceptionnellement long. Pas d'alerte de risque, pas
+de comparaison entre contrats, pas d'export (hors scope MVP, voir plus
+haut).
+
+Testé : `tsc --noEmit` propre, 176 tests au vert (6 nouveaux pour
+`extractContractClauses`), `npm run build` propre (routes `/dashboard/
+contrats` et `/dashboard/contrats/[id]` générées). **Pas encore testé en
+conditions réelles** (upload d'un vrai contrat, vérification manuelle du
+résumé produit).
 
 ### 24. Digitaliseur de paperasse
 
@@ -2439,10 +2475,13 @@ annulation/moyen de paiement par défaut, pas le changement de palier
 demandé. Voir `docs/deployment.md` §4.
 
 Testé : `tsc --noEmit` propre, 169 tests au vert (1 nouveau test pour
-`createBillingPortalSession`). **Pas encore testé en conditions
-réelles** : il faut d'abord faire la configuration du portail ci-dessus
-dans Stripe avant qu'un changement de palier via le bouton ne fonctionne
-vraiment.
+`createBillingPortalSession`).
+
+**Vérifié (2026-11-09)** : la configuration du portail côté Stripe (mode
+test) était déjà en place, "Les clients peuvent changer d'offre" activé
+avec CorpusAI Solo et CorpusAI PME comme produits autorisés, pas
+d'action restante ici. À refaire une fois en mode live le jour du
+passage.
 
 **Effort** : faible (portail entièrement hébergé par Stripe).
 

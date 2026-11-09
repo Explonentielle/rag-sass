@@ -8,9 +8,14 @@ import { Card, Input } from '@/components/ui/Card';
 export default function DeleteChatbotSection({
   chatbotId,
   chatbotName,
+  redirectHref = '/dashboard/chatbots',
 }: {
   chatbotId: string;
   chatbotName: string;
+  // Where to send the user after deletion — the list page this chatbot
+  // actually belongs to (e.g. /dashboard/contrats for a contract
+  // analyzer), not always the generic chatbots list.
+  redirectHref?: string;
 }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
@@ -34,7 +39,7 @@ export default function DeleteChatbotSection({
       return;
     }
 
-    router.push('/dashboard/chatbots');
+    router.push(redirectHref);
     router.refresh();
   }
 
