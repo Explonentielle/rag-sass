@@ -51,7 +51,9 @@ export default function ChatbotCard({
         <IconBadge size="sm" spacing="mb-3">
           {icon}
         </IconBadge>
-        <p className="font-medium text-slate-900">{name}</p>
+        <p className="truncate font-medium text-slate-900" title={name}>
+          {name}
+        </p>
         <p className="mt-1 text-xs text-slate-400">Créé le {new Date(createdAt).toLocaleDateString('fr-FR')}</p>
       </Card>
     </button>

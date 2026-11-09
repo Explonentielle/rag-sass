@@ -189,4 +189,5 @@ export const ICONS = {
       <line x1="4" y1="17" x2="20" y2="17" />
     </>
   ),
+  chevronDown: <polyline points="6,9 12,15 18,9" />,
 };

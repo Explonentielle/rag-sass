@@ -4,23 +4,11 @@ import { createClient } from '@/lib/supabase/server';
 import ChatWidget from '@/components/ChatWidget';
 import DeleteChatbotSection from '@/components/DeleteChatbotSection';
 import ContractStatusPoller from '@/components/ContractStatusPoller';
+import ContractSummaryAccordion from '@/components/ContractSummaryAccordion';
 import { DocumentStatusBadge } from '@/components/DocumentStatusBadge';
 import { Card } from '@/components/ui/Card';
 import { Icon, IconBadge, ICONS } from '@/components/icons';
 import { logQueryError } from '@/lib/supabaseResult';
-import type { ContractSummaryJson } from '@/types/database';
-
-const SUMMARY_FIELDS: { key: keyof ContractSummaryJson; label: string }[] = [
-  { key: 'parties', label: 'Parties' },
-  { key: 'objet', label: 'Objet' },
-  { key: 'dureeEtReconduction', label: 'Durée et reconduction' },
-  { key: 'conditionsResiliation', label: 'Conditions de résiliation' },
-  { key: 'penalites', label: 'Pénalités' },
-  { key: 'modalitesPaiement', label: 'Modalités de paiement' },
-  { key: 'clauseConfidentialite', label: 'Clause de confidentialité' },
-  { key: 'clauseNonConcurrence', label: 'Clause de non-concurrence' },
-  { key: 'pointsNotables', label: 'Points notables' },
-];
 
 export default async function ContractPage({ params }: { params: { id: string } }) {
   const supabase = createClient();
@@ -105,13 +93,8 @@ export default async function ContractPage({ params }: { params: { id: string } 
             Résumé des clauses clés
           </h2>
           {summary ? (
-            <Card className="grid gap-5 p-6 sm:grid-cols-2">
-              {SUMMARY_FIELDS.map(({ key, label }) => (
-                <div key={key}>
-                  <p className="text-xs font-medium uppercase tracking-wide text-slate-400">{label}</p>
-                  <p className="mt-1 text-sm text-slate-700">{summary[key] ?? 'Non applicable.'}</p>
-                </div>
-              ))}
+            <Card className="overflow-hidden">
+              <ContractSummaryAccordion summary={summary} />
             </Card>
           ) : (
             <Card className="p-6 text-sm text-slate-500">
