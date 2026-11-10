@@ -1,6 +1,11 @@
 import { createClient } from '@/lib/supabase/server';
 import { embedText, streamAnswer, rewriteQuery, rerankChunks } from '@/lib/openai';
-import { createNotifyOwnerOfLeadTool, NOTIFY_OWNER_PROMPT_NOTE } from '@/lib/agenticTools';
+import {
+  createNotifyOwnerOfLeadTool,
+  NOTIFY_OWNER_PROMPT_NOTE,
+  createLeadQualificationTool,
+  buildLeadQualificationPromptNote,
+} from '@/lib/agenticTools';
 import { hybridSearch } from '@/lib/elasticsearch';
 import { buildSystemPrompt } from '@/lib/prompts';
 import { logInfo, logWarn, logError } from '@/lib/logger';
@@ -134,7 +139,7 @@ export async function POST(request: Request) {
   const { data: chatbot, error: chatbotError } = await supabase
     .from('chatbots')
     .select(
-      'id, organization_id, system_prompt_template, use_documents, allow_email_tool, notification_email, organizations!inner(plan, overage_mode)'
+      'id, organization_id, system_prompt_template, use_documents, allow_email_tool, notification_email, allow_lead_qualification, lead_qualification_criteria, meeting_link, organizations!inner(plan, overage_mode)'
     )
     .eq('id', chatbotId)
     .single();
@@ -216,15 +221,29 @@ export async function POST(request: Request) {
         controller.enqueue(encoder.encode(sseEvent('sources', { sources })));
 
         const notifyEmail = chatbot.allow_email_tool ? chatbot.notification_email : null;
-        const tools = notifyEmail
-          ? [createNotifyOwnerOfLeadTool(notifyEmail, { ...logCtx, conversationId })]
-          : undefined;
+        const leadQualificationEmail = chatbot.allow_lead_qualification ? chatbot.notification_email : null;
+        const combinedTools = [
+          ...(notifyEmail ? [createNotifyOwnerOfLeadTool(notifyEmail, { ...logCtx, conversationId })] : []),
+          ...(leadQualificationEmail
+            ? [createLeadQualificationTool(leadQualificationEmail, { ...logCtx, conversationId })]
+            : []),
+        ];
+        const tools = combinedTools.length ? combinedTools : undefined;
+
+        const toolsNote = [
+          notifyEmail ? NOTIFY_OWNER_PROMPT_NOTE : null,
+          leadQualificationEmail
+            ? buildLeadQualificationPromptNote(chatbot.lead_qualification_criteria, chatbot.meeting_link)
+            : null,
+        ]
+          .filter(Boolean)
+          .join('\n\n');
 
         const systemPrompt = buildSystemPrompt({
           systemPromptTemplate: chatbot.system_prompt_template,
           contextChunks: chunks,
           useDocuments: chatbot.use_documents,
-          toolsNote: notifyEmail ? NOTIFY_OWNER_PROMPT_NOTE : undefined,
+          toolsNote: toolsNote || undefined,
         });
 
         controller.enqueue(encoder.encode(sseEvent('status', { step: 'writing' })));

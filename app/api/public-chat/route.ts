@@ -1,6 +1,11 @@
 import { getAdminClient } from '@/lib/supabase/admin';
 import { embedText, streamAnswer, rewriteQuery, rerankChunks } from '@/lib/openai';
-import { createNotifyOwnerOfLeadTool, NOTIFY_OWNER_PROMPT_NOTE } from '@/lib/agenticTools';
+import {
+  createNotifyOwnerOfLeadTool,
+  NOTIFY_OWNER_PROMPT_NOTE,
+  createLeadQualificationTool,
+  buildLeadQualificationPromptNote,
+} from '@/lib/agenticTools';
 import { hybridSearch } from '@/lib/elasticsearch';
 import { buildSystemPrompt } from '@/lib/prompts';
 import { logInfo, logWarn, logError } from '@/lib/logger';
@@ -223,23 +228,39 @@ export async function POST(request: Request) {
         controller.enqueue(encoder.encode(sseEvent('sources', { sources })));
 
         const notifyEmail = chatbot.allow_email_tool ? chatbot.notification_email : null;
-        const tools = notifyEmail
-          ? [
-              createNotifyOwnerOfLeadTool(
-                notifyEmail,
-                { ...logCtx, conversationId },
-                chatbot.allow_visitor_uploads
-                  ? () => loadConversationAttachments(admin, conversationId)
-                  : undefined
-              ),
-            ]
-          : undefined;
+        const leadQualificationEmail = chatbot.allow_lead_qualification ? chatbot.notification_email : null;
+        const combinedTools = [
+          ...(notifyEmail
+            ? [
+                createNotifyOwnerOfLeadTool(
+                  notifyEmail,
+                  { ...logCtx, conversationId },
+                  chatbot.allow_visitor_uploads
+                    ? () => loadConversationAttachments(admin, conversationId)
+                    : undefined
+                ),
+              ]
+            : []),
+          ...(leadQualificationEmail
+            ? [createLeadQualificationTool(leadQualificationEmail, { ...logCtx, conversationId })]
+            : []),
+        ];
+        const tools = combinedTools.length ? combinedTools : undefined;
+
+        const toolsNote = [
+          notifyEmail ? NOTIFY_OWNER_PROMPT_NOTE : null,
+          leadQualificationEmail
+            ? buildLeadQualificationPromptNote(chatbot.lead_qualification_criteria, chatbot.meeting_link)
+            : null,
+        ]
+          .filter(Boolean)
+          .join('\n\n');
 
         const systemPrompt = buildSystemPrompt({
           systemPromptTemplate: chatbot.system_prompt_template,
           contextChunks: chunks,
           useDocuments: chatbot.use_documents,
-          toolsNote: notifyEmail ? NOTIFY_OWNER_PROMPT_NOTE : undefined,
+          toolsNote: toolsNote || undefined,
           filesNote: chatbot.allow_visitor_uploads ? VISITOR_FILE_PROMPT_NOTE : undefined,
         });
 

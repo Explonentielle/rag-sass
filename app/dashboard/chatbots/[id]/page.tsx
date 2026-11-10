@@ -15,6 +15,7 @@ import DeleteChatbotSection from '@/components/DeleteChatbotSection';
 import AiIndexingToggle from '@/components/AiIndexingToggle';
 import EmailToolToggle from '@/components/EmailToolToggle';
 import VisitorUploadsToggle from '@/components/VisitorUploadsToggle';
+import LeadQualificationToggle from '@/components/LeadQualificationToggle';
 import LoadingMessagesForm from '@/components/LoadingMessagesForm';
 import { listAllConversationsForChatbot } from '@/lib/conversations';
 import { logQueryError } from '@/lib/supabaseResult';
@@ -27,7 +28,7 @@ export default async function ChatbotPage({ params }: { params: { id: string } }
   const { data: chatbotData, error: chatbotError } = await supabase
     .from('chatbots')
     .select(
-      'id, name, system_prompt_template, organization_id, is_public, allowed_origins, use_documents, use_ai_indexing, allow_email_tool, notification_email, allow_visitor_uploads, show_loading_steps, loading_messages, use_case'
+      'id, name, system_prompt_template, organization_id, is_public, allowed_origins, use_documents, use_ai_indexing, allow_email_tool, notification_email, allow_visitor_uploads, allow_lead_qualification, lead_qualification_criteria, meeting_link, show_loading_steps, loading_messages, use_case'
     )
     .eq('id', params.id)
     .single();
@@ -200,6 +201,13 @@ export default async function ChatbotPage({ params }: { params: { id: string } }
             chatbotId={chatbot.id}
             initialValue={chatbot.allow_visitor_uploads}
             emailNotificationsReady={chatbot.allow_email_tool && !!chatbot.notification_email}
+          />
+          <LeadQualificationToggle
+            chatbotId={chatbot.id}
+            initialValue={chatbot.allow_lead_qualification}
+            initialCriteria={chatbot.lead_qualification_criteria}
+            initialMeetingLink={chatbot.meeting_link}
+            notificationEmailSet={!!chatbot.notification_email}
           />
         </section>
       )}

@@ -1066,13 +1066,44 @@ listé dans Fonctionnalités). Les items 21-28 ci-dessous restent la liste
 complète des idées — le tri n'affecte que ce qui est *affiché*, pas ce qui
 est documenté.
 
-### 21. Agent de qualification de leads
+### 21. Agent de qualification de leads : ✅ Fait (MVP)
 
 **Idée** : engage un visiteur du widget, pose des questions de
 qualification, score le contact et le route — jusqu'à proposer un
-rendez-vous. **Dépend de** l'item 3 (agent unique topK + reformulation) et
-plus largement d'une vraie boucle agentique (tool calling), pas juste du
-RAG actuel.
+rendez-vous. **Dépendait de** l'item 33 (boucle agentique/tool calling),
+déjà en place : implémenté comme une extension de cette infra plutôt
+qu'un nouveau chantier séparé.
+
+**Décisions prises (2026-11-10)**, avant de coder : un toggle dédié par
+chatbot (pas une extension du toggle email existant, pour ne pas mélanger
+deux déclenchements différents), un lien de RDV optionnel partagé par le
+bot si le lead est jugé chaud, disponible à tous les paliers (comme
+l'outil email existant, pas une fonctionnalité premium isolée).
+
+**Implémenté** : nouveau toggle `chatbots.allow_lead_qualification`
+(migration `0025_lead_qualification.sql`), plus deux champs optionnels :
+`lead_qualification_criteria` (texte libre du propriétaire, ex. "budget
+mini 5000€, zone Île-de-France") et `meeting_link` (URL de prise de
+RDV, validée côté serveur dans `PATCH /api/chatbots/[id]`). UI :
+`components/LeadQualificationToggle.tsx`, section "Widget" de la page du
+chatbot (comme `VisitorUploadsToggle`).
+
+Nouvel outil agentique séparé de `notify_bot_owner` (item 33) plutôt
+qu'une extension de celui-ci : `createLeadQualificationTool`
+(`score_and_route_lead`) dans `lib/agenticTools.ts`, déclenché
+proactivement par le modèle (2-3 questions de qualification au fil de la
+conversation) et sans dance de confirmation préalable avec le visiteur,
+contrairement à `notify_bot_owner` : les deux outils ont des contrats
+comportementaux différents (silencieux/proactif vs confirmé/réactif), les
+garder séparés évite qu'une seule description d'outil doive satisfaire
+les deux à la fois. Branché dans les deux routes de chat (`/api/chat` et
+`/api/public-chat`), notes de prompt concaténées quand les deux outils
+sont actifs en même temps sur un même chatbot.
+
+**Limite connue du MVP** : pas de vraie prise de RDV automatisée (pas
+d'intégration calendrier) : le bot partage un lien externe (Calendly ou
+autre) renseigné par le propriétaire, la prise de RDV elle-même se fait
+hors produit.
 
 ### 22. Brouillon de réponse email
 

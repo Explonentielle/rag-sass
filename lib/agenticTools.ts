@@ -97,3 +97,95 @@ export function createNotifyOwnerOfLeadTool(
     },
   };
 }
+
+const LEAD_SCORE_LABELS: Record<string, string> = { chaud: 'Chaud', tiede: 'Tiède', froid: 'Froid' };
+
+/**
+ * Appended to the system prompt (lib/prompts.ts's `toolsNote`) whenever
+ * lead qualification is enabled (roadmap item 21) — a separate tool and note
+ * from `notify_bot_owner`/`NOTIFY_OWNER_PROMPT_NOTE` on purpose: that flow is
+ * reactive (triggered when the visitor asks to be called back) and needs
+ * their confirmation before acting, while this one is proactive (the bot
+ * initiates the qualifying questions) and silent (an internal notification,
+ * nothing the visitor needs to confirm). Keeping them as two independently
+ * toggleable tools avoids one tool's description having to satisfy two
+ * different behavioral contracts at once.
+ */
+export function buildLeadQualificationPromptNote(
+  criteria: string | null,
+  meetingLink: string | null
+): string {
+  const criteriaText = criteria?.trim()
+    ? `Critères de qualification définis par le propriétaire : ${criteria.trim()}`
+    : "Aucun critère spécifique défini par le propriétaire : qualifie sur des critères génériques (besoin, budget approximatif, délai).";
+  const meetingText = meetingLink
+    ? `\n\nSi tu juges le lead "chaud", partage directement ce lien de prise de rendez-vous dans ta réponse : ${meetingLink}`
+    : '';
+
+  return `Tu as aussi accès à un outil, score_and_route_lead, pour qualifier activement l'interlocuteur. Ce n'est PAS une connaissance externe interdite par la règle ci-dessus : c'est une action que tu es explicitement autorisé à réaliser en plus de répondre aux questions.
+
+${criteriaText}
+
+Dès que l'interlocuteur exprime un besoin ou un projet concret, pose 2 à 3 questions de qualification au fil de la conversation, de façon naturelle plutôt qu'en interrogatoire d'un coup. Une fois que tu as assez d'informations pour juger le lead chaud, tiède ou froid, utilise l'outil score_and_route_lead UNE SEULE FOIS par conversation, avec ce score et un résumé. N'attends pas de confirmation de l'interlocuteur avant de l'utiliser : c'est une notification interne silencieuse, pas une action qui l'engage.${meetingText}`;
+}
+
+/**
+ * Notifies the chatbot's owner that a lead has been actively qualified
+ * (roadmap item 21), with a score and a summary of what was learned — unlike
+ * `notify_bot_owner` above, this fires without asking the visitor first,
+ * since nothing here is a promise made to them.
+ */
+export function createLeadQualificationTool(
+  ownerEmail: string,
+  logCtx: Record<string, unknown>
+): ChatTool {
+  return {
+    name: 'score_and_route_lead',
+    description:
+      "Notifie le propriétaire qu'un lead a été qualifié, avec un score (chaud, tiede ou froid) et un résumé. À utiliser une seule fois par conversation, sans demander confirmation au préalable : c'est une notification interne, pas une action visible pour l'interlocuteur.",
+    parameters: {
+      type: 'object',
+      properties: {
+        lead_score: {
+          type: 'string',
+          enum: ['chaud', 'tiede', 'froid'],
+          description: 'Score du lead au regard des critères de qualification.',
+        },
+        summary: {
+          type: 'string',
+          description:
+            "Résumé des réponses obtenues (besoin, budget, délai...) pour que le propriétaire comprenne pourquoi ce score.",
+        },
+        contact: {
+          type: 'string',
+          description:
+            "Coordonnées de l'interlocuteur si elles ont été données spontanément (email, téléphone, nom), chaîne vide sinon.",
+        },
+      },
+      required: ['lead_score', 'summary', 'contact'],
+      additionalProperties: false,
+    },
+    async execute(args) {
+      const leadScore = String(args.lead_score ?? '').trim();
+      const summary = String(args.summary ?? '').trim();
+      const contact = String(args.contact ?? '').trim();
+      const scoreLabel = LEAD_SCORE_LABELS[leadScore] ?? leadScore;
+
+      const subject = `Lead qualifié (${scoreLabel}) sur votre chatbot Corpus.ai`;
+      const body = `Score : ${scoreLabel}\n\nRésumé :\n${summary || '(non précisé)'}\n\nCoordonnées données :\n${contact || '(aucune)'}`;
+
+      try {
+        await sendEmail({ to: ownerEmail, subject, body });
+        logInfo('agentic_tool.lead_scored', { ...logCtx, tool: 'score_and_route_lead', leadScore });
+        return "Le propriétaire a été notifié. Continue la conversation normalement, sans mentionner cette notification à l'interlocuteur.";
+      } catch (err) {
+        logWarn('agentic_tool.lead_score_failed', {
+          ...logCtx,
+          tool: 'score_and_route_lead',
+          error: err instanceof Error ? err.message : String(err),
+        });
+        return "Échec de la notification. N'en fais pas mention, réponds normalement par ailleurs.";
+      }
+    },
+  };
+}

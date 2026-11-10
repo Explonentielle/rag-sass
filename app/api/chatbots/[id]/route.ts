@@ -26,9 +26,12 @@ export async function PATCH(request: Request, { params }: { params: { id: string
   const useAiIndexing: boolean | undefined = body?.useAiIndexing;
   const allowEmailTool: boolean | undefined = body?.allowEmailTool;
   const allowVisitorUploads: boolean | undefined = body?.allowVisitorUploads;
+  const allowLeadQualification: boolean | undefined = body?.allowLeadQualification;
   const showLoadingSteps: boolean | undefined = body?.showLoadingSteps;
   const loadingMessagesInput: unknown = body?.loadingMessages;
   const notificationEmailInput: unknown = body?.notificationEmail;
+  const leadQualificationCriteriaInput: unknown = body?.leadQualificationCriteria;
+  const meetingLinkInput: unknown = body?.meetingLink;
 
   // null or empty string clears it; anything else must look like an email.
   let notificationEmail: string | null | undefined;
@@ -69,6 +72,50 @@ export async function PATCH(request: Request, { params }: { params: { id: string
     }
   }
 
+  // null or empty string clears it (as for notificationEmail above); any
+  // other value must be a http(s) URL — this is shared directly in chat
+  // answers (lib/agenticTools.ts buildLeadQualificationPromptNote), not
+  // just stored, so a garbage value would leak straight to visitors.
+  let leadQualificationCriteria: string | null | undefined;
+  if (leadQualificationCriteriaInput !== undefined) {
+    if (leadQualificationCriteriaInput === null) {
+      leadQualificationCriteria = null;
+    } else if (typeof leadQualificationCriteriaInput === 'string') {
+      const trimmed = leadQualificationCriteriaInput.trim();
+      leadQualificationCriteria = trimmed === '' ? null : trimmed;
+    } else {
+      return NextResponse.json(
+        { error: 'leadQualificationCriteria doit être une chaîne (ou null).' },
+        { status: 400 }
+      );
+    }
+  }
+
+  let meetingLink: string | null | undefined;
+  if (meetingLinkInput !== undefined) {
+    if (meetingLinkInput === null) {
+      meetingLink = null;
+    } else if (typeof meetingLinkInput === 'string') {
+      const trimmed = meetingLinkInput.trim();
+      if (trimmed === '') {
+        meetingLink = null;
+      } else {
+        try {
+          const url = new URL(trimmed);
+          if (url.protocol !== 'http:' && url.protocol !== 'https:') throw new Error('bad protocol');
+          meetingLink = trimmed;
+        } catch {
+          return NextResponse.json(
+            { error: "Le lien de rendez-vous doit être une URL valide (http:// ou https://)." },
+            { status: 400 }
+          );
+        }
+      }
+    } else {
+      return NextResponse.json({ error: 'meetingLink doit être une chaîne (ou null).' }, { status: 400 });
+    }
+  }
+
   let allowedOrigins: string[] | undefined;
   if (allowedOriginsInput !== undefined) {
     if (!Array.isArray(allowedOriginsInput) || !allowedOriginsInput.every((o) => typeof o === 'string')) {
@@ -93,9 +140,12 @@ export async function PATCH(request: Request, { params }: { params: { id: string
     useAiIndexing === undefined &&
     allowEmailTool === undefined &&
     allowVisitorUploads === undefined &&
+    allowLeadQualification === undefined &&
     showLoadingSteps === undefined &&
     notificationEmail === undefined &&
-    loadingMessages === undefined
+    loadingMessages === undefined &&
+    leadQualificationCriteria === undefined &&
+    meetingLink === undefined
   ) {
     return NextResponse.json({ error: 'Rien à mettre à jour.' }, { status: 400 });
   }
@@ -164,9 +214,14 @@ export async function PATCH(request: Request, { params }: { params: { id: string
       ...(useAiIndexing !== undefined ? { use_ai_indexing: useAiIndexing } : {}),
       ...(allowEmailTool !== undefined ? { allow_email_tool: allowEmailTool } : {}),
       ...(allowVisitorUploads !== undefined ? { allow_visitor_uploads: allowVisitorUploads } : {}),
+      ...(allowLeadQualification !== undefined ? { allow_lead_qualification: allowLeadQualification } : {}),
       ...(showLoadingSteps !== undefined ? { show_loading_steps: showLoadingSteps } : {}),
       ...(notificationEmail !== undefined ? { notification_email: notificationEmail } : {}),
       ...(loadingMessages !== undefined ? { loading_messages: loadingMessages } : {}),
+      ...(leadQualificationCriteria !== undefined
+        ? { lead_qualification_criteria: leadQualificationCriteria }
+        : {}),
+      ...(meetingLink !== undefined ? { meeting_link: meetingLink } : {}),
     })
     .eq('id', params.id);
 

@@ -22,6 +22,9 @@ export type ChatbotAccessResult =
         allow_email_tool: boolean;
         notification_email: string | null;
         allow_visitor_uploads: boolean;
+        allow_lead_qualification: boolean;
+        lead_qualification_criteria: string | null;
+        meeting_link: string | null;
         plan: OrgPlan;
         overage_mode: OrgOverageMode;
       };
@@ -49,7 +52,7 @@ export async function getAccessibleChatbot(
   const { data: chatbot, error } = await admin
     .from('chatbots')
     .select(
-      'id, organization_id, system_prompt_template, is_public, allowed_origins, use_documents, use_case, allow_email_tool, notification_email, allow_visitor_uploads, organizations!inner(plan, overage_mode)'
+      'id, organization_id, system_prompt_template, is_public, allowed_origins, use_documents, use_case, allow_email_tool, notification_email, allow_visitor_uploads, allow_lead_qualification, lead_qualification_criteria, meeting_link, organizations!inner(plan, overage_mode)'
     )
     .eq('id', chatbotId)
     .single();

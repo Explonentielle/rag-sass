@@ -88,6 +88,9 @@ export interface Database {
           loading_messages: string[] | null;
           use_case: ChatbotUseCase;
           contract_summary: ContractSummaryJson | null;
+          allow_lead_qualification: boolean;
+          lead_qualification_criteria: string | null;
+          meeting_link: string | null;
           created_at: string;
         };
         Insert: {
@@ -106,6 +109,9 @@ export interface Database {
           loading_messages?: string[] | null;
           use_case?: ChatbotUseCase;
           contract_summary?: ContractSummaryJson | null;
+          allow_lead_qualification?: boolean;
+          lead_qualification_criteria?: string | null;
+          meeting_link?: string | null;
           created_at?: string;
         };
         Update: {
@@ -124,6 +130,9 @@ export interface Database {
           loading_messages?: string[] | null;
           use_case?: ChatbotUseCase;
           contract_summary?: ContractSummaryJson | null;
+          allow_lead_qualification?: boolean;
+          lead_qualification_criteria?: string | null;
+          meeting_link?: string | null;
           created_at?: string;
         };
       };
