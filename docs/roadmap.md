@@ -1105,6 +1105,29 @@ d'intégration calendrier) : le bot partage un lien externe (Calendly ou
 autre) renseigné par le propriétaire, la prise de RDV elle-même se fait
 hors produit.
 
+**Testé en conditions réelles (2026-11-10)**, sur un chatbot "Votre
+Accompagnateur" (rénovation énergétique, Bordeaux) : conversation visiteur
+simulée (projet photovoltaïque, budget, délai, facture annuelle), score
+"Chaud" correctement déduit, résumé fidèle à la conversation, coordonnées
+marquées "(aucune)" quand le visiteur n'en a pas donné. Logs serveur
+confirment que l'outil `score_and_route_lead` est bien appelé par le
+modèle à chaque tour une fois un projet concret exprimé, sans qu'il le
+mentionne au visiteur.
+
+**Blocage ndd confirmé sur un second point (2026-11-10)** : premier essai
+avec l'adresse de notification réelle du propriétaire
+(`a.debonnieres@speedmedia.fr`) en échec, Resend répondant 403 ("test
+mode", domaine d'envoi non vérifié) : `lib/email.ts` envoie depuis
+`no-reply@corpus-ai.fr`, dont le domaine n'est pas encore vérifié sur
+resend.com/domains. Tant qu'il ne l'est pas, Resend n'autorise l'envoi
+qu'à l'adresse du compte Resend lui-même, pas aux adresses réelles des
+propriétaires de chatbot. Testé avec succès en basculant temporairement
+l'adresse de notification sur l'adresse du compte Resend. **Le même
+blocage ndd déjà identifié pour Stripe (mode live) et le SMTP Supabase
+Auth touche donc aussi tout l'outil email agentique (item 33 et celui-ci)**,
+pas seulement les deux premiers : rien à corriger côté code, la
+vérification de domaine chez Resend suit l'achat du nom de domaine.
+
 ### 22. Brouillon de réponse email
 
 **Idée** : à partir d'un email client entrant, rédige un brouillon de

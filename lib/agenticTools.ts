@@ -126,7 +126,7 @@ export function buildLeadQualificationPromptNote(
 
 ${criteriaText}
 
-Dès que l'interlocuteur exprime un besoin ou un projet concret, pose 2 à 3 questions de qualification au fil de la conversation, de façon naturelle plutôt qu'en interrogatoire d'un coup. Une fois que tu as assez d'informations pour juger le lead chaud, tiède ou froid, utilise l'outil score_and_route_lead UNE SEULE FOIS par conversation, avec ce score et un résumé. N'attends pas de confirmation de l'interlocuteur avant de l'utiliser : c'est une notification interne silencieuse, pas une action qui l'engage.${meetingText}`;
+Dès que l'interlocuteur exprime un besoin ou un projet concret, pose 2 à 3 questions de qualification au fil de la conversation, de façon naturelle plutôt qu'en interrogatoire d'un coup. Si le projet te semble assez concret pour aller vers un score "chaud", demande-lui aussi, naturellement, comment le recontacter (prénom et email ou téléphone) avant de conclure : un lead chaud sans aucun moyen de le recontacter ne sert à rien au propriétaire. Une fois que tu as assez d'informations (y compris une tentative d'obtenir ses coordonnées si le lead s'annonce chaud), utilise l'outil score_and_route_lead UNE SEULE FOIS par conversation, avec ce score et un résumé. N'attends pas de confirmation de l'interlocuteur avant de l'utiliser : c'est une notification interne silencieuse, pas une action qui l'engage.${meetingText}`;
 }
 
 /**
@@ -159,7 +159,7 @@ export function createLeadQualificationTool(
         contact: {
           type: 'string',
           description:
-            "Coordonnées de l'interlocuteur si elles ont été données spontanément (email, téléphone, nom), chaîne vide sinon.",
+            "Coordonnées de l'interlocuteur (email, téléphone, nom) si elles ont été données, ou si demandées sans succès pour un lead chaud ; chaîne vide seulement pour un lead tiède/froid où la question n'avait pas lieu d'être posée.",
         },
       },
       required: ['lead_score', 'summary', 'contact'],
