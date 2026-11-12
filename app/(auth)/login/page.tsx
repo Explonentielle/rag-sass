@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { Input, Label } from '@/components/ui/Card';
 import { Logo } from '@/components/ui/Logo';
+import { describeAuthError } from '@/lib/userErrors';
 
 export default function LoginPage() {
   const router = useRouter();
@@ -26,7 +27,7 @@ export default function LoginPage() {
 
     setLoading(false);
     if (error) {
-      setError(error.message);
+      setError(describeAuthError(error));
       return;
     }
 

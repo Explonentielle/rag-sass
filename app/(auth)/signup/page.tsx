@@ -7,6 +7,7 @@ import { createClient } from '@/lib/supabase/client';
 import { Button } from '@/components/ui/Button';
 import { Card, Input, Label } from '@/components/ui/Card';
 import { Logo } from '@/components/ui/Logo';
+import { describeAuthError, describeDbError } from '@/lib/userErrors';
 
 export default function SignupPage() {
   const router = useRouter();
@@ -31,7 +32,7 @@ export default function SignupPage() {
 
     if (signUpError) {
       setLoading(false);
-      setError(signUpError.message);
+      setError(describeAuthError(signUpError));
       return;
     }
 
@@ -46,7 +47,7 @@ export default function SignupPage() {
       });
       setLoading(false);
       if (orgError) {
-        setError(orgError.message);
+        setError(describeDbError(orgError));
         return;
       }
       router.push('/dashboard');

@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { reportDbError } from '@/lib/userErrors';
 import { File } from 'node:buffer';
 import { v4 as uuidv4 } from 'uuid';
 import { waitUntil } from '@vercel/functions';
@@ -58,7 +59,8 @@ export async function POST(request: Request) {
         .select('id', { count: 'exact', head: true })
         .eq('chatbot_id', chatbot.id);
       if (countError) {
-        return NextResponse.json({ error: countError.message }, { status: 400 });
+        const { message } = reportDbError('upload.count_failed', countError, { chatbotId: chatbot.id });
+        return NextResponse.json({ error: message }, { status: 400 });
       }
       if ((count ?? 0) >= 1) {
         return NextResponse.json(

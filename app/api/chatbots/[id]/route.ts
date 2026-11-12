@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { reportDbError } from '@/lib/userErrors';
 import { createClient } from '@/lib/supabase/server';
 import { normalizeOrigin } from '@/lib/embedAccess';
 import { deleteChatbotChunks } from '@/lib/elasticsearch';
@@ -332,7 +333,8 @@ export async function PATCH(request: Request, { params }: { params: { id: string
     .eq('id', params.id);
 
   if (error) {
-    return NextResponse.json({ error: error.message }, { status: 400 });
+    const { message } = reportDbError('chatbot.update_failed', error, { chatbotId: params.id });
+    return NextResponse.json({ error: message }, { status: 400 });
   }
 
   return NextResponse.json({ ok: true });
@@ -409,7 +411,8 @@ export async function DELETE(_request: Request, { params }: { params: { id: stri
   // admin/owner can reach this — a plain member's request fails here.
   const { error: deleteError } = await supabase.from('chatbots').delete().eq('id', chatbot.id);
   if (deleteError) {
-    return NextResponse.json({ error: deleteError.message }, { status: 400 });
+    const { message } = reportDbError('chatbot.delete_failed', deleteError, { chatbotId: chatbot.id });
+    return NextResponse.json({ error: message }, { status: 400 });
   }
 
   logInfo('chatbot.deleted', {

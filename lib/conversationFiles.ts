@@ -2,6 +2,7 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import type { Database } from '@/types/database';
 import { encryptText, decryptText, UNREADABLE_PLACEHOLDER } from '@/lib/crypto';
 import { logError } from '@/lib/logger';
+import { UserFacingError } from '@/lib/userErrors';
 import { sanitizeFilenameForPath } from '@/lib/visitorFileRules';
 import type { EmailAttachment } from '@/lib/email';
 import type { FileContextEntry } from '@/lib/fileContext';
@@ -90,7 +91,7 @@ export async function storeVisitorFile(
     .upload(storagePath, data, { contentType, upsert: false });
   if (uploadError) {
     logError('conversation_files.upload_failed', { chatbotId, conversationId, error: uploadError.message });
-    throw new Error("Impossible d'enregistrer le fichier.");
+    throw new UserFacingError("Impossible d'enregistrer le fichier.");
   }
 
   async function rollback(messageId?: string) {
@@ -106,7 +107,7 @@ export async function storeVisitorFile(
   if (messageError || !message) {
     logError('conversation_files.message_failed', { chatbotId, conversationId, error: messageError?.message });
     await rollback();
-    throw new Error("Impossible d'enregistrer le fichier.");
+    throw new UserFacingError("Impossible d'enregistrer le fichier.");
   }
 
   const { error: rowError } = await admin.from('conversation_files').insert({
@@ -121,7 +122,7 @@ export async function storeVisitorFile(
   if (rowError) {
     logError('conversation_files.row_failed', { chatbotId, conversationId, error: rowError.message });
     await rollback(message.id);
-    throw new Error("Impossible d'enregistrer le fichier.");
+    throw new UserFacingError("Impossible d'enregistrer le fichier.");
   }
 
   await admin

@@ -5,7 +5,7 @@ import {
   deleteConversationForChatbot,
   loadHistoryForChatbot,
 } from '@/lib/conversations';
-import { logError } from '@/lib/logger';
+import { reportError } from '@/lib/userErrors';
 
 // Dashboard admin tool (roadmap.md item 20-B): lists and deletes any
 // conversation on a chatbot, across every identity (org test-chat users and
@@ -37,12 +37,10 @@ export async function GET(request: Request, { params }: { params: { id: string }
       }
       return NextResponse.json({ messages });
     } catch (err) {
-      const message = err instanceof Error ? err.message : 'Erreur inconnue.';
-      logError('admin_conversations.load_history_failed', {
+      const { message } = reportError('admin_conversations.load_history_failed', err, {
         userId: user.id,
         chatbotId: params.id,
         conversationId,
-        error: message,
       });
       return NextResponse.json({ error: message }, { status: 500 });
     }
@@ -52,8 +50,10 @@ export async function GET(request: Request, { params }: { params: { id: string }
     const conversations = await listAllConversationsForChatbot(supabase, params.id);
     return NextResponse.json({ conversations });
   } catch (err) {
-    const message = err instanceof Error ? err.message : 'Erreur inconnue.';
-    logError('admin_conversations.list_failed', { userId: user.id, chatbotId: params.id, error: message });
+    const { message } = reportError('admin_conversations.list_failed', err, {
+      userId: user.id,
+      chatbotId: params.id,
+    });
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }
@@ -76,12 +76,10 @@ export async function DELETE(request: Request, { params }: { params: { id: strin
     await deleteConversationForChatbot(supabase, conversationId, params.id);
     return NextResponse.json({ ok: true });
   } catch (err) {
-    const message = err instanceof Error ? err.message : 'Erreur inconnue.';
-    logError('admin_conversations.delete_failed', {
+    const { message } = reportError('admin_conversations.delete_failed', err, {
       userId: user.id,
       chatbotId: params.id,
       conversationId,
-      error: message,
     });
     return NextResponse.json({ error: message }, { status: 500 });
   }

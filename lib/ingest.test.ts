@@ -125,7 +125,13 @@ describe('processDocument', () => {
     const result = await processDocument(supabase, baseParams);
 
     expect(result.status).toBe('error');
-    expect(result.errorMessage).toContain('Téléchargement du fichier échoué');
+    // The stored message is shown in the documents list: never the raw storage
+    // error ("Téléchargement du fichier échoué: not found"), only a plain
+    // sentence plus a reference to find the details in the logs.
+    expect(result.errorMessage).toContain('Une erreur est survenue');
+    expect(result.errorMessage).toContain('réf.');
+    expect(result.errorMessage).not.toContain('not found');
+    expect(result.errorMessage).not.toContain('Téléchargement du fichier échoué');
     expect(updates[1].patch).toMatchObject({ status: 'error' });
     expect(bulkMock).not.toHaveBeenCalled(); // jamais indexé si l'extraction n'a jamais eu lieu
   });

@@ -10,7 +10,8 @@ import {
 } from '@/lib/agenticTools';
 import { hybridSearch } from '@/lib/elasticsearch';
 import { buildSystemPrompt } from '@/lib/prompts';
-import { logInfo, logWarn, logError } from '@/lib/logger';
+import { logInfo, logWarn } from '@/lib/logger';
+import { reportDbError, reportError } from '@/lib/userErrors';
 import { checkRateLimit } from '@/lib/rateLimit';
 import { checkQuota } from '@/lib/usage';
 import {
@@ -66,8 +67,7 @@ export async function GET(request: Request) {
     const history = await loadHistory(supabase, conversationId);
     return Response.json({ messages: history });
   } catch (err) {
-    const message = err instanceof Error ? err.message : 'Erreur inconnue.';
-    logError('chat.history_failed', { userId: user.id, chatbotId, conversationId, error: message });
+    const { message } = reportError('chat.history_failed', err, { userId: user.id, chatbotId, conversationId });
     return new Response(message, { status: 500 });
   }
 }
@@ -100,7 +100,8 @@ export async function DELETE(request: Request) {
     .eq('user_id', user.id);
 
   if (error) {
-    return new Response(error.message, { status: 400 });
+    const { message } = reportDbError('chat.delete_failed', error, { userId: user.id, chatbotId, conversationId });
+    return new Response(message, { status: 400 });
   }
   return Response.json({ ok: true });
 }
@@ -138,13 +139,8 @@ export async function PATCH(request: Request) {
     if (!updated) return new Response('Message introuvable.', { status: 404 });
     return Response.json({ ok: true });
   } catch (err) {
-    logError('chat.feedback_failed', {
-      userId: user.id,
-      chatbotId,
-      conversationId,
-      error: err instanceof Error ? err.message : 'Erreur inconnue.',
-    });
-    return new Response("Impossible d'enregistrer le retour.", { status: 500 });
+    const { message } = reportError('chat.feedback_failed', err, { userId: user.id, chatbotId, conversationId });
+    return new Response(message, { status: 500 });
   }
 }
 
@@ -320,8 +316,8 @@ export async function POST(request: Request) {
           sourceCount: sources.length,
         });
       } catch (err) {
-        const message = err instanceof Error ? err.message : 'Erreur inconnue.';
-        logError('chat.failed', { ...logCtx, error: message, stack: err instanceof Error ? err.stack : undefined });
+        // Never the raw exception text — see lib/userErrors.ts.
+        const { message } = reportError('chat.failed', err, logCtx);
         controller.enqueue(encoder.encode(sseEvent('error', { message })));
       } finally {
         controller.close();

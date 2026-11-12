@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { logError } from '@/lib/logger';
+import { reportDbError } from '@/lib/userErrors';
 import type { OrgRole } from '@/types/database';
 
 async function getMembership(
@@ -89,7 +90,10 @@ export async function PATCH(
     .eq('user_id', params.userId);
 
   if (error) {
-    return NextResponse.json({ error: error.message }, { status: 400 });
+    const { message } = reportDbError('organization_members.role_update_failed', error, {
+      organizationId: params.id,
+    });
+    return NextResponse.json({ error: message }, { status: 400 });
   }
 
   return NextResponse.json({ ok: true });
@@ -161,7 +165,10 @@ export async function DELETE(
     .select('user_id');
 
   if (error) {
-    return NextResponse.json({ error: error.message }, { status: 400 });
+    const { message } = reportDbError('organization_members.remove_failed', error, {
+      organizationId: params.id,
+    });
+    return NextResponse.json({ error: message }, { status: 400 });
   }
 
   if (!deleted || deleted.length === 0) {

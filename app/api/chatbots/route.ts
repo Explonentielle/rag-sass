@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { reportDbError } from '@/lib/userErrors';
 import { createClient } from '@/lib/supabase/server';
 import { PROMPT_TEMPLATES } from '@/lib/prompts';
 import {
@@ -93,7 +94,8 @@ export async function POST(request: Request) {
       .select('id', { count: 'exact', head: true })
       .eq('organization_id', organizationId);
     if (countError) {
-      return NextResponse.json({ error: countError.message }, { status: 400 });
+      const { message } = reportDbError('chatbot.count_failed', countError, { organizationId });
+      return NextResponse.json({ error: message }, { status: 400 });
     }
     if ((count ?? 0) >= chatbotLimit) {
       return NextResponse.json(
@@ -125,7 +127,8 @@ export async function POST(request: Request) {
     .single();
 
   if (error) {
-    return NextResponse.json({ error: error.message }, { status: 400 });
+    const { message } = reportDbError('chatbot.create_failed', error, { organizationId });
+    return NextResponse.json({ error: message }, { status: 400 });
   }
 
   return NextResponse.json({ id: data.id }, { status: 201 });

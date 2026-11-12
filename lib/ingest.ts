@@ -11,7 +11,8 @@ import {
   type ChunkDoc,
 } from '@/lib/elasticsearch';
 import { hashText } from '@/lib/sourceRefreshRules';
-import { logInfo, logError, logWarn } from '@/lib/logger';
+import { reportError } from '@/lib/userErrors';
+import { logInfo, logWarn } from '@/lib/logger';
 
 const EMBEDDING_BATCH_SIZE = 50;
 
@@ -104,8 +105,11 @@ async function runIngestion(
     logInfo('ingest.success', { ...logCtx, chunkCount: indexedCount });
     return { status: 'indexed', chunkCount: indexedCount };
   } catch (err) {
-    const message = err instanceof Error ? err.message : 'Erreur inconnue lors du traitement.';
-    logError('ingest.failed', { ...logCtx, error: message, stack: err instanceof Error ? err.stack : undefined });
+    // This text is stored and shown in the documents list: only our own
+    // UnsupportedDocumentError wording (written for the user) passes through,
+    // anything else (storage, OpenAI, Elasticsearch...) is replaced by a
+    // plain sentence plus a reference, the full error staying in the logs.
+    const { message } = reportError('ingest.failed', err, logCtx);
 
     await supabase
       .from('documents')

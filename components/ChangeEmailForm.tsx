@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { Button } from '@/components/ui/Button';
 import { Input, Label } from '@/components/ui/Card';
+import { describeAuthError } from '@/lib/userErrors';
 
 export default function ChangeEmailForm({ currentEmail }: { currentEmail: string }) {
   const [open, setOpen] = useState(false);
@@ -33,7 +34,7 @@ export default function ChangeEmailForm({ currentEmail }: { currentEmail: string
     setLoading(false);
 
     if (error) {
-      setError(error.message);
+      setError(describeAuthError(error));
       return;
     }
 

@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import { reportDbError } from '@/lib/userErrors';
 
 export async function PATCH(request: Request, { params }: { params: { id: string } }) {
   const supabase = createClient();
@@ -27,7 +28,8 @@ export async function PATCH(request: Request, { params }: { params: { id: string
     .single();
 
   if (error) {
-    return NextResponse.json({ error: error.message }, { status: 400 });
+    const { message } = reportDbError('template.update_failed', error, { templateId: params.id });
+    return NextResponse.json({ error: message }, { status: 400 });
   }
 
   return NextResponse.json({ template: data });
@@ -47,7 +49,8 @@ export async function DELETE(_request: Request, { params }: { params: { id: stri
   const { error } = await supabase.from('custom_templates').delete().eq('id', params.id);
 
   if (error) {
-    return NextResponse.json({ error: error.message }, { status: 400 });
+    const { message } = reportDbError('template.delete_failed', error, { templateId: params.id });
+    return NextResponse.json({ error: message }, { status: 400 });
   }
 
   return NextResponse.json({ ok: true });

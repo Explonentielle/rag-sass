@@ -5,6 +5,7 @@ import { JSDOM } from 'jsdom';
 import { Readability } from '@mozilla/readability';
 import { assertPublicHostname as assertPublicHost, BlockedAddressError } from '@/lib/ssrfGuard';
 import { logWarn } from '@/lib/logger';
+import { UserFacingError } from '@/lib/userErrors';
 import { runOcr } from '@/lib/ocrService';
 import { transcribeAudio } from '@/lib/openai';
 import {
@@ -49,7 +50,9 @@ const MAX_AUDIO_BYTES = 24 * 1024 * 1024;
 // docs/roadmap.md item 6 note on the OpenAI Batch API), not this endpoint.
 const LARGE_SHEET_ROW_WARNING = 5000;
 
-export class UnsupportedDocumentError extends Error {}
+// Written for the end user (every throw site uses a French sentence), so it
+// is safe to show as is — see lib/userErrors.ts.
+export class UnsupportedDocumentError extends UserFacingError {}
 
 /**
  * Shared tail for the two cases that need OCR: a scanned PDF (no native
@@ -59,8 +62,11 @@ export class UnsupportedDocumentError extends Error {}
  */
 async function ocrOrThrow(buffer: Buffer, context: string): Promise<string> {
   const ocrText = await runOcr(buffer).catch((err) => {
+    // The service's own error text (network, auth, HTTP status) is for the
+    // logs, not for the person who uploaded the file.
+    logWarn('ocr.failed', { error: err instanceof Error ? err.message : String(err) });
     throw new UnsupportedDocumentError(
-      `${context} L'OCR a échoué : ${err instanceof Error ? err.message : 'erreur inconnue'}.`
+      `${context} Le service de lecture des scans est momentanément indisponible, réessayez dans quelques minutes.`
     );
   });
 

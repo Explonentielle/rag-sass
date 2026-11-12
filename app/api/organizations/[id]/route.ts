@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { reportDbError } from '@/lib/userErrors';
 import { createClient } from '@/lib/supabase/server';
 import { deleteOrganizationChunks } from '@/lib/elasticsearch';
 import { removeConversationFiles } from '@/lib/conversationFiles';
@@ -92,7 +93,8 @@ export async function DELETE(_request: Request, { params }: { params: { id: stri
 
   const { error: deleteError } = await supabase.from('organizations').delete().eq('id', params.id);
   if (deleteError) {
-    return NextResponse.json({ error: deleteError.message }, { status: 400 });
+    const { message } = reportDbError('organization.delete_failed', deleteError, { organizationId: params.id });
+    return NextResponse.json({ error: message }, { status: 400 });
   }
 
   logInfo('organization.deleted', { organizationId: params.id, documentCount: storagePaths.length });

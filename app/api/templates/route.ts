@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import { reportDbError } from '@/lib/userErrors';
 
 export async function POST(request: Request) {
   const supabase = createClient();
@@ -30,7 +31,8 @@ export async function POST(request: Request) {
     .single();
 
   if (error) {
-    return NextResponse.json({ error: error.message }, { status: 400 });
+    const { message } = reportDbError('template.create_failed', error);
+    return NextResponse.json({ error: message }, { status: 400 });
   }
 
   return NextResponse.json({ template: data }, { status: 201 });

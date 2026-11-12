@@ -3,6 +3,7 @@ import { waitUntil } from '@vercel/functions';
 import { createClient } from '@/lib/supabase/server';
 import { processUrlDocument } from '@/lib/ingest';
 import { logWarn, logError } from '@/lib/logger';
+import { reportError } from '@/lib/userErrors';
 
 // Same reasoning as app/api/documents/upload/route.ts: ingestion runs in
 // the background (waitUntil below), this only bounds that background work.
@@ -74,7 +75,7 @@ export async function POST(request: Request) {
         error: insertError?.message,
       });
       return NextResponse.json(
-        { error: `Enregistrement échoué: ${insertError?.message}` },
+        { error: reportError('upload_url.insert_error_response', insertError ?? new Error('insert sans résultat')).message },
         { status: 500 }
       );
     }
@@ -96,11 +97,7 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ document });
   } catch (err) {
-    const message = err instanceof Error ? err.message : 'Erreur inconnue.';
-    logError('upload_url.uncaught_exception', {
-      error: message,
-      stack: err instanceof Error ? err.stack : undefined,
-    });
-    return NextResponse.json({ error: `Erreur serveur: ${message}` }, { status: 500 });
+    const { message } = reportError('upload_url.uncaught_exception', err);
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }

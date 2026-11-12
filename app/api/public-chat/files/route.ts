@@ -9,7 +9,8 @@ import {
   MAX_FILES_PER_CONVERSATION,
   MAX_VISITOR_FILE_BYTES,
 } from '@/lib/visitorFileRules';
-import { logInfo, logWarn, logError } from '@/lib/logger';
+import { logInfo, logWarn } from '@/lib/logger';
+import { reportError } from '@/lib/userErrors';
 
 // Visitor file upload for the public chat widget (docs/roadmap.md item 48).
 // Same anonymous trust model as ../route.ts: access = chatbotId + is_public +
@@ -158,8 +159,7 @@ export async function POST(request: Request) {
       readable,
     });
   } catch (err) {
-    const message = err instanceof Error ? err.message : 'Erreur inconnue.';
-    logError('public-chat-files.failed', { ...logCtx, error: message });
+    const { message } = reportError('public-chat-files.failed', err, logCtx);
     return new Response(message, { status: 500 });
   }
 }

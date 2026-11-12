@@ -70,6 +70,7 @@ fixe — sert de mémoire centralisée plutôt que de planning strict.
 | 61 | Ingestion | Re-scan automatique des pages web indexées (cron quotidien, ré-indexation seulement si le contenu change) | Moyen | ✅ Fait côté code (2026-11-12), migration `0029` à appliquer, à tester |
 | 62 | Intégrations | Webhook « nouveau lead » signé vers un CRM, Zapier ou Make | Faible-moyen | ✅ Fait côté code (2026-11-12), migration `0030` à appliquer, à tester |
 | 63 | Chat | Lecture par le chatbot des fichiers envoyés par les visiteurs (réalise l'item 49) | Élevé | ✅ Fait côté code (2026-11-12), migration `0031` à appliquer, à tester |
+| 64 | Qualité | Gestion d'erreur côté utilisateur : plus aucun texte technique brut dans le front | Moyen | ✅ Fait (2026-11-12) |
 
 ---
 
@@ -3137,3 +3138,63 @@ conditions réelles** : passer l'organisation en PME, activer l'envoi de fichier
 la lecture, envoyer un PDF texte, un scan et une image depuis le widget et poser une
 question sur chacun, essayer un fichier corrompu, et un PDF contenant une consigne
 du type « ignore tes instructions » pour vérifier qu'elle est sans effet.
+
+---
+
+### 64. Gestion d'erreur côté utilisateur : ✅ Fait (2026-11-12)
+
+**Déclencheur** : le jour du déploiement des items 59 à 63, un visiteur a vu dans
+le widget `Impossible d'enregistrer les messages: null value in column "no_context"
+of relation "messages" violates not-null constraint`. Cause directe : un insert
+groupé de `appendTurn` ne renseignait `no_context` que sur la ligne de la réponse,
+PostgREST envoyant `null` pour l'autre (corrigé, avec test de non-régression). Le
+vrai défaut était plus large : les routes renvoyaient au navigateur le texte brut
+de l'exception (message Postgres, erreur OpenAI, erreur de stockage...), donc le
+moindre incident technique s'affichait tel quel à un visiteur, en anglais et avec
+des noms de colonnes.
+
+**Règle posée** (`lib/userErrors.ts`) : ce que voit l'utilisateur n'est jamais le
+texte d'une exception.
+- `UserFacingError` : erreur dont le message est écrit pour l'utilisateur, affiché
+  tel quel (ex. « Impossible d'enregistrer le fichier. »). `UnsupportedDocumentError`
+  (fichier illisible, adresse refusée...) en hérite.
+- Toute autre erreur est journalisée en entier (message, pile, contexte) avec une
+  **référence courte** de 8 caractères, et l'utilisateur reçoit une phrase claire
+  suivie de `(réf. xxxxxxxx)`, que l'on retrouve dans les logs Vercel. Deux causes
+  réessayables sont reconnues : service saturé (429, quota) et délai dépassé.
+- Erreurs de base de données (`reportDbError`) : les causes courantes sont expliquées
+  (doublon, élément lié absent, droits, valeur invalide), le reste est générique
+  avec référence.
+- Erreurs d'authentification (`describeAuthError`) : traduites en français par code
+  (identifiants incorrects, email non confirmé, compte existant, mot de passe faible
+  ou identique, trop de tentatives, session expirée). Avant, « Invalid login
+  credentials » s'affichait tel quel.
+
+**Où c'est appliqué** :
+- Chat public et chat du dashboard : flux de réponse (évènement `error`), historique,
+  suppression, notation, envoi de fichiers.
+- Une trentaine de routes du dashboard qui renvoyaient `error.message` : chatbots,
+  documents, ingestion par adresse, extraits, modèles, conversations, membres,
+  organisation.
+- Erreur d'ingestion **stockée** et affichée dans la liste des documents : seul le
+  texte écrit pour l'utilisateur passe (le détail de l'OCR, du stockage ou
+  d'OpenAI reste dans les logs).
+- Formulaires de connexion, inscription, définition et changement de mot de passe,
+  changement d'email.
+- **Widget** : un échec de plateforme (504 de Vercel, page HTML d'erreur, passerelle)
+  est remplacé par un message clair (`describeFailedResponse`), et une coupure
+  réseau en plein milieu d'une réponse affiche une erreur au lieu d'une bulle vide.
+
+**Non concerné** : les routes de cron (appelées par Vercel avec un secret, jamais
+vues d'un utilisateur) et les pages d'erreur Next.js du dashboard, qui affichaient
+déjà un message générique avec une référence.
+
+**Tests** : `lib/userErrors.test.ts` (aucun texte brut ne passe, références, causes
+courantes, traduction auth, corps de réponse HTML ou trop long), `lib/conversations.test.ts`
+(`no_context` sur les deux lignes), `lib/ingest.test.ts` adapté (l'erreur de stockage
+n'apparaît plus dans le message stocké).
+
+**À savoir** : le message de l'ancienne version (« Impossible d'enregistrer les
+messages: null value... ») ne peut plus apparaître ; à la place, un incident donne une
+phrase claire et une référence. Si un utilisateur envoie cette référence, la ligne de
+log correspondante contient l'erreur complète.

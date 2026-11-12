@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Card';
 import { validateVisitorFile, VISITOR_FILE_ACCEPT } from '@/lib/visitorFileRules';
 import type { WidgetAppearance } from '@/lib/widgetAppearance';
+import { GENERIC_ERROR_MESSAGE, describeFailedResponse } from '@/lib/userErrors';
 
 function PaperclipIcon({ className }: { className?: string }) {
   return (
@@ -527,7 +528,7 @@ export default function ChatWidget({
 
       const res = await fetch(`${apiEndpoint}/files`, { method: 'POST', body: form });
       if (!res.ok) {
-        setUploadError((await res.text().catch(() => '')) || "Erreur lors de l'envoi du fichier.");
+        setUploadError(describeFailedResponse(res.status, await res.text().catch(() => '')));
         return;
       }
       const body = await res.json();
@@ -609,7 +610,7 @@ export default function ChatWidget({
       });
 
       if (!res.ok || !res.body) {
-        const text = await res.text().catch(() => 'Erreur inconnue.');
+        const text = describeFailedResponse(res.status, await res.text().catch(() => ''));
         setMessages((prev) => {
           const next = [...prev];
           next[next.length - 1] = { role: 'assistant', content: '', error: text };
@@ -666,9 +667,10 @@ export default function ChatWidget({
                 return next;
               });
             } else if (event === 'error') {
+              const errorText = typeof data.message === 'string' && data.message ? data.message : GENERIC_ERROR_MESSAGE;
               setMessages((prev) => {
                 const next = [...prev];
-                next[next.length - 1] = { ...next[next.length - 1], error: data.message };
+                next[next.length - 1] = { ...next[next.length - 1], error: errorText };
                 return next;
               });
             } else if (event === 'truncated') {
@@ -690,6 +692,17 @@ export default function ChatWidget({
           }
         }
       }
+    } catch {
+      // Network drop or a stream cut mid-answer: without this the visitor is
+      // left with an empty bubble and no explanation.
+      setMessages((prev) => {
+        const next = [...prev];
+        const last = next[next.length - 1];
+        if (last?.role === 'assistant' && !last.error) {
+          next[next.length - 1] = { ...last, error: GENERIC_ERROR_MESSAGE };
+        }
+        return next;
+      });
     } finally {
       setLoading(false);
     }

@@ -8,7 +8,8 @@ import {
 } from '@/lib/agenticTools';
 import { hybridSearch } from '@/lib/elasticsearch';
 import { buildSystemPrompt } from '@/lib/prompts';
-import { logInfo, logWarn, logError } from '@/lib/logger';
+import { logInfo, logWarn } from '@/lib/logger';
+import { reportDbError, reportError } from '@/lib/userErrors';
 import { checkPublicChatRateLimit, checkRateLimit, getClientIp } from '@/lib/rateLimit';
 import { isUuid, parseFeedbackValue, setAssistantMessageFeedback } from '@/lib/feedback';
 import { createLeadWebhookNotifier, resolveWebhookTarget } from '@/lib/leadWebhook';
@@ -87,8 +88,7 @@ export async function GET(request: Request) {
     const history = await loadHistory(admin, conversationId);
     return Response.json({ messages: history });
   } catch (err) {
-    const message = err instanceof Error ? err.message : 'Erreur inconnue.';
-    logError('public-chat.history_failed', { chatbotId, conversationId, error: message });
+    const { message } = reportError('public-chat.history_failed', err, { chatbotId, conversationId });
     return new Response(message, { status: 500 });
   }
 }
@@ -127,7 +127,8 @@ export async function DELETE(request: Request) {
     .eq('visitor_id', visitorId);
 
   if (error) {
-    return new Response(error.message, { status: 400 });
+    const { message } = reportDbError('public-chat.delete_failed', error, { chatbotId, conversationId });
+    return new Response(message, { status: 400 });
   }
   return Response.json({ ok: true });
 }
@@ -175,12 +176,8 @@ export async function PATCH(request: Request) {
     if (!updated) return new Response('Message introuvable.', { status: 404 });
     return Response.json({ ok: true });
   } catch (err) {
-    logError('public-chat.feedback_failed', {
-      chatbotId,
-      conversationId,
-      error: err instanceof Error ? err.message : 'Erreur inconnue.',
-    });
-    return new Response("Impossible d'enregistrer le retour.", { status: 500 });
+    const { message } = reportError('public-chat.feedback_failed', err, { chatbotId, conversationId });
+    return new Response(message, { status: 500 });
   }
 }
 
@@ -375,8 +372,9 @@ export async function POST(request: Request) {
           sourceCount: sources.length,
         });
       } catch (err) {
-        const message = err instanceof Error ? err.message : 'Erreur inconnue.';
-        logError('public-chat.failed', { ...logCtx, error: message, stack: err instanceof Error ? err.stack : undefined });
+        // Never the raw exception text (a Postgres or OpenAI message) — the
+        // visitor gets a plain sentence plus a reference found in the logs.
+        const { message } = reportError('public-chat.failed', err, logCtx);
         controller.enqueue(encoder.encode(sseEvent('error', { message })));
       } finally {
         controller.close();

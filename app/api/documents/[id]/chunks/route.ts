@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { getDocumentChunks } from '@/lib/elasticsearch';
-import { logError } from '@/lib/logger';
+import { reportError } from '@/lib/userErrors';
 
 // Lets someone inspect what ingestion actually indexed for a document
 // (docs/roadmap.md item 45) — especially useful with AI-assisted indexing
@@ -26,8 +26,7 @@ export async function GET(_request: Request, { params }: { params: { id: string 
     const chunks = await getDocumentChunks(document.id);
     return NextResponse.json({ chunks });
   } catch (err) {
-    const message = err instanceof Error ? err.message : 'Erreur inconnue.';
-    logError('document_chunks.fetch_failed', { documentId: document.id, error: message });
-    return NextResponse.json({ error: `Échec de la récupération: ${message}` }, { status: 500 });
+    const { message } = reportError('document_chunks.fetch_failed', err, { documentId: document.id });
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }

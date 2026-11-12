@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { getAdminClient } from '@/lib/supabase/admin';
-import { logError } from '@/lib/logger';
+import { reportDbError, reportError } from '@/lib/userErrors';
 import { PLAN_MEMBER_LIMITS, PLAN_LABELS } from '@/lib/plans';
 import type { OrgPlan } from '@/types/database';
 
@@ -36,7 +36,8 @@ export async function GET(_request: Request, { params }: { params: { id: string 
     .order('created_at', { ascending: true });
 
   if (error) {
-    return NextResponse.json({ error: error.message }, { status: 400 });
+    const { message } = reportDbError('organization_members.list_failed', error, { organizationId: params.id });
+    return NextResponse.json({ error: message }, { status: 400 });
   }
 
   // Emails live in auth.users, not reachable via the RLS-scoped client —
@@ -98,7 +99,8 @@ export async function POST(request: Request, { params }: { params: { id: string 
       .select('user_id', { count: 'exact', head: true })
       .eq('organization_id', params.id);
     if (countError) {
-      return NextResponse.json({ error: countError.message }, { status: 400 });
+      const { message } = reportDbError('organization_members.count_failed', countError, { organizationId: params.id });
+      return NextResponse.json({ error: message }, { status: 400 });
     }
     if ((count ?? 0) >= memberLimit) {
       return NextResponse.json(
@@ -116,7 +118,10 @@ export async function POST(request: Request, { params }: { params: { id: string 
   let page = 1;
   while (!targetUserId) {
     const { data, error } = await admin.auth.admin.listUsers({ page, perPage: 200 });
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    if (error) {
+      const { message } = reportError('organization_members.list_users_failed', error, { organizationId: params.id });
+      return NextResponse.json({ error: message }, { status: 500 });
+    }
     const found = data.users.find((u) => u.email?.toLowerCase() === email);
     if (found) targetUserId = found.id;
     if (data.users.length < 200) break;
@@ -134,14 +139,12 @@ export async function POST(request: Request, { params }: { params: { id: string 
       redirectTo: `${origin}/auth/callback`,
     });
     if (error || !data.user) {
-      logError('organization_members.invite_failed', {
-        organizationId: params.id,
-        error: error?.message,
-      });
-      return NextResponse.json(
-        { error: error?.message || "Échec de l'envoi de l'invitation." },
-        { status: 500 }
+      const { message } = reportError(
+        'organization_members.invite_failed',
+        error ?? new Error("invitation sans utilisateur"),
+        { organizationId: params.id }
       );
+      return NextResponse.json({ error: message }, { status: 500 });
     }
     targetUserId = data.user.id;
     invited = true;
@@ -158,7 +161,10 @@ export async function POST(request: Request, { params }: { params: { id: string 
         { status: 409 }
       );
     }
-    return NextResponse.json({ error: insertError.message }, { status: 400 });
+    const { message } = reportDbError('organization_members.insert_failed', insertError, {
+      organizationId: params.id,
+    });
+    return NextResponse.json({ error: message }, { status: 400 });
   }
 
   return NextResponse.json({ ok: true, invited }, { status: 201 });

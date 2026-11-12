@@ -7,6 +7,7 @@ import { createClient } from '@/lib/supabase/client';
 import { Button } from '@/components/ui/Button';
 import { Card, Input, Label } from '@/components/ui/Card';
 import { Logo } from '@/components/ui/Logo';
+import { describeAuthError } from '@/lib/userErrors';
 
 // Landing page for someone who just accepted a team invite (see
 // app/auth/callback/route.ts, which redirects type=invite links here
@@ -35,7 +36,7 @@ export default function SetPasswordPage() {
     setLoading(false);
 
     if (error) {
-      setError(error.message);
+      setError(describeAuthError(error));
       return;
     }
 

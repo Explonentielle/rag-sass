@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { reportDbError } from '@/lib/userErrors';
 import { createClient } from '@/lib/supabase/server';
 import { deleteDocumentChunks } from '@/lib/elasticsearch';
 import { logInfo, logError } from '@/lib/logger';
@@ -76,7 +77,8 @@ export async function DELETE(_request: Request, { params }: { params: { id: stri
 
   const { error: deleteError } = await supabase.from('documents').delete().eq('id', document.id);
   if (deleteError) {
-    return NextResponse.json({ error: deleteError.message }, { status: 400 });
+    const { message } = reportDbError('document.delete_failed', deleteError, { documentId: document.id });
+    return NextResponse.json({ error: message }, { status: 400 });
   }
 
   logInfo('document.deleted', { documentId: document.id, chatbotId: document.chatbot_id });
