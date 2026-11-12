@@ -16,6 +16,9 @@ export type ChatbotAccessResult =
       ok: true;
       chatbot: {
         id: string;
+        name: string;
+        lead_webhook_url: string | null;
+        lead_webhook_secret: string | null;
         organization_id: string;
         system_prompt_template: string;
         use_documents: boolean;
@@ -52,7 +55,7 @@ export async function getAccessibleChatbot(
   const { data: chatbot, error } = await admin
     .from('chatbots')
     .select(
-      'id, organization_id, system_prompt_template, is_public, allowed_origins, use_documents, use_case, allow_email_tool, notification_email, allow_visitor_uploads, allow_lead_qualification, lead_qualification_criteria, meeting_link, organizations!inner(plan, overage_mode)'
+      'id, name, organization_id, system_prompt_template, is_public, allowed_origins, use_documents, use_case, allow_email_tool, notification_email, allow_visitor_uploads, allow_lead_qualification, lead_qualification_criteria, meeting_link, lead_webhook_url, lead_webhook_secret, organizations!inner(plan, overage_mode)'
     )
     .eq('id', chatbotId)
     .single();

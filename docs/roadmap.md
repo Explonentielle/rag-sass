@@ -68,6 +68,7 @@ fixe — sert de mémoire centralisée plutôt que de planning strict.
 | 59 | Produit | Retour 👍/👎 sur les réponses + statistiques et questions sans réponse par chatbot | Moyen | ✅ Fait côté code (2026-11-12), migration `0027` à appliquer, à tester |
 | 60 | Produit | Personnalisation du widget : logo, nom, message d'accueil, questions suggérées, mention « Propulsé par » selon le plan | Faible-moyen | ✅ Fait côté code (2026-11-12), migration `0028` à appliquer, à tester |
 | 61 | Ingestion | Re-scan automatique des pages web indexées (cron quotidien, ré-indexation seulement si le contenu change) | Moyen | ✅ Fait côté code (2026-11-12), migration `0029` à appliquer, à tester |
+| 62 | Intégrations | Webhook « nouveau lead » signé vers un CRM, Zapier ou Make | Faible-moyen | ✅ Fait côté code (2026-11-12), migration `0030` à appliquer, à tester |
 
 ---
 
@@ -3004,3 +3005,66 @@ hebdomadaire, empreinte stable). **À tester en conditions réelles** : activer
 « Actualiser » sur une page (première fois : « Page mise à jour », seconde fois :
 « Déjà à jour »), modifier un texte sur le site puis actualiser et poser la
 question au chatbot, vérifier dans les logs Vercel le passage du cron.
+
+---
+
+### 62. Webhook « nouveau lead » : ✅ Fait côté code (migration à appliquer, à tester)
+
+**Besoin** : aujourd'hui un lead qualifié (item 21) ou une demande de rappel
+(item 33) arrive par email. Un client qui a un CRM ou un outil
+d'automatisation veut que ces leads y arrivent seuls, sans recopier. Aucune
+autorisation à demander sur les outils du client : il colle une adresse, c'est
+tout. C'est l'alternative simple aux connecteurs (même problème
+d'autorisation par client que l'agenda, voir la réflexion plus haut).
+
+**Ce qui est fait** :
+- **Configuration par chatbot** (section Widget du dashboard) : adresse https
+  + secret de signature généré à l'enregistrement, affiché avec copie et
+  régénération, stocké chiffré (`lib/crypto.ts`, colonne
+  `lead_webhook_secret`). Bouton « Envoyer un test ».
+- **Évènements** : `lead.qualified` (outil `score_and_route_lead`) et
+  `contact.requested` (outil `notify_bot_owner`), plus `test.ping`. Le
+  webhook s'ajoute à l'email de notification, sans le remplacer, et un échec
+  de l'un des deux canaux n'affecte pas l'autre ni la conversation.
+- **Signature** : en-tête `X-Corpus-Signature` = HMAC-SHA256 de
+  `timestamp.corps` avec le secret, plus `X-Corpus-Timestamp`, pour que le
+  destinataire vérifie l'origine et rejette un rejeu. Format et exemple de
+  vérification dans `docs/integration.md`.
+- **Sécurité de l'envoi** : https obligatoire, pas d'identifiants dans l'URL,
+  adresse refusée si elle pointe vers un réseau privé ou interne (garde SSRF,
+  désormais dans `lib/ssrfGuard.ts` et partagée avec l'ingestion d'URL ;
+  refactor vérifié par les 49 tests d'`extract`), aucune redirection suivie,
+  délai de 5 s. La garde est appliquée à l'enregistrement et à chaque envoi.
+- **Contenu** : le webhook reçoit résumé et coordonnées donnés par le visiteur
+  (donnée personnelle envoyée à un tiers choisi par le client). Les logs
+  n'en contiennent rien, seulement l'évènement et le code de réponse.
+- **Palier** : réservé à PME et Métier (`LEAD_WEBHOOK_ALLOWED_PLANS`, vérifié à
+  l'enregistrement de l'adresse ; un passage à un palier inférieur ne
+  supprime pas un webhook existant).
+
+**Choix et limites** :
+- **Pas de webhook depuis le chat de test du dashboard** (seulement le
+  widget public) : un membre de l'équipe qui essaie le parcours de lead ne
+  pousse pas de faux leads dans le CRM du client. L'email, lui, part toujours
+  comme avant.
+- **Pas de nouvelle tentative** : un échec est journalisé et c'est tout ; l'email
+  reste le filet de sécurité. Une file de relance (backoff, historique des
+  envois dans le dashboard) serait la suite si des clients en dépendent.
+- **Le secret est lisible par les membres de l'organisation** dans le
+  dashboard (comme une clé de signature affichée par un fournisseur) ;
+  régénérable à tout moment.
+- Le webhook n'est utilisé que si l'email de notification est renseigné, car
+  les outils de lead ne sont proposés au chatbot que dans ce cas.
+- Limite connue de la garde SSRF : le DNS rebinding n'est pas couvert (item
+  44).
+
+**À appliquer** : migration `0030_lead_webhook.sql`. Sans elle, le chat public
+et la page du chatbot échouent (colonnes lues), donc l'appliquer avant de
+déployer.
+
+**Tests** : `lib/leadWebhook.test.ts` (validation d'URL, signature vérifiable,
+redirection non suivie, adresse interne refusée, échec réseau sans exception,
+contenu de l'évènement). **À tester en conditions réelles** : passer
+l'organisation en PME, coller l'adresse d'un récepteur de test (Zapier « Catch
+Hook » ou webhook.site), « Envoyer un test », puis déclencher un vrai lead
+depuis le widget public et vérifier le contenu et la signature.

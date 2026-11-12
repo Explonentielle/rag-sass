@@ -109,6 +109,8 @@ export interface Database {
           welcome_message: string | null;
           suggested_questions: string[] | null;
           logo_path: string | null;
+          lead_webhook_url: string | null;
+          lead_webhook_secret: string | null;
           source_refresh: SourceRefreshFrequency;
           created_at: string;
         };
@@ -136,6 +138,8 @@ export interface Database {
           welcome_message?: string | null;
           suggested_questions?: string[] | null;
           logo_path?: string | null;
+          lead_webhook_url?: string | null;
+          lead_webhook_secret?: string | null;
           source_refresh?: SourceRefreshFrequency;
           created_at?: string;
         };
@@ -163,6 +167,8 @@ export interface Database {
           welcome_message?: string | null;
           suggested_questions?: string[] | null;
           logo_path?: string | null;
+          lead_webhook_url?: string | null;
+          lead_webhook_secret?: string | null;
           source_refresh?: SourceRefreshFrequency;
           created_at?: string;
         };

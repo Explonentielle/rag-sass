@@ -79,6 +79,49 @@ RAG que le chat authentifié (`/api/chat`), mais **sans vérification de
 session**. Utilisé par le widget flottant interne, `/embed/[chatbotId]` et
 `/embed/[chatbotId]?widget=1`.
 
+## Webhook « nouveau lead » (plans PME et Métier)
+
+Réglable dans `/dashboard/chatbots/[id]` → section Widget. À chaque lead
+qualifié (`lead.qualified`) ou demande de rappel d'un visiteur
+(`contact.requested`), le chatbot envoie un `POST` JSON à l'adresse
+configurée (https obligatoire). Un bouton « Envoyer un test » émet un
+évènement `test.ping`. Les conversations de test du dashboard n'envoient
+rien. Pas de nouvelle tentative en cas d'échec (délai de 5 s, journalisé).
+
+```json
+{
+  "id": "7b0f6c1e-…",
+  "event": "lead.qualified",
+  "occurred_at": "2026-11-12T10:15:00.000Z",
+  "data": {
+    "chatbot": { "id": "5434af79-…", "name": "Mon assistant" },
+    "conversation_id": "…",
+    "score": "chaud",
+    "summary": "Projet de rénovation, budget 20 k€, sous 2 mois.",
+    "contact": "Marie, marie@exemple.fr"
+  }
+}
+```
+
+`contact.requested` porte les mêmes champs sauf `score`. En-têtes :
+`X-Corpus-Event`, `X-Corpus-Delivery` (id unique de l'envoi),
+`X-Corpus-Timestamp` (secondes Unix) et `X-Corpus-Signature`.
+
+**Vérifier la signature** : `X-Corpus-Signature` vaut `sha256=` suivi du
+HMAC-SHA256 hexadécimal de la chaîne `timestamp + "." + corps brut`, calculé
+avec le secret affiché dans le dashboard. À faire sur le corps brut, avant
+tout `JSON.parse`, et à comparer en temps constant ; rejeter un timestamp
+trop ancien (5 minutes par exemple) pour éviter le rejeu.
+
+```js
+import { createHmac, timingSafeEqual } from 'crypto';
+
+function isValid(secret, timestamp, rawBody, header) {
+  const expected = 'sha256=' + createHmac('sha256', secret).update(`${timestamp}.${rawBody}`).digest('hex');
+  return header.length === expected.length && timingSafeEqual(Buffer.from(header), Buffer.from(expected));
+}
+```
+
 ## Sécurité et limites connues
 
 - **Allowlist de domaines ✅ fait** (`docs/roadmap.md` item 31) : chaque

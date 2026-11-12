@@ -7,6 +7,8 @@ import { AI_INDEXING_ALLOWED_PLANS } from '@/lib/plans';
 import { getAdminClient } from '@/lib/supabase/admin';
 import { removeChatbotLogos } from '@/lib/chatbotLogo';
 import { isSourceRefreshFrequency } from '@/lib/sourceRefreshRules';
+import { validateWebhookUrl } from '@/lib/leadWebhook';
+import { prepareWebhookUpdate } from '@/lib/leadWebhookConfig';
 import type { SourceRefreshFrequency } from '@/types/database';
 import {
   parseOptionalText,
@@ -46,6 +48,17 @@ export async function PATCH(request: Request, { params }: { params: { id: string
   const welcomeMessageInput: unknown = body?.welcomeMessage;
   const suggestedQuestionsInput: unknown = body?.suggestedQuestions;
   const sourceRefreshInput: unknown = body?.sourceRefresh;
+  const leadWebhookUrlInput: unknown = body?.leadWebhookUrl;
+  const regenerateWebhookSecret = body?.regenerateWebhookSecret === true;
+
+  // Outgoing lead webhook (docs/roadmap.md item 62): shape check here, plan
+  // entitlement / public address / secret generation in prepareWebhookUpdate.
+  let leadWebhookUrl: string | null | undefined;
+  if (leadWebhookUrlInput !== undefined) {
+    const parsed = validateWebhookUrl(leadWebhookUrlInput);
+    if (!parsed.ok) return NextResponse.json({ error: parsed.error }, { status: 400 });
+    leadWebhookUrl = parsed.value;
+  }
 
   // Automatic refresh of web pages (docs/roadmap.md item 61).
   let sourceRefresh: SourceRefreshFrequency | undefined;
@@ -193,9 +206,19 @@ export async function PATCH(request: Request, { params }: { params: { id: string
     botName === undefined &&
     welcomeMessage === undefined &&
     suggestedQuestions === undefined &&
-    sourceRefresh === undefined
+    sourceRefresh === undefined &&
+    leadWebhookUrl === undefined &&
+    !regenerateWebhookSecret
   ) {
     return NextResponse.json({ error: 'Rien à mettre à jour.' }, { status: 400 });
+  }
+
+  const webhookChange = await prepareWebhookUpdate(supabase, params.id, {
+    url: leadWebhookUrl,
+    regenerate: regenerateWebhookSecret,
+  });
+  if (!webhookChange.ok) {
+    return NextResponse.json({ error: webhookChange.error }, { status: webhookChange.status });
   }
 
   // Premium entitlement (docs/roadmap.md item 18) — only check when
@@ -274,6 +297,7 @@ export async function PATCH(request: Request, { params }: { params: { id: string
       ...(welcomeMessage !== undefined ? { welcome_message: welcomeMessage } : {}),
       ...(suggestedQuestions !== undefined ? { suggested_questions: suggestedQuestions } : {}),
       ...(sourceRefresh !== undefined ? { source_refresh: sourceRefresh } : {}),
+      ...webhookChange.update,
     })
     .eq('id', params.id);
 

@@ -11,6 +11,7 @@ import { buildSystemPrompt } from '@/lib/prompts';
 import { logInfo, logWarn, logError } from '@/lib/logger';
 import { checkPublicChatRateLimit, checkRateLimit, getClientIp } from '@/lib/rateLimit';
 import { isUuid, parseFeedbackValue, setAssistantMessageFeedback } from '@/lib/feedback';
+import { createLeadWebhookNotifier, resolveWebhookTarget } from '@/lib/leadWebhook';
 import { checkQuota } from '@/lib/usage';
 import { getAccessibleChatbot, isValidVisitorId } from '@/lib/publicChatAccess';
 import {
@@ -282,6 +283,14 @@ export async function POST(request: Request) {
 
         const notifyEmail = chatbot.allow_email_tool ? chatbot.notification_email : null;
         const leadQualificationEmail = chatbot.allow_lead_qualification ? chatbot.notification_email : null;
+        // Outgoing webhook (docs/roadmap.md item 62) — real visitors only: the
+        // dashboard test chat (app/api/chat/route.ts) never fires it, so a
+        // team member trying the lead flow doesn't push fake leads into a CRM.
+        const notifyWebhook = createLeadWebhookNotifier(
+          resolveWebhookTarget(chatbot.lead_webhook_url, chatbot.lead_webhook_secret),
+          { chatbot: { id: chatbot.id, name: chatbot.name }, conversationId },
+          { ...logCtx, conversationId }
+        );
         const combinedTools = [
           ...(notifyEmail
             ? [
@@ -290,12 +299,13 @@ export async function POST(request: Request) {
                   { ...logCtx, conversationId },
                   chatbot.allow_visitor_uploads
                     ? () => loadConversationAttachments(admin, conversationId)
-                    : undefined
+                    : undefined,
+                  notifyWebhook
                 ),
               ]
             : []),
           ...(leadQualificationEmail
-            ? [createLeadQualificationTool(leadQualificationEmail, { ...logCtx, conversationId })]
+            ? [createLeadQualificationTool(leadQualificationEmail, { ...logCtx, conversationId }, notifyWebhook)]
             : []),
         ];
         const tools = combinedTools.length ? combinedTools : undefined;

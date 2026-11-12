@@ -116,6 +116,15 @@ export const PAPERWORK_DIGITIZER_ALLOWED_PLANS: OrgPlan[] = ['pme', 'metier'];
 export const AUDIO_TRANSCRIPTION_ALLOWED_PLANS: OrgPlan[] = ['pme', 'metier'];
 
 /**
+ * Plans entitled to the outgoing lead webhook (docs/roadmap.md item 62):
+ * connecting leads to a CRM, Zapier or Make is a business feature, kept to
+ * the upper tiers. Enforced when the URL is set (lib/leadWebhookConfig.ts);
+ * soft-gated like the other premium features, a downgrade doesn't wipe an
+ * existing webhook.
+ */
+export const LEAD_WEBHOOK_ALLOWED_PLANS: OrgPlan[] = ['pme', 'metier'];
+
+/**
  * Plans whose public widget shows « Propulsé par Corpus.ai » (docs/roadmap.md
  * item 60). PME and above get the widget without the mention, a selling
  * point that costs nothing to run. Read in app/embed/[chatbotId]/page.tsx.

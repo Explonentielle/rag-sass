@@ -22,6 +22,8 @@ import ChatbotStatsPanel from '@/components/ChatbotStatsPanel';
 import WidgetAppearanceForm from '@/components/WidgetAppearanceForm';
 import SourceRefreshSelect from '@/components/SourceRefreshSelect';
 import RefreshDocumentButton from '@/components/RefreshDocumentButton';
+import LeadWebhookForm from '@/components/LeadWebhookForm';
+import { resolveWebhookTarget } from '@/lib/leadWebhook';
 import { getLogoPublicUrl } from '@/lib/chatbotLogo';
 import { listAllConversationsForChatbot } from '@/lib/conversations';
 import { loadChatbotStats } from '@/lib/chatbotStats';
@@ -29,6 +31,7 @@ import { logQueryError } from '@/lib/supabaseResult';
 import {
   AI_INDEXING_ALLOWED_PLANS,
   AUDIO_TRANSCRIPTION_ALLOWED_PLANS,
+  LEAD_WEBHOOK_ALLOWED_PLANS,
   WIDGET_BRANDING_PLANS,
 } from '@/lib/plans';
 import { Icon, IconBadge, ICONS } from '@/components/icons';
@@ -49,7 +52,7 @@ export default async function ChatbotPage({ params }: { params: { id: string } }
   const { data: chatbotData, error: chatbotError } = await supabase
     .from('chatbots')
     .select(
-      'id, name, system_prompt_template, organization_id, is_public, allowed_origins, use_documents, use_ai_indexing, allow_email_tool, notification_email, allow_visitor_uploads, allow_lead_qualification, lead_qualification_criteria, meeting_link, show_loading_steps, loading_messages, use_case, bot_name, welcome_message, suggested_questions, logo_path, source_refresh'
+      'id, name, system_prompt_template, organization_id, is_public, allowed_origins, use_documents, use_ai_indexing, allow_email_tool, notification_email, allow_visitor_uploads, allow_lead_qualification, lead_qualification_criteria, meeting_link, show_loading_steps, loading_messages, use_case, bot_name, welcome_message, suggested_questions, logo_path, source_refresh, lead_webhook_url, lead_webhook_secret'
     )
     .eq('id', params.id)
     .single();
@@ -240,6 +243,12 @@ export default async function ChatbotPage({ params }: { params: { id: string } }
             initialCriteria={chatbot.lead_qualification_criteria}
             initialMeetingLink={chatbot.meeting_link}
             notificationEmailSet={!!chatbot.notification_email}
+          />
+          <LeadWebhookForm
+            chatbotId={chatbot.id}
+            initialUrl={chatbot.lead_webhook_url}
+            initialSecret={resolveWebhookTarget(chatbot.lead_webhook_url, chatbot.lead_webhook_secret)?.secret ?? null}
+            allowed={!!org && LEAD_WEBHOOK_ALLOWED_PLANS.includes(org.plan)}
           />
         </section>
       )}

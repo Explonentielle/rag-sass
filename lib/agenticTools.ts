@@ -4,6 +4,7 @@
 // only knows how to run the generic tool-call loop.
 import type { ChatTool } from '@/lib/openai';
 import { sendEmail, type EmailAttachment } from '@/lib/email';
+import type { LeadWebhookNotifier } from '@/lib/leadWebhook';
 import { logInfo, logWarn } from '@/lib/logger';
 
 /**
@@ -37,7 +38,8 @@ Dès que l'interlocuteur exprime l'envie d'être recontacté ou suivi par un hum
 export function createNotifyOwnerOfLeadTool(
   ownerEmail: string,
   logCtx: Record<string, unknown>,
-  loadAttachments?: () => Promise<EmailAttachment[]>
+  loadAttachments?: () => Promise<EmailAttachment[]>,
+  notifyWebhook?: LeadWebhookNotifier
 ): ChatTool {
   return {
     name: 'notify_bot_owner',
@@ -81,6 +83,10 @@ export function createNotifyOwnerOfLeadTool(
         ? `\n\nFichiers envoyés par le visiteur (en pièces jointes) :\n${attachments.map((a) => `- ${a.filename}`).join('\n')}`
         : '';
       const body = `Résumé de la demande :\n${summary || '(non précisé)'}\n\nCoordonnées données par le visiteur :\n${visitorContact || '(aucune)'}${filesNote}`;
+
+      // Independent of the email below (roadmap item 62): never throws, and a
+      // failure of either channel doesn't affect the other.
+      await notifyWebhook?.('contact.requested', { summary, contact: visitorContact });
 
       try {
         await sendEmail({ to: ownerEmail, subject, body, attachments });
@@ -137,7 +143,8 @@ Dès que l'interlocuteur exprime un besoin ou un projet concret, pose 2 à 3 que
  */
 export function createLeadQualificationTool(
   ownerEmail: string,
-  logCtx: Record<string, unknown>
+  logCtx: Record<string, unknown>,
+  notifyWebhook?: LeadWebhookNotifier
 ): ChatTool {
   return {
     name: 'score_and_route_lead',
@@ -173,6 +180,9 @@ export function createLeadQualificationTool(
 
       const subject = `Lead qualifié (${scoreLabel}) sur votre chatbot Corpus.ai`;
       const body = `Score : ${scoreLabel}\n\nRésumé :\n${summary || '(non précisé)'}\n\nCoordonnées données :\n${contact || '(aucune)'}`;
+
+      // Roadmap item 62 — see the note in createNotifyOwnerOfLeadTool.
+      await notifyWebhook?.('lead.qualified', { score: leadScore, summary, contact });
 
       try {
         await sendEmail({ to: ownerEmail, subject, body });

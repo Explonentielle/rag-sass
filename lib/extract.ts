@@ -3,8 +3,7 @@ import { parse as parseCsv } from 'csv-parse/sync';
 import * as XLSX from 'xlsx';
 import { JSDOM } from 'jsdom';
 import { Readability } from '@mozilla/readability';
-import { isIP } from 'node:net';
-import dns from 'node:dns/promises';
+import { assertPublicHostname as assertPublicHost, BlockedAddressError } from '@/lib/ssrfGuard';
 import { logWarn } from '@/lib/logger';
 import { runOcr } from '@/lib/ocrService';
 import { transcribeAudio } from '@/lib/openai';
@@ -232,52 +231,18 @@ const URL_FETCH_TIMEOUT_MS = 15_000;
 const URL_MAX_RESPONSE_BYTES = 10 * 1024 * 1024; // 10MB of raw HTML
 
 /**
- * SSRF guard: refuses to let the server fetch a private/internal/reserved
- * address on a user's behalf, no matter who asked — this fetch is
- * triggered by an authenticated org member, but the request itself
- * originates from our server (on a VPS, possibly alongside other internal
- * services), so a malicious or compromised account could otherwise use
- * this as a path to probe the internal network. Known residual gap: this
- * checks the hostname *before* fetching — a DNS answer that changes
- * between this check and the actual `fetch()` (DNS rebinding), or a
- * redirect to a private address, isn't caught. Acceptable for a pilot
- * behind authenticated access; a bulletproof fix needs a resolver that
- * pins the checked IP for the actual connection.
+ * SSRF guard (the logic lives in lib/ssrfGuard.ts, shared with outgoing
+ * webhooks): refuses to let the server fetch a private/internal/reserved
+ * address on a user's behalf. Here it only maps the guard's error onto
+ * UnsupportedDocumentError, which is what callers of this file expect.
  */
 async function assertPublicHostname(hostname: string): Promise<void> {
-  if (hostname === 'localhost') {
-    throw new UnsupportedDocumentError('Cette URL pointe vers une adresse locale, non autorisée.');
+  try {
+    await assertPublicHost(hostname);
+  } catch (err) {
+    if (err instanceof BlockedAddressError) throw new UnsupportedDocumentError(err.message);
+    throw err;
   }
-
-  const addresses = isIP(hostname)
-    ? [hostname]
-    : (await dns.lookup(hostname, { all: true }).catch(() => [])).map((a) => a.address);
-
-  if (addresses.length === 0) {
-    throw new UnsupportedDocumentError("Cette adresse n'a pas pu être résolue.");
-  }
-
-  for (const address of addresses) {
-    if (isPrivateOrReservedIp(address)) {
-      throw new UnsupportedDocumentError('Cette URL pointe vers une adresse réseau privée, non autorisée.');
-    }
-  }
-}
-
-function isPrivateOrReservedIp(ip: string): boolean {
-  if (isIP(ip) === 4) {
-    const [a, b] = ip.split('.').map(Number);
-    if (a === 10 || a === 127 || a === 0) return true;
-    if (a === 169 && b === 254) return true; // link-local, includes cloud metadata (169.254.169.254)
-    if (a === 172 && b >= 16 && b <= 31) return true;
-    if (a === 192 && b === 168) return true;
-    return false;
-  }
-  const lower = ip.toLowerCase();
-  if (lower === '::1') return true;
-  if (lower.startsWith('fc') || lower.startsWith('fd')) return true; // unique local, fc00::/7
-  if (lower.startsWith('fe80')) return true; // link-local
-  return false;
 }
 
 // How many redirect hops to follow before giving up (docs/roadmap.md item
