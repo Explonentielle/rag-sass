@@ -1,5 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
-import type { Database, MessageRole } from '@/types/database';
+import type { Database, MessageFeedback, MessageRole } from '@/types/database';
 import type { ChatTurn } from '@/lib/openai';
 import { encryptText, decryptText } from '@/lib/crypto';
 import { logError } from '@/lib/logger';
@@ -11,9 +11,12 @@ import {
 } from '@/lib/conversationFiles';
 
 export interface StoredMessage {
+  id: string;
   role: MessageRole;
   content: string;
   sources: string[] | null;
+  /** 👍/👎 given to an assistant answer (roadmap item 59), null if none. */
+  feedback: MessageFeedback | null;
   /** Set when this user message is a file the visitor sent (roadmap item 48). */
   attachment?: ConversationAttachment | null;
 }
@@ -268,7 +271,13 @@ export async function getConversationForIdentity(
  * means an encrypted blob (see lib/crypto.ts), an array means a legacy row
  * written before this feature existed — both are handled, no migration
  * needed for pre-existing data. */
-function decryptStoredMessage(row: { role: MessageRole; content: string; sources: unknown }): StoredMessage {
+function decryptStoredMessage(row: {
+  id: string;
+  role: MessageRole;
+  content: string;
+  sources: unknown;
+  feedback: MessageFeedback | null;
+}): StoredMessage {
   const rawSources = row.sources;
   let sources: string[] | null;
   if (typeof rawSources === 'string') {
@@ -284,7 +293,7 @@ function decryptStoredMessage(row: { role: MessageRole; content: string; sources
   } else {
     sources = (rawSources as string[] | null) ?? null;
   }
-  return { role: row.role, content: decryptText(row.content), sources };
+  return { id: row.id, role: row.role, content: decryptText(row.content), sources, feedback: row.feedback };
 }
 
 export async function loadHistory(
@@ -293,7 +302,7 @@ export async function loadHistory(
 ): Promise<StoredMessage[]> {
   const { data, error } = await supabase
     .from('messages')
-    .select('id, role, content, sources')
+    .select('id, role, content, sources, feedback')
     .eq('conversation_id', conversationId)
     .order('created_at', { ascending: true });
 
@@ -313,27 +322,45 @@ export function toChatTurns(history: StoredMessage[]): ChatTurn[] {
   return history.map(({ role, content }) => ({ role, content }));
 }
 
+/**
+ * Stores one question/answer pair. `noContext` flags a documents-grounded
+ * chatbot whose retrieval found nothing for this question — the statistics
+ * (roadmap item 59) surface those as "questions sans réponse". Returns the
+ * assistant message's id so the client can attach a 👍/👎 to it.
+ */
 export async function appendTurn(
   supabase: SupabaseClient<Database>,
   conversationId: string,
-  turn: { question: string; answer: string; sources: string[] }
-): Promise<void> {
+  turn: { question: string; answer: string; sources: string[]; noContext?: boolean }
+): Promise<{ assistantMessageId: string }> {
   // sources is a jsonb column; storing the encrypted blob as its JSON string
   // value (rather than an array) is what decryptStoredMessage above expects
   // — the DB type says string[], but the cast is deliberate, see lib/crypto.ts.
   const encryptedSources = encryptText(JSON.stringify(turn.sources)) as unknown as string[];
-  const { error } = await supabase.from('messages').insert([
-    { conversation_id: conversationId, role: 'user', content: encryptText(turn.question), sources: null },
-    { conversation_id: conversationId, role: 'assistant', content: encryptText(turn.answer), sources: encryptedSources },
-  ]);
+  const { data, error } = await supabase
+    .from('messages')
+    .insert([
+      { conversation_id: conversationId, role: 'user', content: encryptText(turn.question), sources: null },
+      {
+        conversation_id: conversationId,
+        role: 'assistant',
+        content: encryptText(turn.answer),
+        sources: encryptedSources,
+        no_context: turn.noContext ?? false,
+      },
+    ])
+    .select('id, role');
 
-  if (error) {
-    logError('conversations.append_turn_failed', { conversationId, error: error.message });
-    throw new Error(`Impossible d'enregistrer les messages: ${error.message}`);
+  const assistantRow = data?.find((row) => row.role === 'assistant');
+  if (error || !assistantRow) {
+    logError('conversations.append_turn_failed', { conversationId, error: error?.message });
+    throw new Error(`Impossible d'enregistrer les messages: ${error?.message ?? 'réponse vide'}`);
   }
 
   await supabase
     .from('conversations')
     .update({ updated_at: new Date().toISOString() })
     .eq('id', conversationId);
+
+  return { assistantMessageId: assistantRow.id };
 }

@@ -22,6 +22,24 @@ function PaperclipIcon({ className }: { className?: string }) {
     </svg>
   );
 }
+function ThumbIcon({ className, down }: { className?: string; down?: boolean }) {
+  return (
+    <svg
+      className={className}
+      style={down ? { transform: 'rotate(180deg)' } : undefined}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <path d="M7 10v12" />
+      <path d="M15 5.88 14 10h5.83a2 2 0 0 1 1.92 2.56l-2.33 8A2 2 0 0 1 17.5 22H4a2 2 0 0 1-2-2v-8a2 2 0 0 1 2-2h2.76a2 2 0 0 0 1.79-1.11L12 2a3.13 3.13 0 0 1 3 3.88Z" />
+    </svg>
+  );
+}
 import { resolveLoadingMessages } from '@/lib/loadingMessages';
 
 // How long each message stays on screen before rotating to the next
@@ -126,6 +144,9 @@ const MARKDOWN_COMPONENTS = {
 };
 
 interface Message {
+  /** Id of a stored assistant answer — set once it's saved, needed to rate it (item 59). */
+  id?: string;
+  feedback?: 1 | -1 | null;
   role: 'user' | 'assistant';
   content: string;
   /** Set when this user message is a file the visitor sent (item 48). */
@@ -528,6 +549,32 @@ export default function ChatWidget({
     }
   }
 
+  // Rates (or un-rates, when clicking the same thumb again) one saved answer.
+  // Optimistic: the thumb lights up at once and reverts if the save fails.
+  async function handleFeedback(index: number, value: 1 | -1) {
+    const target = messages[index];
+    if (!target?.id || !activeConversationId || (isPublic && !visitorId)) return;
+    const previous = target.feedback ?? null;
+    const next = previous === value ? null : value;
+
+    const setFeedback = (feedback: 1 | -1 | null) =>
+      setMessages((prev) => prev.map((m, i) => (i === index ? { ...m, feedback } : m)));
+
+    setFeedback(next);
+    const payload = {
+      chatbotId,
+      conversationId: activeConversationId,
+      messageId: target.id,
+      value: next,
+    };
+    const res = await fetch(apiEndpoint, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(isPublic ? { ...payload, visitorId } : payload),
+    }).catch(() => null);
+    if (!res?.ok) setFeedback(previous);
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     const question = input.trim();
@@ -615,6 +662,15 @@ export default function ChatWidget({
                 next[next.length - 1] = { ...next[next.length - 1], truncated: true };
                 return next;
               });
+            } else if (event === 'done') {
+              if (typeof data.messageId === 'string') {
+                const messageId: string = data.messageId;
+                setMessages((prev) => {
+                  const next = [...prev];
+                  next[next.length - 1] = { ...next[next.length - 1], id: messageId, feedback: null };
+                  return next;
+                });
+              }
             }
           }
         }
@@ -692,6 +748,29 @@ export default function ChatWidget({
               {m.sources && m.sources.length > 0 && (
                 <div className="mt-2 border-t border-slate-300/60 pt-1.5 text-xs text-slate-500">
                   Sources : {m.sources.join(', ')}
+                </div>
+              )}
+
+              {m.role === 'assistant' && m.id && m.content && !m.error && (
+                <div className="mt-1.5 flex items-center gap-1 text-slate-400">
+                  {([1, -1] as const).map((value) => {
+                    const active = m.feedback === value;
+                    return (
+                      <button
+                        key={value}
+                        type="button"
+                        onClick={() => handleFeedback(i, value)}
+                        aria-pressed={active}
+                        aria-label={value === 1 ? 'Réponse utile' : "Réponse pas utile"}
+                        title={value === 1 ? 'Réponse utile' : 'Réponse pas utile'}
+                        className={`rounded p-1 transition-colors hover:bg-slate-200 hover:text-slate-700 ${
+                          active ? 'bg-slate-200 text-slate-800' : ''
+                        }`}
+                      >
+                        <ThumbIcon className="h-3.5 w-3.5" down={value === -1} />
+                      </button>
+                    );
+                  })}
                 </div>
               )}
             </div>

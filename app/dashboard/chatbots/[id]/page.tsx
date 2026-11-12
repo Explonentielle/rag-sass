@@ -18,7 +18,9 @@ import EmailToolToggle from '@/components/EmailToolToggle';
 import VisitorUploadsToggle from '@/components/VisitorUploadsToggle';
 import LeadQualificationToggle from '@/components/LeadQualificationToggle';
 import LoadingMessagesForm from '@/components/LoadingMessagesForm';
+import ChatbotStatsPanel from '@/components/ChatbotStatsPanel';
 import { listAllConversationsForChatbot } from '@/lib/conversations';
+import { loadChatbotStats } from '@/lib/chatbotStats';
 import { logQueryError } from '@/lib/supabaseResult';
 import { AI_INDEXING_ALLOWED_PLANS, AUDIO_TRANSCRIPTION_ALLOWED_PLANS } from '@/lib/plans';
 import { Icon, IconBadge, ICONS } from '@/components/icons';
@@ -41,7 +43,7 @@ export default async function ChatbotPage({ params }: { params: { id: string } }
   const backHref = isSecondCerveau ? '/dashboard/second-cerveau' : '/dashboard/chatbots';
   const backLabel = isSecondCerveau ? '← Assistant interne' : '← Chatbots';
 
-  const [documentsResult, customTemplatesResult, orgResult, conversations] = await Promise.all([
+  const [documentsResult, customTemplatesResult, orgResult, conversations, stats] = await Promise.all([
     supabase
       .from('documents')
       .select('id, filename, status, error_message, chunk_count, uploaded_at')
@@ -60,6 +62,10 @@ export default async function ChatbotPage({ params }: { params: { id: string } }
     // of returning a {data,error} pair — it goes through app/dashboard/
     // error.tsx (see roadmap.md item 38), not logQueryError below.
     listAllConversationsForChatbot(supabase, chatbot.id),
+    // Statistics are secondary: a failure here (already logged by the loader)
+    // must not take the whole chatbot page down, so it degrades to a notice.
+    // Public chatbots count visitors only — the team's own test chats would skew them.
+    loadChatbotStats(supabase, chatbot.id, { visitorsOnly: chatbot.is_public }).catch(() => null),
   ]);
   const documents = logQueryError(
     'chatbot_page.documents_failed',
@@ -201,6 +207,27 @@ export default async function ChatbotPage({ params }: { params: { id: string } }
           />
         </section>
       )}
+
+      <section className="space-y-3">
+        <div>
+          <h2 className="flex items-center gap-2 font-semibold text-slate-900">
+            <Icon className="h-4 w-4 text-brand-600">{ICONS.chart}</Icon>
+            Statistiques
+          </h2>
+          <p className="mt-1 text-sm text-slate-500">
+            {chatbot.is_public
+              ? "Activité des visiteurs sur les 30 derniers jours (vos propres tests ne sont pas comptés)."
+              : 'Activité de cet assistant sur les 30 derniers jours.'}
+          </p>
+        </div>
+        {stats ? (
+          <ChatbotStatsPanel stats={stats} useDocuments={chatbot.use_documents} />
+        ) : (
+          <Card className="px-5 py-6 text-center text-sm text-slate-400">
+            Statistiques indisponibles pour le moment.
+          </Card>
+        )}
+      </section>
 
       <section className="space-y-3">
         <div>

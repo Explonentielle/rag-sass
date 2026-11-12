@@ -9,7 +9,8 @@ import {
 import { hybridSearch } from '@/lib/elasticsearch';
 import { buildSystemPrompt } from '@/lib/prompts';
 import { logInfo, logWarn, logError } from '@/lib/logger';
-import { checkPublicChatRateLimit, getClientIp } from '@/lib/rateLimit';
+import { checkPublicChatRateLimit, checkRateLimit, getClientIp } from '@/lib/rateLimit';
+import { isUuid, parseFeedbackValue, setAssistantMessageFeedback } from '@/lib/feedback';
 import { checkQuota } from '@/lib/usage';
 import { getAccessibleChatbot, isValidVisitorId } from '@/lib/publicChatAccess';
 import {
@@ -125,6 +126,58 @@ export async function DELETE(request: Request) {
     return new Response(error.message, { status: 400 });
   }
   return Response.json({ ok: true });
+}
+
+// Rates one answer 👍/👎 (roadmap item 59). Same access and ownership checks
+// as the other visitor endpoints: the conversation must belong to this visitor.
+export async function PATCH(request: Request) {
+  const body = await request.json().catch(() => null);
+  const chatbotId: unknown = body?.chatbotId;
+  const visitorId: unknown = body?.visitorId;
+  const conversationId: unknown = body?.conversationId;
+  const messageId: unknown = body?.messageId;
+  const value = parseFeedbackValue(body?.value);
+
+  if (
+    !isUuid(chatbotId) ||
+    !isUuid(conversationId) ||
+    !isUuid(messageId) ||
+    !isValidVisitorId(visitorId) ||
+    value === undefined
+  ) {
+    return new Response('chatbotId, visitorId, conversationId, messageId et value sont requis.', { status: 400 });
+  }
+
+  const rateLimit = checkRateLimit(`feedback:${chatbotId}:${getClientIp(request)}`);
+  if (!rateLimit.allowed) {
+    return new Response('Trop de requêtes, réessayez dans un instant.', { status: 429 });
+  }
+
+  const admin = getAdminClient();
+  const access = await getAccessibleChatbot(admin, chatbotId, request);
+  if (!access.ok) {
+    logWarn('public-chat.feedback_blocked', { chatbotId, reason: access.reason });
+    return new Response('Chatbot introuvable.', { status: 404 });
+  }
+
+  try {
+    const owned = await getConversationForIdentity(admin, conversationId, {
+      chatbotId: access.chatbot.id,
+      visitorId,
+    });
+    if (!owned) return new Response('Conversation introuvable.', { status: 404 });
+
+    const updated = await setAssistantMessageFeedback(admin, { conversationId, messageId, value });
+    if (!updated) return new Response('Message introuvable.', { status: 404 });
+    return Response.json({ ok: true });
+  } catch (err) {
+    logError('public-chat.feedback_failed', {
+      chatbotId,
+      conversationId,
+      error: err instanceof Error ? err.message : 'Erreur inconnue.',
+    });
+    return new Response("Impossible d'enregistrer le retour.", { status: 500 });
+  }
 }
 
 export async function POST(request: Request) {
@@ -275,13 +328,18 @@ export async function POST(request: Request) {
         }
         const { truncated } = step.value;
 
-        await appendTurn(admin, conversationId, { question, answer, sources });
+        const { assistantMessageId } = await appendTurn(admin, conversationId, {
+          question,
+          answer,
+          sources,
+          noContext: chatbot.use_documents && chunks.length === 0,
+        });
 
         if (truncated) {
           controller.enqueue(encoder.encode(sseEvent('truncated', {})));
           logWarn('public-chat.answer_truncated', logCtx);
         }
-        controller.enqueue(encoder.encode(sseEvent('done', {})));
+        controller.enqueue(encoder.encode(sseEvent('done', { messageId: assistantMessageId })));
         logInfo('public-chat.success', {
           ...logCtx,
           chunkCount: chunks.length,

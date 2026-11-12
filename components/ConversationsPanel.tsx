@@ -18,6 +18,7 @@ interface ConversationMessage {
   role: 'user' | 'assistant';
   content: string;
   sources: string[] | null;
+  feedback?: 1 | -1 | null;
   attachment?: { id: string; filename: string } | null;
 }
 
@@ -78,6 +79,15 @@ function ConversationDetail({ chatbotId, conversationId }: { chatbotId: string; 
             {m.sources && m.sources.length > 0 && (
               <div className="mt-1.5 border-t border-slate-300/60 pt-1 text-[11px] text-slate-500">
                 Sources : {m.sources.join(', ')}
+              </div>
+            )}
+            {m.role === 'assistant' && m.feedback && (
+              <div
+                className={`mt-1.5 border-t border-slate-300/60 pt-1 text-[11px] font-medium ${
+                  m.feedback === 1 ? 'text-emerald-600' : 'text-red-600'
+                }`}
+              >
+                {m.feedback === 1 ? 'Jugée utile par le visiteur' : 'Jugée pas utile par le visiteur'}
               </div>
             )}
           </div>

@@ -65,6 +65,7 @@ fixe — sert de mémoire centralisée plutôt que de planning strict.
 | 56 | Pricing | Revoir les montants/quotas des paliers (Solo/PME) + restrictions fonctionnelles réelles | Faible à moyen | ✅ Fait (2026-11-05) |
 | 57 | Légal | Pages légales (mentions légales/CGU/confidentialité) | Faible | ✅ Fait (brouillon, `app/legal/[slug]/page.tsx`) — rappel : mettre à jour domaine et email une fois le nom de domaine acheté et le déploiement définitif en place (item 42) |
 | 58 | Méthode | Méthode de travail inspirée de Spec Kit (spec, clarification, plan avant de coder) + `CLAUDE.md` | Faible | ✅ Fait (`CLAUDE.md` créé) : étapes "clarifier" et "analyser" appliquées aux grosses features, outil Spec Kit non installé |
+| 59 | Produit | Retour 👍/👎 sur les réponses + statistiques et questions sans réponse par chatbot | Moyen | ✅ Fait côté code (2026-11-12), migration `0027` à appliquer, à tester |
 
 ---
 
@@ -2786,3 +2787,106 @@ qui ferait doublon avec cette roadmap.
 **Piste ouverte** : si les grosses features se multiplient, réévaluer
 l'adoption de Spec Kit, ou de simples commandes slash maison
 (`.claude/commands/`) pour outiller les étapes spec, clarification et plan.
+
+---
+
+## 15. Complétude produit avant commercialisation (2026-11-12)
+
+### Réflexion
+
+**Constat** : avant de prendre le vrai nom de domaine et de commercialiser,
+le produit paraît restreint pour le prix demandé (Solo 9 €, PME 49 €). Le
+socle est solide (RAG, multi-tenant, facturation, agents email et leads),
+mais il manque ce qu'un client attend d'un chatbot payant : savoir ce que
+ses visiteurs demandent, adapter le widget à son image, garder sa base à
+jour, brancher ses outils. Aucune de ces fonctions n'était dans la
+roadmap (vérifié dans le code : pas de retour sur les réponses, pas de
+statistiques, pas de message d'accueil, pas de re-scan, pas de clé API ni
+de webhook sortant).
+
+**Décision sur l'item 33 (MCP Google Calendar)** : mis en pause, sans
+modifier l'item 33 ci-dessus. Raisons : (1) avec un serveur MCP auto-hébergé
+l'agenda connecté est celui du propriétaire de la plateforme, pas celui du
+client ; pour que ce soit une fonction produit, chaque client devrait
+connecter son propre agenda par OAuth Google, ce qui impose la vérification
+de l'application par Google ; (2) le lien de rendez-vous partagé aux leads
+chauds (`meeting_link`, item 21) couvre l'essentiel du besoin sans demander
+l'accès à un agenda. À reprendre si un client le demande ; le pattern
+d'outils agentiques est déjà en place et le garde-fou prévu pour un chatbot
+public (consulter les créneaux libres et transmettre une demande par email,
+sans créer d'événement ni lister l'agenda) est décrit dans la conversation
+du 2026-11-12.
+
+**Ordre retenu** (valeur visible par le client d'abord) :
+1. Statistiques, questions sans réponse et retour 👍/👎 (item 59) : montre
+   au client ce que l'outil lui rapporte et quels documents ajouter.
+2. Personnalisation du widget (item 60) : message d'accueil, questions
+   suggérées, nom et logo ; la mention "Propulsé par" devient un argument
+   de palier.
+3. Re-scan automatique des sources web (item 61) : une base construite
+   depuis un site se périme dès que le site change.
+4. Webhook "nouveau lead" (item 62) : relie l'outil à un CRM, Zapier ou
+   Make sans demander d'accès aux outils du client.
+5. Analyse IA des fichiers envoyés (item 49, déjà noté plus haut,
+   implémenté sous l'item 63) : le bot lit réellement le fichier du visiteur.
+
+**Écartés pour l'instant** : connecteurs Google Drive/Notion (même problème
+d'autorisation par client que l'agenda), standard téléphonique (item 25),
+agent de veille (item 26), coach de simulation (item 28) : gros chantiers
+pour un usage de niche.
+
+**Méthode** : un commit par item. Rien n'est poussé tant que la migration
+de l'item n'est pas appliquée en base, car un déploiement qui lit une
+colonne absente fait tomber la page ou la route concernée (cas vécu avec la
+migration `0019`).
+
+---
+
+### 59. Retour 👍/👎 sur les réponses + statistiques par chatbot : ✅ Fait côté code (migration à appliquer, à tester)
+
+**Besoin** : le client n'a aucun moyen de savoir si son chatbot sert à
+quelque chose, ni quels documents lui manquent. C'est la fonction qui
+justifie un abonnement dans la durée.
+
+**Ce qui est fait** :
+- **Retour sur chaque réponse** : deux boutons (utile / pas utile) sous
+  chaque réponse du widget public et du chat du dashboard. Cliquer deux
+  fois sur le même bouton retire la note. Les routes de chat reçoivent un
+  `PATCH` (même vérification d'accès et de propriété de la conversation que
+  les autres routes visiteur, limitation de débit en plus). L'id du message
+  de réponse arrive au client dans l'évènement SSE `done`.
+- **Signal "question sans réponse"** : `messages.no_context` vaut vrai quand
+  un chatbot avec documents n'a remonté aucun extrait pertinent (la
+  recherche hybride applique déjà un seuil de score, voir item 1). Un
+  chatbot en mode "prompt seul" n'en produit jamais.
+- **Panneau "Statistiques"** sur la page du chatbot (30 derniers jours) :
+  conversations, questions, part de questions sans réponse, retours,
+  graphique des questions par jour, liste des questions sans réponse,
+  questions les plus posées, réponses jugées pas utiles. Pour un chatbot
+  public, seuls les visiteurs comptent (les tests de l'équipe sont exclus).
+  Dans la liste des conversations, une réponse notée est signalée.
+- **Calcul à la lecture** : une fonction SQL `chatbot_stats_messages`
+  (SECURITY INVOKER, donc soumise à la RLS) renvoie les messages de la
+  période ; `lib/chatbotStats.ts` déchiffre les questions et agrège côté
+  serveur. Pas de table d'agrégats à maintenir. Plafond de 6 000 messages
+  lus (le panneau le signale si la période est plus active).
+
+**Limites assumées** :
+- "Les plus posées" regroupe les formulations identiques (casse, accents et
+  ponctuation mis à part), pas les questions de sens proche. Un regroupement
+  sémantique par embeddings serait une amélioration ultérieure.
+- Pas de limitation par palier : tous les plans voient les statistiques. À
+  réserver à PME/Métier si on veut en faire un argument de montée en gamme
+  (une constante dans `lib/plans.ts` suffirait).
+- Le fuseau des jours est celui de Paris.
+
+**À appliquer** : migration `0027_message_feedback_and_stats.sql`. Sans elle,
+le chat et l'historique plantent (colonnes `feedback`/`no_context` lues et
+écrites), donc l'appliquer avant de déployer.
+
+**Tests** : `lib/chatbotStats.test.ts` (agrégation, appariement
+question/réponse, regroupement, jours vides) et `lib/feedback.test.ts`.
+**À tester en conditions réelles** : noter une réponse dans le widget et le
+retrouver dans la liste des conversations, poser une question hors sujet et la
+voir apparaître dans "Questions sans réponse", vérifier que la page du chatbot
+reste affichée si les statistiques échouent.

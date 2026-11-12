@@ -138,6 +138,14 @@ export const ICONS = {
       <rect x="13" y="13" width="8" height="8" rx="1" />
     </>
   ),
+  chart: (
+    <>
+      <line x1="4" y1="20" x2="20" y2="20" />
+      <rect x="5" y="11" width="3.5" height="9" rx="0.5" />
+      <rect x="10.25" y="5" width="3.5" height="15" rx="0.5" />
+      <rect x="15.5" y="14" width="3.5" height="6" rx="0.5" />
+    </>
+  ),
   layers: (
     <>
       <polygon points="12,3 21,8 12,13 3,8" />

@@ -5,6 +5,7 @@
 export type DocumentStatus = 'pending' | 'processing' | 'indexed' | 'error';
 export type OrgRole = 'owner' | 'admin' | 'member';
 export type MessageRole = 'user' | 'assistant';
+export type MessageFeedback = 1 | -1;
 export type OrgPlan = 'free' | 'solo' | 'pme' | 'metier';
 export type OrgOverageMode = 'block' | 'auto_bill';
 export type OverageChargeStatus = 'succeeded' | 'failed';
@@ -250,6 +251,8 @@ export interface Database {
           role: MessageRole;
           content: string;
           sources: string[] | null;
+          feedback: MessageFeedback | null;
+          no_context: boolean;
           created_at: string;
         };
         Insert: {
@@ -258,6 +261,8 @@ export interface Database {
           role: MessageRole;
           content: string;
           sources?: string[] | null;
+          feedback?: MessageFeedback | null;
+          no_context?: boolean;
           created_at?: string;
         };
         Update: {
@@ -266,6 +271,8 @@ export interface Database {
           role?: MessageRole;
           content?: string;
           sources?: string[] | null;
+          feedback?: MessageFeedback | null;
+          no_context?: boolean;
           created_at?: string;
         };
       };
@@ -346,6 +353,18 @@ export interface Database {
       is_org_admin: {
         Args: { org_id: string };
         Returns: boolean;
+      };
+      chatbot_stats_messages: {
+        Args: { p_chatbot_id: string; p_since: string; p_visitors_only: boolean; p_limit?: number };
+        Returns: {
+          id: string;
+          conversation_id: string;
+          role: MessageRole;
+          content: string;
+          no_context: boolean;
+          feedback: MessageFeedback | null;
+          created_at: string;
+        }[];
       };
     };
   };

@@ -37,7 +37,7 @@ export async function countConversationFiles(client: Client, conversationId: str
 // — kept as one constant so VISITOR_FILE_PROMPT_NOTE's instructions to the
 // model describe exactly what it'll actually see in its own history, not a
 // copy that can drift out of sync with it.
-const ATTACHMENT_MESSAGE_PREFIX = 'Fichier joint : ';
+export const ATTACHMENT_MESSAGE_PREFIX = 'Fichier joint : ';
 
 // Carve-out from buildSystemPrompt's "N'utilise aucune connaissance externe
 // à ces extraits" grounding rule (lib/prompts.ts), same lesson as

@@ -1,4 +1,6 @@
 import { createClient } from '@/lib/supabase/server';
+import { getAdminClient } from '@/lib/supabase/admin';
+import { isUuid, parseFeedbackValue, setAssistantMessageFeedback } from '@/lib/feedback';
 import { embedText, streamAnswer, rewriteQuery, rerankChunks } from '@/lib/openai';
 import {
   createNotifyOwnerOfLeadTool,
@@ -101,6 +103,49 @@ export async function DELETE(request: Request) {
     return new Response(error.message, { status: 400 });
   }
   return Response.json({ ok: true });
+}
+
+// Rates one answer 👍/👎 (roadmap item 59). Ownership is checked through the
+// caller's RLS client; the write itself goes through the admin client because
+// `messages` has no update policy (members must not be able to edit content).
+export async function PATCH(request: Request) {
+  const supabase = createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) {
+    return new Response('Non authentifié.', { status: 401 });
+  }
+
+  const body = await request.json().catch(() => null);
+  const chatbotId: unknown = body?.chatbotId;
+  const conversationId: unknown = body?.conversationId;
+  const messageId: unknown = body?.messageId;
+  const value = parseFeedbackValue(body?.value);
+
+  if (!isUuid(chatbotId) || !isUuid(conversationId) || !isUuid(messageId) || value === undefined) {
+    return new Response('chatbotId, conversationId, messageId et value sont requis.', { status: 400 });
+  }
+
+  try {
+    const owned = await getConversationForIdentity(supabase, conversationId, {
+      chatbotId,
+      userId: user.id,
+    });
+    if (!owned) return new Response('Conversation introuvable.', { status: 404 });
+
+    const updated = await setAssistantMessageFeedback(getAdminClient(), { conversationId, messageId, value });
+    if (!updated) return new Response('Message introuvable.', { status: 404 });
+    return Response.json({ ok: true });
+  } catch (err) {
+    logError('chat.feedback_failed', {
+      userId: user.id,
+      chatbotId,
+      conversationId,
+      error: err instanceof Error ? err.message : 'Erreur inconnue.',
+    });
+    return new Response("Impossible d'enregistrer le retour.", { status: 500 });
+  }
 }
 
 export async function POST(request: Request) {
@@ -257,13 +302,18 @@ export async function POST(request: Request) {
         }
         const { truncated } = step.value;
 
-        await appendTurn(supabase, conversationId, { question, answer, sources });
+        const { assistantMessageId } = await appendTurn(supabase, conversationId, {
+          question,
+          answer,
+          sources,
+          noContext: chatbot.use_documents && chunks.length === 0,
+        });
 
         if (truncated) {
           controller.enqueue(encoder.encode(sseEvent('truncated', {})));
           logWarn('chat.answer_truncated', logCtx);
         }
-        controller.enqueue(encoder.encode(sseEvent('done', {})));
+        controller.enqueue(encoder.encode(sseEvent('done', { messageId: assistantMessageId })));
         logInfo('chat.success', {
           ...logCtx,
           chunkCount: chunks.length,

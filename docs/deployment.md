@@ -84,7 +84,7 @@ l'étape 5 (`OCR_SERVICE_URL=https://<ES_DOMAIN>:8443`,
 
 ## 2. Supabase — appliquer les migrations
 
-**Aucune des 19 migrations n'est protégée contre une double exécution par
+**Aucune des 27 migrations n'est protégée contre une double exécution par
 un mécanisme de suivi automatique** (pas de CLI Supabase liée, voir
 `supabase/migrations/`) — mais la plupart sont écrites de façon
 idempotente (`create table if not exists`, `add column if not exists`,
@@ -112,6 +112,14 @@ Editor**, exécute-les dans l'ordre, une par une :
 | 17 | `0017_visitor_file_uploads.sql` | Sans effet si déjà appliquée (`drop policy if exists`, `on conflict do nothing`) |
 | 18 | `0018_retention_purge_to_vercel_cron.sql` | Sans effet si déjà appliquée (désactive l'ancien job `pg_cron`, voir §5) |
 | 19 | `0019_chatbot_loading_steps.sql` | Sans effet si déjà appliquée (`add column if not exists`) |
+| 20 | `0020_organization_overage.sql` | Erreur sur un `create policy` → déjà appliquée, passe à la suivante |
+| 21 | `0021_chatbot_use_case.sql` | Sans effet si déjà appliquée (`add column if not exists`) |
+| 22 | `0022_organization_free_plan.sql` | Erreur de colonne ou de contrainte existante → déjà appliquée |
+| 23 | `0023_contract_analyzer.sql` | Sans effet si déjà appliquée (`drop constraint if exists` avant recréation) |
+| 24 | `0024_private_internal_chatbots.sql` | Sans effet si déjà appliquée (simple mise à jour de données) |
+| 25 | `0025_lead_qualification.sql` | Erreur de colonne existante → déjà appliquée |
+| 26 | `0026_paperwork_digitizer.sql` | Sans effet si déjà appliquée (`if not exists`, `drop constraint if exists`) |
+| 27 | `0027_message_feedback_and_stats.sql` | Sans effet si déjà appliquée (`add column if not exists`, `create or replace function`) |
 
 Pour les n° 1 à 4 : si l'exécution s'arrête sur une erreur
 `policy "..." already exists`, c'est le signal que cette migration (au
@@ -119,8 +127,8 @@ moins sa partie policies) est déjà en place — passe simplement à la
 migration suivante, rien d'autre à faire.
 
 **Si c'est un projet Supabase tout neuf** (jamais aucune migration
-appliquée) : exécute simplement les 18 dans l'ordre, aucune erreur
-attendue.
+appliquée) : exécute simplement toutes les migrations dans l'ordre,
+aucune erreur attendue.
 
 **Vérification rapide après coup** : la purge de rétention (item 48 du
 roadmap) ne tourne plus via `pg_cron` — `0018` désactive l'ancien job
