@@ -148,7 +148,9 @@ export default async function DashboardPage() {
                   <IconBadge size="sm" spacing="mb-3">
                     {ICONS.chat}
                   </IconBadge>
-                  <p className="font-medium text-slate-900">{bot.name}</p>
+                  <p className="truncate font-medium text-slate-900" title={bot.name}>
+                    {bot.name}
+                  </p>
                   <p className="mt-1 text-xs text-slate-400">
                     {new Date(bot.created_at).toLocaleDateString('fr-FR')}
                   </p>
