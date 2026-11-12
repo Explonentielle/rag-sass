@@ -340,7 +340,16 @@ export async function appendTurn(
   const { data, error } = await supabase
     .from('messages')
     .insert([
-      { conversation_id: conversationId, role: 'user', content: encryptText(turn.question), sources: null },
+      // no_context spelled out on both rows: in a bulk insert PostgREST sends
+      // an explicit null for a key missing from one row instead of using the
+      // column default, which the NOT NULL column rejects.
+      {
+        conversation_id: conversationId,
+        role: 'user',
+        content: encryptText(turn.question),
+        sources: null,
+        no_context: false,
+      },
       {
         conversation_id: conversationId,
         role: 'assistant',
