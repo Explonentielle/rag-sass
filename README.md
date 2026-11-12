@@ -1,116 +1,118 @@
-# RAG SaaS : MVP
+# Corpus.ai : plateforme de chatbots RAG multi-tenant
 
-Chatbot RAG multi-tenant : upload de documents internes, indexation (Elasticsearch, hybrid search), chat (OpenAI) avec citation des sources.
+Chaque organisation crée des chatbots, y indexe ses documents (ou des pages web), puis les déploie sur son site (widget ou iframe) ou les garde en interne. Les réponses s'appuient uniquement sur les documents de l'organisation et citent leurs sources.
+
+## Fonctionnalités
+
+- **Chatbots** : templates de prompt, mode « prompt seul » (sans documents), chatbot public (widget) ou privé/interne, couleur et domaines autorisés pour l'embed.
+- **Ingestion** : PDF (texte ou scanné via OCR), DOCX, TXT, MD, CSV, XLSX, images (PNG/JPG/WEBP), pages web et site entier. Indexation en arrière-plan, plusieurs fichiers en parallèle, indexation assistée par IA sur les plans supérieurs.
+- **Recherche** : hybride (BM25 + vecteurs, fusion RRF), reformulation de la question, reranking, analyseur français.
+- **Chat** : streaming SSE, historique chiffré, conversations consultables dans le dashboard, étapes de chargement personnalisables ou réelles, envoi de fichiers par le visiteur (réglable par chatbot).
+- **Outils agentiques** : email au propriétaire sur demande du visiteur (avec confirmation), qualification de leads.
+- **Modules** : analyseur de contrats, digitaliseur de paperasse, transcription de réunions (« Second cerveau »).
+- **Compte** : multi-organisations, équipe (rôles, invitations), onboarding guidé, suppression d'organisation.
+- **Facturation** : Stripe (plans Gratuit / Solo / PME / Métier, portail client, dépassement au choix : blocage ou débit automatique).
+- **Conformité** : rétention de 90 jours avec purge automatique (cron Vercel), chiffrement des messages, pages légales (brouillon).
 
 ## Stack
 
-- **Next.js 14** (App Router, TypeScript) : frontend + backend (API routes)
-- **Supabase** : Postgres (multi-tenant + RLS), Auth, Storage
-- **Elasticsearch** : recherche hybride (full-text + dense_vector, fusion RRF calculée côté application, voir note plus bas)
-- **OpenAI** : embeddings (`text-embedding-3-small`) **et** génération de chat (`gpt-5.6-luna` par défaut) — un seul fournisseur, un seul abonnement à gérer. `lib/anthropic.ts` reste dans le repo si ce choix change un jour, mais rien ne l'utilise actuellement.
+| Couche | Technologie |
+|---|---|
+| App | Next.js 14 (App Router), TypeScript strict, Tailwind |
+| Données | Supabase : Postgres (RLS), Auth, Storage |
+| Recherche | Elasticsearch 8 (auto-hébergé sur VPS en prod) |
+| IA | OpenAI (embeddings + chat, `gpt-5.6-luna` par défaut) |
+| OCR | Service Tesseract maison (`ocr-service/`), sur le même VPS |
+| Paiement / email | Stripe / Resend |
+| Hébergement | Vercel (app + crons) + VPS OVH (Elasticsearch, OCR, Caddy) |
 
-## Ce que vous devez faire vous-même avant de lancer le projet
+`lib/anthropic.ts` reste dans le repo mais rien ne l'utilise actuellement.
 
-Ces étapes ne peuvent pas être automatisées depuis ce repo :
+## Démarrage en local
 
-1. **Créer un projet Supabase** sur [supabase.com](https://supabase.com).
-   - Dans **SQL Editor**, exécute dans l'ordre le contenu de `supabase/migrations/0001_init.sql` puis `supabase/migrations/0002_storage.sql`.
-   - Dans **Authentication > Providers > Email**, pour le pilote je recommande de **désactiver "Confirm email"** (Settings > Auth) pour éviter la friction de confirmation par email pendant les tests. Sinon prévois de recevoir/valider l'email de confirmation avant la 1ère connexion.
-   - Récupère `Project URL`, `anon public key` et `service_role key` dans **Settings > API**.
-2. **Créer une clé API OpenAI** sur [platform.openai.com](https://platform.openai.com/api-keys), avec de la facturation active (embeddings + chat en dépendent tous les deux désormais).
-3. **Avoir Docker installé** (Docker Desktop sur Windows) pour lancer Elasticsearch en local.
-
-## Setup
+Prérequis : Node 18.17+ (requis par Next.js 14), Docker, un projet Supabase, une clé API OpenAI.
 
 ```bash
 # 1. Dépendances
 npm install
 
-# 2. Elasticsearch en local
+# 2. Elasticsearch local (port 9201, sans authentification, dev uniquement)
 docker compose up -d
-# vérifier que ça tourne : http://localhost:9201 doit répondre (pas d'auth en dev)
-# (port 9201, pas 9200 : évite le conflit avec un éventuel autre ES local sur cette machine)
 
 # 3. Variables d'environnement
 cp .env.example .env.local
-# remplir NEXT_PUBLIC_SUPABASE_URL, NEXT_PUBLIC_SUPABASE_ANON_KEY, SUPABASE_SERVICE_ROLE_KEY,
-# OPENAI_API_KEY (ELASTICSEARCH_URL par défaut convient pour le local)
+# Renseigner au minimum : NEXT_PUBLIC_SUPABASE_URL, NEXT_PUBLIC_SUPABASE_ANON_KEY,
+# SUPABASE_SERVICE_ROLE_KEY, OPENAI_API_KEY, CONVERSATION_ENCRYPTION_KEY.
+# ELASTICSEARCH_URL par défaut (http://localhost:9201) convient en local.
 
-# 4. Lancer le projet
+# 4. Lancer
 npm run dev
 ```
 
-### Vérification rapide du pipeline (optionnel)
+**Base de données** : dans le *SQL Editor* de Supabase, exécuter **toutes** les migrations de `supabase/migrations/` dans l'ordre (`0001` à `0026`). Pour un pilote, désactiver « Confirm email » dans Authentication > Providers > Email évite la friction des tests.
 
-`scripts/smoke-test.mts` teste extraction, chunking, embeddings OpenAI, indexation ES, recherche hybride et isolation multi-tenant, sans dépendre de Supabase/Anthropic. Utile pour valider `OPENAI_API_KEY` et Elasticsearch indépendamment du reste :
+Ouvrir [http://localhost:3000](http://localhost:3000), créer un compte (`/signup`, cela crée aussi l'organisation), créer un chatbot, uploader un document puis poser une question.
 
-```bash
-npm run smoke-test
-```
+### Variables d'environnement
 
-Ouvre [http://localhost:3000](http://localhost:3000).
+Voir `.env.example`, qui est la référence. Obligatoires pour le cœur du produit : Supabase, Elasticsearch, OpenAI, `CONVERSATION_ENCRYPTION_KEY`. Optionnelles selon les fonctions : `OCR_SERVICE_*` (PDF scannés et images), `STRIPE_*` (abonnements), `RESEND_*` (emails), `CRON_SECRET` (protège les endpoints de cron).
 
-1. Créez un compte (`/signup`), ça crée aussi votre organisation.
-2. Crée un chatbot, choisis un template ("Closer / vente" ou "Infopreneur / support").
-3. Uploade un `.pdf` (texte natif ou scanné via OCR), `.docx`, `.txt`, `.md`, ou une image (`.png`/`.jpg`/`.webp`). Le statut passe `pending` → `processing` → `indexed`.
-4. Ouvre le chat et pose une question sur le contenu du document.
+### Scripts
+
+| Commande | Rôle |
+|---|---|
+| `npm run dev` / `build` / `start` | Serveur de dev, build et lancement de prod |
+| `npm run lint` / `typecheck` | Lint et vérification des types |
+| `npm test` / `test:watch` | Tests unitaires (Vitest) |
+| `npm run smoke-test` | Vérifie extraction, embeddings, indexation et isolation multi-tenant sans passer par Supabase |
 
 ## Structure
 
 ```
 app/
-  (auth)/login, (auth)/signup       : pages d'auth Supabase
-  auth/callback                     : callback confirmation email
-  dashboard/                        : vue d'ensemble, liste des chatbots, création
-  dashboard/chatbots/[id]/          : upload docs, config prompt
-  dashboard/chatbots/[id]/chat/     : interface de chat
-  legal/[slug]/                     : pages placeholder (mentions légales, CGU, confidentialité)
-  api/chatbots/                     : CRUD chatbots
-  api/documents/upload/             : upload + pipeline d'ingestion (synchrone)
-  api/chat/                         : pipeline RAG (SSE streaming)
-lib/
-  supabase/                         : clients browser/server
-  elasticsearch.ts                  : client ES, mapping, recherche hybride RRF
-  extract.ts                        : extraction texte PDF/DOCX/TXT + détection scan
-  chunking.ts                       : découpage en chunks avec overlap
-  ingest.ts                         : orchestration extraction, chunk, embed, index
-  openai.ts                         : client OpenAI (embeddings + chat)
-  anthropic.ts                      : client Claude, gardé mais inutilisé
-  prompts.ts                        : templates de system prompt
-components/ui/                      : primitives de design partagées (Button, Card, Input...)
-supabase/migrations/                : schéma SQL + RLS (à exécuter manuellement)
-docker-compose.yml                  : Elasticsearch (+ Kibana optionnel) local
+  (auth)/                 login, signup
+  dashboard/              chatbots, documents, contrats, paperasse, second-cerveau, plan, settings
+  embed/[chatbotId]/      page chargée dans l'iframe du widget
+  api/                    chat, public-chat, chatbots, documents, billing, cron, webhooks, organizations
+  legal/[slug]/           mentions légales, CGU, confidentialité
+lib/                      logique métier (RAG, ingestion, plans, usage, Stripe, outils agentiques...)
+components/               composants React (components/ui/ = primitives partagées)
+supabase/migrations/      schéma SQL + RLS, à exécuter dans l'ordre
+ocr-service/              service OCR Tesseract (déployé sur le VPS)
+docker-compose.yml        Elasticsearch de dev
+docker-compose.prod.yml   Elasticsearch sécurisé + OCR + Caddy (VPS)
+docs/                     documentation (voir plus bas)
 ```
 
-## Décisions techniques prises (à valider / ajuster)
+## Production
 
-- **Chunking** : découpage par phrases, cible ~650 tokens (estimation ~4 caractères/token, pas de tokenizer dédié), overlap ~80 tokens (~12%). Une phrase plus longue que la cible est découpée brutalement en dernier recours. Voir `lib/chunking.ts`.
-- **Ingestion synchrone** : le pipeline (extraction, chunk, embeddings, indexation ES) tourne dans la requête d'upload elle-même (pas de queue/worker). Simple pour le MVP ; à revoir si des documents volumineux font timeout ou si le volume grossit.
-- **Détection de PDF scanné** : heuristique. Si le texte extrait fait moins de ~20 caractères/page en moyenne, on considère que c'est un scan sans couche texte et on renvoie une erreur claire (voir `lib/extract.ts`). Pas d'OCR.
-- **Un seul org par utilisateur** dans l'UI actuelle (le schéma supporte plusieurs organisations par utilisateur via `users_organizations`, mais le dashboard prend la première trouvée). Le switch multi-org est à ajouter plus tard si besoin.
-- **Rôles** (`owner`/`admin`/`member`) : la colonne existe et les policies RLS distinguent déjà `is_org_member` vs `is_org_admin`, mais l'UI ne gère pas encore l'invitation de coéquipiers. Un seul utilisateur (le créateur, `owner`) par organisation pour l'instant.
-- **Formats non supportés** (csv, xlsx, images...) : rejetés à l'upload avec un message explicite, sans créer de ligne `documents`.
+- **App** : Vercel (les crons de `vercel.json` gèrent la purge des conversations et le débit des dépassements).
+- **Elasticsearch + OCR** : VPS avec `docker-compose.prod.yml`. Seul Caddy est exposé (HTTPS automatique), Elasticsearch et l'OCR restent sur le réseau Docker interne, avec authentification.
+- **Données** : Supabase.
 
-## Notes de sécurité multi-tenant
+Le pas-à-pas complet est dans `docs/deployment.md`.
 
-- Toutes les tables Postgres ont RLS activé, scopées par organisation (directement ou via `chatbots.organization_id`).
-- Le bucket Storage `documents` a des policies RLS basées sur le premier segment du chemin (`{organization_id}/...`).
-- Elasticsearch n'a **pas** de RLS native : chaque requête (indexation et recherche) filtre explicitement sur `organization_id` + `chatbot_id` côté application (`lib/elasticsearch.ts`). C'est le point critique à ne jamais contourner si vous ajoutez de nouvelles routes qui touchent l'index.
+## Sécurité multi-tenant
 
-## Vers un cluster Elasticsearch hébergé
+- Toutes les tables Postgres ont RLS activé, scopé par organisation. Les buckets Storage sont privés, avec des policies basées sur l'organisation.
+- Elasticsearch n'a **pas** de RLS : chaque requête filtre explicitement sur `organization_id` et `chatbot_id` (`lib/elasticsearch.ts`). Ne jamais contourner ce filtre dans une nouvelle route qui touche l'index.
+- Les chatbots publics sont limités par `allowed_origins` (vérification d'origine + CSP `frame-ancestors`) et par un rate limiting.
+- L'ingestion par URL est protégée contre le SSRF (adresses privées bloquées, redirections revalidées).
 
-Rien à changer dans le code : renseigne `ELASTICSEARCH_URL` (et `ELASTICSEARCH_USERNAME`/`ELASTICSEARCH_PASSWORD`, ou `ELASTICSEARCH_API_KEY`) dans `.env.local`. Le mapping de l'index est créé automatiquement au premier appel si l'index n'existe pas encore (`ensureChunksIndex()`).
+## Note sur la fusion RRF
 
-Note sur la RRF : l'API `retriever.rrf` native d'Elasticsearch nécessite une licence **Platinum** (vérifié en local, erreur `security_exception: current license is non-compliant for RRF` sous licence Basic). Comme la cible est un cluster potentiellement auto-hébergé en Basic, `hybridSearch()` (`lib/elasticsearch.ts`) fait deux requêtes séparées (BM25 sur `content`, kNN sur `embedding`) et fusionne les résultats en JS avec la même formule RRF qu'Elasticsearch utilise en interne (`score = Σ 1 / (60 + rang)`). Fonctionne sous licence Basic, testé en local. Si le cluster cible dispose d'une licence Platinum, on pourrait basculer sur `retriever.rrf` natif pour économiser un aller-retour réseau, pas nécessaire pour le MVP.
+L'API `retriever.rrf` native d'Elasticsearch exige une licence Platinum. `hybridSearch()` fait donc deux requêtes (BM25 sur `content`, kNN sur `embedding`) et fusionne côté application avec la même formule (`score = Σ 1 / (60 + rang)`), ce qui fonctionne sous licence Basic.
 
-## Documentation complémentaire
+## Documentation
 
-- `docs/architecture.md` : schémas (composants, flux d'ingestion et de chat, bases de données).
-- `docs/deployment.md` : guide de mise en prod (VPS Elasticsearch, migrations Supabase, Vercel).
-- `docs/rgpd-conformite.md` : sous-traitants, registre de traitement, mention visiteur, gabarit DPA.
+- `docs/architecture.md` : composants, flux d'ingestion et de chat, bases de données.
+- `docs/deployment.md` : mise en production (VPS, migrations, Vercel).
 - `docs/integration.md` : intégrer un chatbot sur un site tiers (widget, iframe).
-- `docs/roadmap.md` : backlog technique détaillé, décisions prises et pourquoi.
+- `docs/guide-utilisateur.md` : guide d'utilisation du dashboard.
+- `docs/metrics.md` : suivi d'usage et de coût.
+- `docs/rgpd-conformite.md` : sous-traitants, registre de traitement, mentions visiteur.
+- `docs/roadmap.md` : backlog, décisions prises et leurs raisons.
 
-## Design / branding
+## Méthode de travail
 
-Identité visuelle provisoire "Corpus.ai" (bleu marine, Inter) posée sur la landing page et l'app pour donner un rendu professionnel présentable à des clients pilotes. Composants réutilisables dans `components/ui/`. Section "Avis" en placeholders explicites (John Doe / Jane Doe) à remplacer par de vrais retours clients avant lancement public. Pages `/legal/*` sont des coquilles vides : contenu juridique réel à rédiger (idéalement avec un professionnel du droit) avant toute ouverture publique.
+Les règles de collaboration (plan avant les gros changements, TypeScript strict, pas de dépendance sans validation) sont dans `CLAUDE.md`.
