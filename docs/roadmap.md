@@ -66,6 +66,7 @@ fixe — sert de mémoire centralisée plutôt que de planning strict.
 | 57 | Légal | Pages légales (mentions légales/CGU/confidentialité) | Faible | ✅ Fait (brouillon, `app/legal/[slug]/page.tsx`) — rappel : mettre à jour domaine et email une fois le nom de domaine acheté et le déploiement définitif en place (item 42) |
 | 58 | Méthode | Méthode de travail inspirée de Spec Kit (spec, clarification, plan avant de coder) + `CLAUDE.md` | Faible | ✅ Fait (`CLAUDE.md` créé) : étapes "clarifier" et "analyser" appliquées aux grosses features, outil Spec Kit non installé |
 | 59 | Produit | Retour 👍/👎 sur les réponses + statistiques et questions sans réponse par chatbot | Moyen | ✅ Fait côté code (2026-11-12), migration `0027` à appliquer, à tester |
+| 60 | Produit | Personnalisation du widget : logo, nom, message d'accueil, questions suggérées, mention « Propulsé par » selon le plan | Faible-moyen | ✅ Fait côté code (2026-11-12), migration `0028` à appliquer, à tester |
 
 ---
 
@@ -2890,3 +2891,59 @@ question/réponse, regroupement, jours vides) et `lib/feedback.test.ts`.
 retrouver dans la liste des conversations, poser une question hors sujet et la
 voir apparaître dans "Questions sans réponse", vérifier que la page du chatbot
 reste affichée si les statistiques échouent.
+
+---
+
+### 60. Personnalisation du widget : ✅ Fait côté code (migration à appliquer, à tester)
+
+**Besoin** : seule la couleur se réglait (`data-primary-color`). Un client
+veut que le widget ressemble à son site : son logo, le nom de son
+assistant, un message d'accueil, des questions pour démarrer. C'est aussi
+ce qui rend la démo convaincante.
+
+**Ce qui est fait** :
+- **Champs par chatbot** (migration `0028`) : `bot_name` (40 caractères),
+  `welcome_message` (400), `suggested_questions` (4 maximum, 100 caractères
+  chacune), `logo_path`. Validation côté API dans `lib/widgetAppearance.ts`
+  (testée), enregistrement par le `PATCH /api/chatbots/[id]` existant.
+- **Logo** : envoyé depuis le dashboard (PNG, JPEG ou WebP, 512 Ko). Le type
+  est vérifié sur les premiers octets du fichier, pas sur le type annoncé
+  par le navigateur ; le SVG est refusé. Stockage dans un bucket public en
+  lecture `chatbot-logos` (le logo s'affiche sur le site du client, sans
+  session), écrit uniquement par la route `POST /api/chatbots/[id]/logo`
+  avec le client service-role après vérification de l'organisation, sans
+  policy d'écriture. Remplacer ou retirer le logo supprime l'ancien objet ;
+  supprimer un chatbot ou une organisation supprime aussi les logos.
+- **Widget** : en-tête avec logo et nom (affiché seulement s'il y en a un),
+  message d'accueil en première bulle (rendu Markdown, liens compris),
+  questions suggérées cliquables tant que la conversation est vide, qui
+  envoient la question comme si le visiteur l'avait tapée. Le test de chat
+  du dashboard affiche la même chose pour que le propriétaire voie le rendu.
+- **Mention « Propulsé par Corpus.ai »** : affichée en bas du widget pour
+  les plans `free` et `solo`, retirée pour PME et Métier
+  (`WIDGET_BRANDING_PLANS` dans `lib/plans.ts`). Argument de montée en
+  gamme sans coût d'exploitation. Si le plan de l'organisation est
+  introuvable, la mention reste affichée.
+
+**Points d'attention** :
+- **Changement visible pour les clients existants** : les widgets des
+  organisations en plan gratuit ou Solo affichent désormais la mention. À
+  vérifier pour le chatbot pilote (votreaccompagnateur.fr) selon le plan de
+  son organisation.
+- Le texte marketing des paliers (`PLAN_FEATURES`, landing) ne cite pas
+  encore « widget sans mention » ni les statistiques : décision de wording à
+  prendre avant de communiquer sur la différence de plan.
+- La page `/embed/[chatbotId]` lit ces champs sans passer par le contrôle
+  `is_public`/`allowed_origins` (comme pour les messages d'attente) : ce sont
+  des textes d'affichage non sensibles, l'accès au chat reste contrôlé.
+- Avant l'application de la migration, la page embed retombe sur le widget
+  simple (la requête échoue et les valeurs par défaut s'appliquent) mais la
+  page du chatbot dans le dashboard et son test de chat ne s'affichent pas :
+  appliquer `0028` avant de déployer.
+
+**Tests** : `lib/widgetAppearance.test.ts` (validation des textes et des
+questions, détection du type réel du logo, SVG et fichier trop gros refusés).
+**À tester en conditions réelles** : envoyer un logo, régler nom, accueil et
+questions, vérifier le rendu dans l'iframe sur le site client et dans le test de
+chat, cliquer une question suggérée, retirer le logo, vérifier la mention sur un
+plan gratuit puis son absence en passant l'organisation en PME.

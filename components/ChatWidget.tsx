@@ -5,6 +5,7 @@ import ReactMarkdown from 'react-markdown';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Card';
 import { validateVisitorFile, VISITOR_FILE_ACCEPT } from '@/lib/visitorFileRules';
+import type { WidgetAppearance } from '@/lib/widgetAppearance';
 
 function PaperclipIcon({ className }: { className?: string }) {
   return (
@@ -356,6 +357,7 @@ export default function ChatWidget({
   loadingMessages,
   allowUploads,
   showLoadingSteps,
+  appearance,
 }: {
   chatbotId: string;
   apiEndpoint?: string;
@@ -381,8 +383,12 @@ export default function ChatWidget({
   // instead of rotating loadingMessages (docs/roadmap.md item 51). The
   // rotation still covers the moment before the first step arrives.
   showLoadingSteps?: boolean;
+  // Name, logo, welcome message, suggested questions and the "Propulsé par"
+  // mention (docs/roadmap.md item 60). Omitted = the plain widget.
+  appearance?: WidgetAppearance;
 }) {
   const isPublic = apiEndpoint === '/api/public-chat';
+  const suggestedQuestions = appearance?.suggestedQuestions ?? [];
   const canUpload = !!allowUploads && isPublic;
   const effectiveLoadingMessages = resolveLoadingMessages(loadingMessages);
 
@@ -575,9 +581,12 @@ export default function ChatWidget({
     if (!res?.ok) setFeedback(previous);
   }
 
-  async function handleSubmit(e: React.FormEvent) {
+  function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    const question = input.trim();
+    void submitQuestion(input.trim());
+  }
+
+  async function submitQuestion(question: string) {
     if (!question || loading || (isPublic && !visitorId)) return;
 
     setMessages((prev) => [...prev, { role: 'user', content: question }, { role: 'assistant', content: '' }]);
@@ -682,6 +691,17 @@ export default function ChatWidget({
 
   return (
     <div className={`flex flex-1 flex-col overflow-hidden bg-white ${className}`}>
+      {(appearance?.botName || appearance?.logoUrl) && (
+        <div className="flex items-center gap-2.5 border-b border-slate-200 px-4 py-2.5">
+          {appearance.logoUrl && (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={appearance.logoUrl} alt="" className="h-7 w-7 flex-shrink-0 rounded-full object-cover" />
+          )}
+          {appearance.botName && (
+            <span className="min-w-0 truncate text-sm font-semibold text-slate-900">{appearance.botName}</span>
+          )}
+        </div>
+      )}
       {/* Public widget (client sites): never show the conversation switcher —
           a visitor only ever sees their current conversation. Browsing or
           switching between a visitor's past conversations is dashboard-only
@@ -700,9 +720,36 @@ export default function ChatWidget({
         </div>
       )}
       <div className="flex-1 space-y-4 overflow-y-auto p-6">
-        {messages.length === 0 && (
-          <div className="flex h-full items-center justify-center">
+        {appearance?.welcomeMessage && (
+          <div className="flex justify-start">
+            <div className="max-w-[80%] break-words rounded-lg bg-slate-100 px-4 py-2.5 text-sm leading-relaxed text-slate-900">
+              <ReactMarkdown components={MARKDOWN_COMPONENTS}>{appearance.welcomeMessage}</ReactMarkdown>
+            </div>
+          </div>
+        )}
+
+        {messages.length === 0 && !appearance?.welcomeMessage && (
+          <div className={`flex items-center justify-center ${suggestedQuestions.length > 0 ? 'py-4' : 'h-full'}`}>
             <p className="text-sm text-slate-400">{placeholder}</p>
+          </div>
+        )}
+
+        {messages.length === 0 && suggestedQuestions.length > 0 && (
+          <div className="flex flex-wrap gap-2">
+            {suggestedQuestions.map((q) => (
+              <button
+                key={q}
+                type="button"
+                onClick={() => void submitQuestion(q)}
+                disabled={loading || (isPublic && !visitorId)}
+                style={accentColor ? { borderColor: accentColor, color: accentColor } : undefined}
+                className={`rounded-full border px-3 py-1.5 text-left text-xs transition-colors hover:bg-slate-50 disabled:opacity-50 ${
+                  accentColor ? '' : 'border-brand-300 text-brand-800'
+                }`}
+              >
+                {q}
+              </button>
+            ))}
           </div>
         )}
 
@@ -824,6 +871,14 @@ export default function ChatWidget({
           Envoyer
         </Button>
       </form>
+      {appearance?.showBranding && (
+        <p className="border-t border-slate-100 py-1.5 text-center text-[11px] text-slate-400">
+          Propulsé par{' '}
+          <a href="/" target="_blank" rel="noopener noreferrer" className="font-medium hover:text-slate-600">
+            Corpus.ai
+          </a>
+        </p>
+      )}
     </div>
   );
 }

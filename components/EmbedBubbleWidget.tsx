@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import ChatWidget from '@/components/ChatWidget';
 import { Icon, ICONS } from '@/components/icons';
+import type { WidgetAppearance } from '@/lib/widgetAppearance';
 
 /**
  * Self-contained bubble+toggle chrome for the iframe embed (see
@@ -21,12 +22,14 @@ export default function EmbedBubbleWidget({
   loadingMessages,
   allowUploads,
   showLoadingSteps,
+  appearance,
 }: {
   chatbotId: string;
   accentColor?: string;
   loadingMessages?: string[];
   allowUploads?: boolean;
   showLoadingSteps?: boolean;
+  appearance?: WidgetAppearance;
 }) {
   const [open, setOpen] = useState(false);
 
@@ -57,6 +60,7 @@ export default function EmbedBubbleWidget({
             loadingMessages={loadingMessages}
             allowUploads={allowUploads}
             showLoadingSteps={showLoadingSteps}
+            appearance={appearance}
           />
         </div>
       )}

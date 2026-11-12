@@ -116,6 +116,13 @@ export const PAPERWORK_DIGITIZER_ALLOWED_PLANS: OrgPlan[] = ['pme', 'metier'];
 export const AUDIO_TRANSCRIPTION_ALLOWED_PLANS: OrgPlan[] = ['pme', 'metier'];
 
 /**
+ * Plans whose public widget shows « Propulsé par Corpus.ai » (docs/roadmap.md
+ * item 60). PME and above get the widget without the mention, a selling
+ * point that costs nothing to run. Read in app/embed/[chatbotId]/page.tsx.
+ */
+export const WIDGET_BRANDING_PLANS: OrgPlan[] = ['free', 'solo'];
+
+/**
  * Overage billing (docs/roadmap.md items 17/36). Messages per block and
  * price per block once a plan's included quota is exceeded in
  * `overage_mode: 'auto_bill'` (see lib/usage.ts checkQuota, lib/stripe.ts

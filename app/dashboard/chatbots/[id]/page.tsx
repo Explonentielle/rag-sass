@@ -19,10 +19,16 @@ import VisitorUploadsToggle from '@/components/VisitorUploadsToggle';
 import LeadQualificationToggle from '@/components/LeadQualificationToggle';
 import LoadingMessagesForm from '@/components/LoadingMessagesForm';
 import ChatbotStatsPanel from '@/components/ChatbotStatsPanel';
+import WidgetAppearanceForm from '@/components/WidgetAppearanceForm';
+import { getLogoPublicUrl } from '@/lib/chatbotLogo';
 import { listAllConversationsForChatbot } from '@/lib/conversations';
 import { loadChatbotStats } from '@/lib/chatbotStats';
 import { logQueryError } from '@/lib/supabaseResult';
-import { AI_INDEXING_ALLOWED_PLANS, AUDIO_TRANSCRIPTION_ALLOWED_PLANS } from '@/lib/plans';
+import {
+  AI_INDEXING_ALLOWED_PLANS,
+  AUDIO_TRANSCRIPTION_ALLOWED_PLANS,
+  WIDGET_BRANDING_PLANS,
+} from '@/lib/plans';
 import { Icon, IconBadge, ICONS } from '@/components/icons';
 
 export default async function ChatbotPage({ params }: { params: { id: string } }) {
@@ -31,7 +37,7 @@ export default async function ChatbotPage({ params }: { params: { id: string } }
   const { data: chatbotData, error: chatbotError } = await supabase
     .from('chatbots')
     .select(
-      'id, name, system_prompt_template, organization_id, is_public, allowed_origins, use_documents, use_ai_indexing, allow_email_tool, notification_email, allow_visitor_uploads, allow_lead_qualification, lead_qualification_criteria, meeting_link, show_loading_steps, loading_messages, use_case'
+      'id, name, system_prompt_template, organization_id, is_public, allowed_origins, use_documents, use_ai_indexing, allow_email_tool, notification_email, allow_visitor_uploads, allow_lead_qualification, lead_qualification_criteria, meeting_link, show_loading_steps, loading_messages, use_case, bot_name, welcome_message, suggested_questions, logo_path'
     )
     .eq('id', params.id)
     .single();
@@ -192,6 +198,14 @@ export default async function ChatbotPage({ params }: { params: { id: string } }
             chatbotId={chatbot.id}
             initialIsPublic={chatbot.is_public}
             initialAllowedOrigins={chatbot.allowed_origins}
+          />
+          <WidgetAppearanceForm
+            chatbotId={chatbot.id}
+            initialBotName={chatbot.bot_name}
+            initialWelcomeMessage={chatbot.welcome_message}
+            initialSuggestedQuestions={chatbot.suggested_questions}
+            initialLogoUrl={getLogoPublicUrl(supabase, chatbot.logo_path)}
+            brandingShown={!org || WIDGET_BRANDING_PLANS.includes(org.plan)}
           />
           <VisitorUploadsToggle
             chatbotId={chatbot.id}

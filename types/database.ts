@@ -104,6 +104,10 @@ export interface Database {
           allow_lead_qualification: boolean;
           lead_qualification_criteria: string | null;
           meeting_link: string | null;
+          bot_name: string | null;
+          welcome_message: string | null;
+          suggested_questions: string[] | null;
+          logo_path: string | null;
           created_at: string;
         };
         Insert: {
@@ -126,6 +130,10 @@ export interface Database {
           allow_lead_qualification?: boolean;
           lead_qualification_criteria?: string | null;
           meeting_link?: string | null;
+          bot_name?: string | null;
+          welcome_message?: string | null;
+          suggested_questions?: string[] | null;
+          logo_path?: string | null;
           created_at?: string;
         };
         Update: {
@@ -148,6 +156,10 @@ export interface Database {
           allow_lead_qualification?: boolean;
           lead_qualification_criteria?: string | null;
           meeting_link?: string | null;
+          bot_name?: string | null;
+          welcome_message?: string | null;
+          suggested_questions?: string[] | null;
+          logo_path?: string | null;
           created_at?: string;
         };
       };

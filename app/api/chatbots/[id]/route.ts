@@ -4,6 +4,14 @@ import { normalizeOrigin } from '@/lib/embedAccess';
 import { deleteChatbotChunks } from '@/lib/elasticsearch';
 import { removeConversationFiles } from '@/lib/conversationFiles';
 import { AI_INDEXING_ALLOWED_PLANS } from '@/lib/plans';
+import { getAdminClient } from '@/lib/supabase/admin';
+import { removeChatbotLogos } from '@/lib/chatbotLogo';
+import {
+  parseOptionalText,
+  parseSuggestedQuestions,
+  MAX_BOT_NAME_CHARS,
+  MAX_WELCOME_MESSAGE_CHARS,
+} from '@/lib/widgetAppearance';
 import { logInfo, logError } from '@/lib/logger';
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -32,6 +40,30 @@ export async function PATCH(request: Request, { params }: { params: { id: string
   const notificationEmailInput: unknown = body?.notificationEmail;
   const leadQualificationCriteriaInput: unknown = body?.leadQualificationCriteria;
   const meetingLinkInput: unknown = body?.meetingLink;
+  const botNameInput: unknown = body?.botName;
+  const welcomeMessageInput: unknown = body?.welcomeMessage;
+  const suggestedQuestionsInput: unknown = body?.suggestedQuestions;
+
+  // Widget appearance (docs/roadmap.md item 60) — plain display text shown to
+  // visitors; null or empty clears it.
+  let botName: string | null | undefined;
+  if (botNameInput !== undefined) {
+    const parsed = parseOptionalText(botNameInput, 'Le nom du bot', MAX_BOT_NAME_CHARS);
+    if (!parsed.ok) return NextResponse.json({ error: parsed.error }, { status: 400 });
+    botName = parsed.value;
+  }
+  let welcomeMessage: string | null | undefined;
+  if (welcomeMessageInput !== undefined) {
+    const parsed = parseOptionalText(welcomeMessageInput, "Le message d'accueil", MAX_WELCOME_MESSAGE_CHARS);
+    if (!parsed.ok) return NextResponse.json({ error: parsed.error }, { status: 400 });
+    welcomeMessage = parsed.value;
+  }
+  let suggestedQuestions: string[] | null | undefined;
+  if (suggestedQuestionsInput !== undefined) {
+    const parsed = parseSuggestedQuestions(suggestedQuestionsInput);
+    if (!parsed.ok) return NextResponse.json({ error: parsed.error }, { status: 400 });
+    suggestedQuestions = parsed.value;
+  }
 
   // null or empty string clears it; anything else must look like an email.
   let notificationEmail: string | null | undefined;
@@ -145,7 +177,10 @@ export async function PATCH(request: Request, { params }: { params: { id: string
     notificationEmail === undefined &&
     loadingMessages === undefined &&
     leadQualificationCriteria === undefined &&
-    meetingLink === undefined
+    meetingLink === undefined &&
+    botName === undefined &&
+    welcomeMessage === undefined &&
+    suggestedQuestions === undefined
   ) {
     return NextResponse.json({ error: 'Rien à mettre à jour.' }, { status: 400 });
   }
@@ -222,6 +257,9 @@ export async function PATCH(request: Request, { params }: { params: { id: string
         ? { lead_qualification_criteria: leadQualificationCriteria }
         : {}),
       ...(meetingLink !== undefined ? { meeting_link: meetingLink } : {}),
+      ...(botName !== undefined ? { bot_name: botName } : {}),
+      ...(welcomeMessage !== undefined ? { welcome_message: welcomeMessage } : {}),
+      ...(suggestedQuestions !== undefined ? { suggested_questions: suggestedQuestions } : {}),
     })
     .eq('id', params.id);
 
@@ -255,7 +293,7 @@ export async function DELETE(_request: Request, { params }: { params: { id: stri
   // another tenant simply won't be found.
   const { data: chatbot } = await supabase
     .from('chatbots')
-    .select('id, organization_id, name')
+    .select('id, organization_id, name, logo_path')
     .eq('id', params.id)
     .single();
 
@@ -297,6 +335,7 @@ export async function DELETE(_request: Request, { params }: { params: { id: stri
   // Files visitors sent in chats (roadmap item 48) live in their own bucket
   // and their paths cascade away with the chatbot — remove them first.
   await removeConversationFiles(supabase, { chatbotIds: [chatbot.id] });
+  await removeChatbotLogos(getAdminClient(), [chatbot.logo_path]);
 
   // RLS (chatbots_delete: is_org_admin) enforces that only an org
   // admin/owner can reach this — a plain member's request fails here.

@@ -1,6 +1,9 @@
 import ChatWidget from '@/components/ChatWidget';
 import EmbedBubbleWidget from '@/components/EmbedBubbleWidget';
 import { getAdminClient } from '@/lib/supabase/admin';
+import { getLogoPublicUrl } from '@/lib/chatbotLogo';
+import { WIDGET_BRANDING_PLANS } from '@/lib/plans';
+import { toWidgetAppearance } from '@/lib/widgetAppearance';
 
 // Only #rgb / #rrggbb / #rrggbbaa — the value flows into inline styles, so
 // this keeps it to a harmless CSS color instead of trusting an arbitrary
@@ -31,13 +34,17 @@ export default async function EmbedPage({
 
   // No session on this route (anonymous iframe) — admin client, same as
   // /api/public-chat. Not gated behind the full is_public/allowed_origins
-  // check that route does: loading_messages is non-sensitive display text,
-  // and real chat access is still enforced there regardless of what loads
-  // here. Falls back to defaults (ChatWidget's resolveLoadingMessages) on
-  // any failure, including a chatbot that doesn't exist.
-  const { data: chatbot } = await getAdminClient()
+  // check that route does: loading_messages and the appearance fields are
+  // non-sensitive display text, and real chat access is still enforced there
+  // regardless of what loads here. Falls back to defaults (ChatWidget's
+  // resolveLoadingMessages) on any failure, including a chatbot that doesn't
+  // exist.
+  const admin = getAdminClient();
+  const { data: chatbot } = await admin
     .from('chatbots')
-    .select('loading_messages, allow_visitor_uploads, show_loading_steps')
+    .select(
+      'loading_messages, allow_visitor_uploads, show_loading_steps, bot_name, welcome_message, suggested_questions, logo_path, organizations(plan)'
+    )
     .eq('id', params.chatbotId)
     .single();
   const loadingMessages = chatbot?.loading_messages ?? undefined;
@@ -45,6 +52,16 @@ export default async function EmbedPage({
   // the setting server-side regardless of what the page says.
   const allowUploads = chatbot?.allow_visitor_uploads ?? false;
   const showLoadingSteps = chatbot?.show_loading_steps ?? false;
+
+  // "Propulsé par Corpus.ai" stays on unless the org's plan is known to be
+  // one that includes the white-label widget (docs/roadmap.md item 60).
+  const org = Array.isArray(chatbot?.organizations) ? chatbot?.organizations[0] : chatbot?.organizations;
+  const appearance = chatbot
+    ? toWidgetAppearance(chatbot, {
+        logoUrl: getLogoPublicUrl(admin, chatbot.logo_path),
+        showBranding: !org || WIDGET_BRANDING_PLANS.includes(org.plan),
+      })
+    : undefined;
 
   if (searchParams.widget === '1') {
     return (
@@ -54,6 +71,7 @@ export default async function EmbedPage({
         loadingMessages={loadingMessages}
         allowUploads={allowUploads}
         showLoadingSteps={showLoadingSteps}
+        appearance={appearance}
       />
     );
   }
@@ -68,6 +86,7 @@ export default async function EmbedPage({
         loadingMessages={loadingMessages}
         allowUploads={allowUploads}
         showLoadingSteps={showLoadingSteps}
+        appearance={appearance}
       />
     </div>
   );
