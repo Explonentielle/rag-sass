@@ -71,6 +71,8 @@ fixe — sert de mémoire centralisée plutôt que de planning strict.
 | 62 | Intégrations | Webhook « nouveau lead » signé vers un CRM, Zapier ou Make | Faible-moyen | ✅ Fait côté code (2026-11-12), migration `0030` à appliquer, à tester |
 | 63 | Chat | Lecture par le chatbot des fichiers envoyés par les visiteurs (réalise l'item 49) | Élevé | ✅ Fait côté code (2026-11-12), migration `0031` à appliquer, à tester |
 | 64 | Qualité | Gestion d'erreur côté utilisateur : plus aucun texte technique brut dans le front | Moyen | ✅ Fait (2026-11-12) |
+| 65 | Chat | Réponse vocale du chatbot (bouton « Écouter » sur chaque réponse, pour ne pas avoir à lire) | Faible (voix du navigateur) à moyen (voix de qualité) | Noté, pas implémenté (2026-11-12) |
+| 66 | Dashboard | Sous-menu des étapes de configuration dans la barre latérale (chatbot, assistant interne, paramètres...) | Faible-moyen | ✅ Fait (2026-11-12) |
 
 ---
 
@@ -3198,3 +3200,76 @@ n'apparaît plus dans le message stocké).
 messages: null value... ») ne peut plus apparaître ; à la place, un incident donne une
 phrase claire et une référence. Si un utilisateur envoie cette référence, la ligne de
 log correspondante contient l'erreur complète.
+
+---
+
+### 65. Réponse vocale du chatbot : noté, pas implémenté (idée du 2026-11-12)
+
+**Besoin** : un visiteur ne veut pas toujours lire une longue réponse : sur
+mobile, en déplacement, ou parce que la lecture est difficile (accessibilité).
+Le chatbot lirait ses réponses à voix haute, au clic sur un bouton « Écouter ».
+C'est la moitié « sortie » de l'idée initiale de l'item 46 (chatbot vocal),
+laissée de côté quand cet item a été reformulé en transcription de réunions.
+
+**Pistes, de la plus simple à la plus complète** :
+1. **Voix du navigateur** (`speechSynthesis`, Web Speech API) : gratuite, rien à
+   héberger, le texte ne quitte pas le navigateur du visiteur. Qualité et voix
+   françaises variables selon l'appareil, mais correctes sur la plupart des
+   téléphones et ordinateurs récents. Effort faible : un bouton par réponse, un
+   bouton « arrêter », nettoyage du texte avant lecture.
+2. **Voix de synthèse de qualité** (API de synthèse vocale d'OpenAI, déjà
+   sous-traitant déclaré) via une route dédiée : voix naturelle et identique sur
+   tous les appareils, mais un coût proportionnel au nombre de caractères lus
+   (tarif à vérifier avant de s'engager), à compter dans l'usage (items 17 et
+   35), à limiter par palier et par débit. Effort moyen, plus un cache pour ne pas
+   resynthétiser deux fois la même réponse.
+3. **Mode vocal complet** (le visiteur parle, le chatbot répond à voix haute) :
+   ajoute la reconnaissance vocale et l'autorisation du micro dans l'iframe
+   (attribut `allow` posé par `widget.js`), avec une latence à soigner. Effort
+   élevé, à ne faire que si la demande se confirme.
+
+**Recommandation** : commencer par la piste 1, avec une option par chatbot
+(« Permettre d'écouter les réponses », désactivée par défaut, comme les autres
+fonctions du widget), puis proposer la piste 2 en option premium (PME) si les
+clients trouvent la voix du navigateur insuffisante.
+
+**Points d'attention à traiter à l'implémentation** :
+- Nettoyer le texte avant lecture : retirer la mise en forme Markdown, lire les
+  listes proprement, ne pas lire les adresses web en entier (« lien »), ne pas lire
+  la ligne « Sources : … ».
+- Les navigateurs exigent un geste de l'utilisateur pour lancer un son : pas de
+  lecture automatique, seulement au clic.
+- Langue : français par défaut, avec repli sur la langue de la réponse si le
+  chatbot répond dans une autre.
+- Réponses longues : découpage par phrases (la synthèse du navigateur s'interrompt
+  sur de longs textes), avec un bouton pour arrêter ou mettre en pause.
+- Piste 2 : le texte de la réponse est envoyé à OpenAI, comme les messages (rien de
+  nouveau côté sous-traitants, voir `docs/rgpd-conformite.md`), mais le coût et le
+  palier doivent être décidés avant de la proposer.
+- Ne pas oublier le test sur iOS Safari et Android Chrome, où les voix disponibles
+  diffèrent le plus.
+
+---
+
+### 66. Sous-menu des étapes de configuration dans la barre latérale : ✅ Fait (2026-11-12)
+
+**Besoin** : la page d'un chatbot est longue (comportement, documents, accès
+public, apparence, fichiers, leads, statistiques, conversations, suppression) et
+rien n'indiquait comment la parcourir. Même chose, en plus court, sur Paramètres.
+Modèle : le menu de configuration d'un autre outil (capture du 2026-11-12), où
+l'entrée active se déplie en liste de sections cliquables.
+
+**Ce qui est fait** :
+- Une page déclare ses sections (`<PageSections sections={[...]} />`) ; la barre
+  latérale les affiche sous l'entrée de menu active, en retrait, et un clic fait
+  défiler jusqu'à la section. Les sections sont définies dans la page elle-même,
+  pas dans la barre : un chatbot de type « assistant interne » n'affiche pas les
+  sections du widget public.
+- La section en cours de lecture est mise en valeur pendant le défilement.
+- Sur mobile, un clic referme le tiroir du menu.
+- Appliqué à la page d'un chatbot (site ou assistant interne), à Paramètres, à
+  l'analyseur de contrats et au digitaliseur de paperasse.
+
+**Pour ajouter un sous-menu à une autre page** : donner un `id` et la classe
+`scroll-mt-6` à chaque bloc, puis rendre `<PageSections>` avec la liste
+`{ id, label }` en tête de page.

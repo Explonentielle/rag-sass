@@ -11,6 +11,7 @@ import { Badge, Card } from '@/components/ui/Card';
 import { Icon, IconBadge, ICONS } from '@/components/icons';
 import { logQueryError } from '@/lib/supabaseResult';
 import type { DocumentFormat } from '@/types/database';
+import PageSections from '@/components/PageSections';
 
 const FORMAT_LABELS = { facture: 'Facture', libre: 'Libre' } as const;
 
@@ -45,6 +46,12 @@ export default async function DigitizerPage({ params }: { params: { id: string }
 
   return (
     <div className="space-y-10">
+      <PageSections
+        sections={[
+          { id: 'documents', label: 'Documents' },
+          { id: 'danger', label: 'Zone de danger' },
+        ]}
+      />
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
           <IconBadge spacing="">{ICONS.layers}</IconBadge>
@@ -60,7 +67,7 @@ export default async function DigitizerPage({ params }: { params: { id: string }
         </div>
       </div>
 
-      <section className="space-y-3">
+      <section id="documents" className="scroll-mt-6 space-y-3">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <h2 className="flex items-center gap-2 font-semibold text-slate-900">
             <Icon className="h-4 w-4 text-brand-600">{ICONS.document}</Icon>
@@ -112,7 +119,7 @@ export default async function DigitizerPage({ params }: { params: { id: string }
         )}
       </section>
 
-      <section className="space-y-3">
+      <section id="danger" className="scroll-mt-6 space-y-3">
         <h2 className="flex items-center gap-2 font-semibold text-slate-900">
           <Icon className="h-4 w-4 text-red-600">{ICONS.alert}</Icon>
           Zone de danger

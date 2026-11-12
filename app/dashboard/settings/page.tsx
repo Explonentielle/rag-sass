@@ -7,6 +7,7 @@ import ChangeEmailForm from '@/components/ChangeEmailForm';
 import TeamMembers from '@/components/TeamMembers';
 import DeleteOrgSection from '@/components/DeleteOrgSection';
 import { Badge, Card } from '@/components/ui/Card';
+import PageSections from '@/components/PageSections';
 import { PLAN_LABELS } from '@/lib/plans';
 
 export default async function SettingsPage() {
@@ -33,14 +34,24 @@ export default async function SettingsPage() {
     member: 'Membre',
   };
 
+  const pageSections = [
+    { id: 'organisation', label: 'Organisation' },
+    { id: 'membres', label: 'Membres' },
+    { id: 'compte', label: 'Compte' },
+    { id: 'email', label: 'Email' },
+    { id: 'mot-de-passe', label: 'Mot de passe' },
+    ...(org.role === 'owner' ? [{ id: 'danger', label: 'Zone dangereuse' }] : []),
+  ];
+
   return (
     <div className="max-w-2xl space-y-6">
+      <PageSections sections={pageSections} />
       <div>
         <h1 className="text-2xl font-semibold tracking-tight text-slate-900">Paramètres</h1>
         <p className="mt-1 text-sm text-slate-500">Organisation et compte</p>
       </div>
 
-      <section className="space-y-3">
+      <section id="organisation" className="scroll-mt-6 space-y-3">
         <h2 className="font-semibold text-slate-900">Organisation</h2>
         {org.role === 'owner' || org.role === 'admin' ? (
           <Card className="p-6">
@@ -69,14 +80,14 @@ export default async function SettingsPage() {
         )}
       </section>
 
-      <section className="space-y-3">
+      <section id="membres" className="scroll-mt-6 space-y-3">
         <h2 className="font-semibold text-slate-900">Membres</h2>
         {user && (
           <TeamMembers organizationId={org.id} currentUserId={user.id} currentUserRole={org.role} />
         )}
       </section>
 
-      <section className="space-y-3">
+      <section id="compte" className="scroll-mt-6 space-y-3">
         <h2 className="font-semibold text-slate-900">Compte</h2>
         <Card className="divide-y divide-slate-100">
           <div className="flex items-center justify-between px-6 py-4 text-sm">
@@ -90,12 +101,12 @@ export default async function SettingsPage() {
         </Card>
       </section>
 
-      <section className="space-y-3">
+      <section id="email" className="scroll-mt-6 space-y-3">
         <h2 className="font-semibold text-slate-900">Email</h2>
         <Card className="p-6">{user?.email && <ChangeEmailForm currentEmail={user.email} />}</Card>
       </section>
 
-      <section className="space-y-3">
+      <section id="mot-de-passe" className="scroll-mt-6 space-y-3">
         <h2 className="font-semibold text-slate-900">Mot de passe</h2>
         <Card className="p-6">
           <ChangePasswordForm />
@@ -103,7 +114,7 @@ export default async function SettingsPage() {
       </section>
 
       {org.role === 'owner' && (
-        <section className="space-y-3">
+        <section id="danger" className="scroll-mt-6 space-y-3">
           <h2 className="font-semibold text-slate-900">Zone dangereuse</h2>
           <DeleteOrgSection orgId={org.id} orgName={org.name} />
         </section>

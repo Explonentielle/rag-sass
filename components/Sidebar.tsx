@@ -6,6 +6,8 @@ import { Icon, ICONS } from '@/components/icons';
 import { Logo } from '@/components/ui/Logo';
 import SignOutButton from '@/components/SignOutButton';
 import OrgSwitcher from '@/components/OrgSwitcher';
+import SidebarSectionMenu from '@/components/SidebarSectionMenu';
+import { usePageSections } from '@/components/PageSections';
 
 const NAV_ITEMS = [
   { href: '/dashboard', label: "Vue d'ensemble", icon: ICONS.grid },
@@ -37,6 +39,7 @@ export default function Sidebar({
   onClose: () => void;
 }) {
   const pathname = usePathname();
+  const sections = usePageSections();
 
   return (
     <aside
@@ -66,19 +69,25 @@ export default function Sidebar({
           const isActive =
             item.href === '/dashboard' ? pathname === item.href : pathname?.startsWith(item.href);
           return (
-            <Link
-              key={item.href}
-              href={item.href}
-              onClick={onClose}
-              className={`flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors ${
-                isActive
-                  ? 'bg-white/10 text-white'
-                  : 'text-brand-200 hover:bg-white/5 hover:text-white'
-              }`}
-            >
-              <Icon className="h-5 w-5 flex-shrink-0">{item.icon}</Icon>
-              {item.label}
-            </Link>
+            <div key={item.href}>
+              <Link
+                href={item.href}
+                onClick={onClose}
+                className={`flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors ${
+                  isActive
+                    ? 'bg-white/10 text-white'
+                    : 'text-brand-200 hover:bg-white/5 hover:text-white'
+                }`}
+              >
+                <Icon className="h-5 w-5 flex-shrink-0">{item.icon}</Icon>
+                {item.label}
+              </Link>
+              {/* The active entry unfolds into the sections of the current
+                  page (docs/roadmap.md item 66). */}
+              {isActive && sections.length > 0 && (
+                <SidebarSectionMenu sections={sections} onNavigate={onClose} />
+              )}
+            </div>
           );
         })}
       </nav>

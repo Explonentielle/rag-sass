@@ -21,6 +21,7 @@ import LoadingMessagesForm from '@/components/LoadingMessagesForm';
 import ChatbotStatsPanel from '@/components/ChatbotStatsPanel';
 import WidgetAppearanceForm from '@/components/WidgetAppearanceForm';
 import SourceRefreshSelect from '@/components/SourceRefreshSelect';
+import PageSections from '@/components/PageSections';
 import RefreshDocumentButton from '@/components/RefreshDocumentButton';
 import LeadWebhookForm from '@/components/LeadWebhookForm';
 import FileAnalysisToggle from '@/components/FileAnalysisToggle';
@@ -109,8 +110,28 @@ export default async function ChatbotPage({ params }: { params: { id: string } }
     orgResult.error
   );
 
+  // The sidebar's sub-menu (components/PageSections.tsx): the configuration
+  // steps of this page, in page order. An internal assistant has no public
+  // widget, so it doesn't list the widget steps.
+  const pageSections = [
+    { id: 'comportement', label: 'Comportement' },
+    { id: 'documents', label: 'Documents' },
+    ...(isSecondCerveau
+      ? []
+      : [
+          { id: 'acces', label: 'Accès public' },
+          { id: 'apparence', label: 'Apparence' },
+          { id: 'fichiers', label: 'Fichiers des visiteurs' },
+          { id: 'leads', label: 'Leads et webhook' },
+        ]),
+    { id: 'statistiques', label: 'Statistiques' },
+    { id: 'conversations', label: 'Conversations' },
+    { id: 'danger', label: 'Zone de danger' },
+  ];
+
   return (
     <div className="space-y-10">
+      <PageSections sections={pageSections} />
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
           <IconBadge spacing="">{ICONS.chat}</IconBadge>
@@ -126,7 +147,7 @@ export default async function ChatbotPage({ params }: { params: { id: string } }
         <ButtonLink href={`/dashboard/chatbots/${chatbot.id}/chat`}>Ouvrir le chat</ButtonLink>
       </div>
 
-      <section className="space-y-3">
+      <section id="comportement" className="scroll-mt-6 space-y-3">
         <h2 className="flex items-center gap-2 font-semibold text-slate-900">
           <Icon className="h-4 w-4 text-brand-600">{ICONS.settings}</Icon>
           Comportement du chatbot
@@ -150,7 +171,7 @@ export default async function ChatbotPage({ params }: { params: { id: string } }
         />
       </section>
 
-      <section className="space-y-3">
+      <section id="documents" className="scroll-mt-6 space-y-3">
         <h2 className="flex items-center gap-2 font-semibold text-slate-900">
           <Icon className="h-4 w-4 text-brand-600">{ICONS.document}</Icon>
           Documents
@@ -221,47 +242,55 @@ export default async function ChatbotPage({ params }: { params: { id: string } }
             <Icon className="h-4 w-4 text-brand-600">{ICONS.globe}</Icon>
             Widget (accès public, apparence, embed)
           </h2>
-          <EmbedSettingsForm
-            chatbotId={chatbot.id}
-            initialIsPublic={chatbot.is_public}
-            initialAllowedOrigins={chatbot.allowed_origins}
-          />
-          <WidgetAppearanceForm
-            chatbotId={chatbot.id}
-            initialBotName={chatbot.bot_name}
-            initialWelcomeMessage={chatbot.welcome_message}
-            initialSuggestedQuestions={chatbot.suggested_questions}
-            initialLogoUrl={getLogoPublicUrl(supabase, chatbot.logo_path)}
-            brandingShown={!org || WIDGET_BRANDING_PLANS.includes(org.plan)}
-          />
-          <VisitorUploadsToggle
-            chatbotId={chatbot.id}
-            initialValue={chatbot.allow_visitor_uploads}
-            emailNotificationsReady={chatbot.allow_email_tool && !!chatbot.notification_email}
-          />
-          <FileAnalysisToggle
-            chatbotId={chatbot.id}
-            initialValue={chatbot.analyze_visitor_files}
-            uploadsEnabled={chatbot.allow_visitor_uploads}
-            allowed={!!org && VISITOR_FILE_ANALYSIS_ALLOWED_PLANS.includes(org.plan)}
-          />
-          <LeadQualificationToggle
-            chatbotId={chatbot.id}
-            initialValue={chatbot.allow_lead_qualification}
-            initialCriteria={chatbot.lead_qualification_criteria}
-            initialMeetingLink={chatbot.meeting_link}
-            notificationEmailSet={!!chatbot.notification_email}
-          />
-          <LeadWebhookForm
-            chatbotId={chatbot.id}
-            initialUrl={chatbot.lead_webhook_url}
-            initialSecret={resolveWebhookTarget(chatbot.lead_webhook_url, chatbot.lead_webhook_secret)?.secret ?? null}
-            allowed={!!org && LEAD_WEBHOOK_ALLOWED_PLANS.includes(org.plan)}
-          />
+          <div id="acces" className="scroll-mt-6">
+            <EmbedSettingsForm
+              chatbotId={chatbot.id}
+              initialIsPublic={chatbot.is_public}
+              initialAllowedOrigins={chatbot.allowed_origins}
+            />
+          </div>
+          <div id="apparence" className="scroll-mt-6">
+            <WidgetAppearanceForm
+              chatbotId={chatbot.id}
+              initialBotName={chatbot.bot_name}
+              initialWelcomeMessage={chatbot.welcome_message}
+              initialSuggestedQuestions={chatbot.suggested_questions}
+              initialLogoUrl={getLogoPublicUrl(supabase, chatbot.logo_path)}
+              brandingShown={!org || WIDGET_BRANDING_PLANS.includes(org.plan)}
+            />
+          </div>
+          <div id="fichiers" className="scroll-mt-6 space-y-3">
+            <VisitorUploadsToggle
+              chatbotId={chatbot.id}
+              initialValue={chatbot.allow_visitor_uploads}
+              emailNotificationsReady={chatbot.allow_email_tool && !!chatbot.notification_email}
+            />
+            <FileAnalysisToggle
+              chatbotId={chatbot.id}
+              initialValue={chatbot.analyze_visitor_files}
+              uploadsEnabled={chatbot.allow_visitor_uploads}
+              allowed={!!org && VISITOR_FILE_ANALYSIS_ALLOWED_PLANS.includes(org.plan)}
+            />
+          </div>
+          <div id="leads" className="scroll-mt-6 space-y-3">
+            <LeadQualificationToggle
+              chatbotId={chatbot.id}
+              initialValue={chatbot.allow_lead_qualification}
+              initialCriteria={chatbot.lead_qualification_criteria}
+              initialMeetingLink={chatbot.meeting_link}
+              notificationEmailSet={!!chatbot.notification_email}
+            />
+            <LeadWebhookForm
+              chatbotId={chatbot.id}
+              initialUrl={chatbot.lead_webhook_url}
+              initialSecret={resolveWebhookTarget(chatbot.lead_webhook_url, chatbot.lead_webhook_secret)?.secret ?? null}
+              allowed={!!org && LEAD_WEBHOOK_ALLOWED_PLANS.includes(org.plan)}
+            />
+          </div>
         </section>
       )}
 
-      <section className="space-y-3">
+      <section id="statistiques" className="scroll-mt-6 space-y-3">
         <div>
           <h2 className="flex items-center gap-2 font-semibold text-slate-900">
             <Icon className="h-4 w-4 text-brand-600">{ICONS.chart}</Icon>
@@ -282,7 +311,7 @@ export default async function ChatbotPage({ params }: { params: { id: string } }
         )}
       </section>
 
-      <section className="space-y-3">
+      <section id="conversations" className="scroll-mt-6 space-y-3">
         <div>
           <h2 className="flex items-center gap-2 font-semibold text-slate-900">
             <Icon className="h-4 w-4 text-brand-600">{ICONS.quote}</Icon>
@@ -297,7 +326,7 @@ export default async function ChatbotPage({ params }: { params: { id: string } }
         <ConversationsPanel chatbotId={chatbot.id} initialConversations={conversations} />
       </section>
 
-      <section className="space-y-3">
+      <section id="danger" className="scroll-mt-6 space-y-3">
         <h2 className="flex items-center gap-2 font-semibold text-slate-900">
           <Icon className="h-4 w-4 text-red-600">{ICONS.alert}</Icon>
           Zone de danger

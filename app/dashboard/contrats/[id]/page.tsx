@@ -9,6 +9,7 @@ import { DocumentStatusBadge } from '@/components/DocumentStatusBadge';
 import { Card } from '@/components/ui/Card';
 import { Icon, IconBadge, ICONS } from '@/components/icons';
 import { logQueryError } from '@/lib/supabaseResult';
+import PageSections from '@/components/PageSections';
 
 export default async function ContractPage({ params }: { params: { id: string } }) {
   const supabase = createClient();
@@ -40,8 +41,20 @@ export default async function ContractPage({ params }: { params: { id: string } 
   const isProcessing = document && (document.status === 'pending' || document.status === 'processing');
   const isReady = document?.status === 'indexed';
 
+  // Sidebar sub-menu (docs/roadmap.md item 66). The summary and the chat only
+  // exist once the contract is indexed; before that the page has nothing worth
+  // a menu of its own.
+  const pageSections = isReady
+    ? [
+        { id: 'resume', label: 'Résumé des clauses' },
+        { id: 'question', label: 'Poser une question' },
+        { id: 'danger', label: 'Zone de danger' },
+      ]
+    : [];
+
   return (
     <div className="space-y-10">
+      <PageSections sections={pageSections} />
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
           <IconBadge spacing="">{ICONS.briefcase}</IconBadge>
@@ -87,7 +100,7 @@ export default async function ContractPage({ params }: { params: { id: string } 
       )}
 
       {isReady && (
-        <section className="space-y-3">
+        <section id="resume" className="scroll-mt-6 space-y-3">
           <h2 className="flex items-center gap-2 font-semibold text-slate-900">
             <Icon className="h-4 w-4 text-brand-600">{ICONS.document}</Icon>
             Résumé des clauses clés
@@ -106,7 +119,7 @@ export default async function ContractPage({ params }: { params: { id: string } 
       )}
 
       {isReady && (
-        <section className="space-y-3">
+        <section id="question" className="scroll-mt-6 space-y-3">
           <h2 className="flex items-center gap-2 font-semibold text-slate-900">
             <Icon className="h-4 w-4 text-brand-600">{ICONS.chat}</Icon>
             Poser une question sur ce contrat
@@ -117,7 +130,7 @@ export default async function ContractPage({ params }: { params: { id: string } 
         </section>
       )}
 
-      <section className="space-y-3">
+      <section id="danger" className="scroll-mt-6 space-y-3">
         <h2 className="flex items-center gap-2 font-semibold text-slate-900">
           <Icon className="h-4 w-4 text-red-600">{ICONS.alert}</Icon>
           Zone de danger
