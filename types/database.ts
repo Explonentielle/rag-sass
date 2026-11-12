@@ -9,6 +9,7 @@ export type MessageFeedback = 1 | -1;
 export type OrgPlan = 'free' | 'solo' | 'pme' | 'metier';
 export type OrgOverageMode = 'block' | 'auto_bill';
 export type SourceRefreshFrequency = 'off' | 'daily' | 'weekly';
+export type FileExtractionStatus = 'ok' | 'empty' | 'failed';
 export type OverageChargeStatus = 'succeeded' | 'failed';
 export type ChatbotUseCase = 'site_widget' | 'second_cerveau' | 'contract_analyzer' | 'paperwork_digitizer';
 
@@ -112,6 +113,7 @@ export interface Database {
           lead_webhook_url: string | null;
           lead_webhook_secret: string | null;
           source_refresh: SourceRefreshFrequency;
+          analyze_visitor_files: boolean;
           created_at: string;
         };
         Insert: {
@@ -141,6 +143,7 @@ export interface Database {
           lead_webhook_url?: string | null;
           lead_webhook_secret?: string | null;
           source_refresh?: SourceRefreshFrequency;
+          analyze_visitor_files?: boolean;
           created_at?: string;
         };
         Update: {
@@ -170,6 +173,7 @@ export interface Database {
           lead_webhook_url?: string | null;
           lead_webhook_secret?: string | null;
           source_refresh?: SourceRefreshFrequency;
+          analyze_visitor_files?: boolean;
           created_at?: string;
         };
       };
@@ -313,6 +317,9 @@ export interface Database {
           filename: string;
           size_bytes: number;
           storage_path: string;
+          extracted_text: string | null;
+          extraction_status: FileExtractionStatus | null;
+          extraction_truncated: boolean;
           created_at: string;
         };
         Insert: {
@@ -323,6 +330,9 @@ export interface Database {
           filename: string;
           size_bytes: number;
           storage_path: string;
+          extracted_text?: string | null;
+          extraction_status?: FileExtractionStatus | null;
+          extraction_truncated?: boolean;
           created_at?: string;
         };
         Update: {
@@ -333,6 +343,9 @@ export interface Database {
           filename?: string;
           size_bytes?: number;
           storage_path?: string;
+          extracted_text?: string | null;
+          extraction_status?: FileExtractionStatus | null;
+          extraction_truncated?: boolean;
           created_at?: string;
         };
       };

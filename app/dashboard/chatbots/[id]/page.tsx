@@ -23,6 +23,7 @@ import WidgetAppearanceForm from '@/components/WidgetAppearanceForm';
 import SourceRefreshSelect from '@/components/SourceRefreshSelect';
 import RefreshDocumentButton from '@/components/RefreshDocumentButton';
 import LeadWebhookForm from '@/components/LeadWebhookForm';
+import FileAnalysisToggle from '@/components/FileAnalysisToggle';
 import { resolveWebhookTarget } from '@/lib/leadWebhook';
 import { getLogoPublicUrl } from '@/lib/chatbotLogo';
 import { listAllConversationsForChatbot } from '@/lib/conversations';
@@ -32,6 +33,7 @@ import {
   AI_INDEXING_ALLOWED_PLANS,
   AUDIO_TRANSCRIPTION_ALLOWED_PLANS,
   LEAD_WEBHOOK_ALLOWED_PLANS,
+  VISITOR_FILE_ANALYSIS_ALLOWED_PLANS,
   WIDGET_BRANDING_PLANS,
 } from '@/lib/plans';
 import { Icon, IconBadge, ICONS } from '@/components/icons';
@@ -52,7 +54,7 @@ export default async function ChatbotPage({ params }: { params: { id: string } }
   const { data: chatbotData, error: chatbotError } = await supabase
     .from('chatbots')
     .select(
-      'id, name, system_prompt_template, organization_id, is_public, allowed_origins, use_documents, use_ai_indexing, allow_email_tool, notification_email, allow_visitor_uploads, allow_lead_qualification, lead_qualification_criteria, meeting_link, show_loading_steps, loading_messages, use_case, bot_name, welcome_message, suggested_questions, logo_path, source_refresh, lead_webhook_url, lead_webhook_secret'
+      'id, name, system_prompt_template, organization_id, is_public, allowed_origins, use_documents, use_ai_indexing, allow_email_tool, notification_email, allow_visitor_uploads, allow_lead_qualification, lead_qualification_criteria, meeting_link, show_loading_steps, loading_messages, use_case, bot_name, welcome_message, suggested_questions, logo_path, source_refresh, lead_webhook_url, lead_webhook_secret, analyze_visitor_files'
     )
     .eq('id', params.id)
     .single();
@@ -236,6 +238,12 @@ export default async function ChatbotPage({ params }: { params: { id: string } }
             chatbotId={chatbot.id}
             initialValue={chatbot.allow_visitor_uploads}
             emailNotificationsReady={chatbot.allow_email_tool && !!chatbot.notification_email}
+          />
+          <FileAnalysisToggle
+            chatbotId={chatbot.id}
+            initialValue={chatbot.analyze_visitor_files}
+            uploadsEnabled={chatbot.allow_visitor_uploads}
+            allowed={!!org && VISITOR_FILE_ANALYSIS_ALLOWED_PLANS.includes(org.plan)}
           />
           <LeadQualificationToggle
             chatbotId={chatbot.id}

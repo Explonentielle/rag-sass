@@ -116,6 +116,15 @@ export const PAPERWORK_DIGITIZER_ALLOWED_PLANS: OrgPlan[] = ['pme', 'metier'];
 export const AUDIO_TRANSCRIPTION_ALLOWED_PLANS: OrgPlan[] = ['pme', 'metier'];
 
 /**
+ * Plans entitled to the chatbot reading files visitors send (docs/roadmap.md
+ * item 63), a premium feature for the same reason as AI indexing (real
+ * per-file extraction cost, OCR included, plus the file's text in every
+ * following prompt). Enforced when the option is turned on
+ * (app/api/chatbots/[id]/route.ts).
+ */
+export const VISITOR_FILE_ANALYSIS_ALLOWED_PLANS: OrgPlan[] = ['pme', 'metier'];
+
+/**
  * Plans entitled to the outgoing lead webhook (docs/roadmap.md item 62):
  * connecting leads to a CRM, Zapier or Make is a business feature, kept to
  * the upper tiers. Enforced when the URL is set (lib/leadWebhookConfig.ts);

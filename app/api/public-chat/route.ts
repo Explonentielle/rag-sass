@@ -16,9 +16,12 @@ import { checkQuota } from '@/lib/usage';
 import { getAccessibleChatbot, isValidVisitorId } from '@/lib/publicChatAccess';
 import {
   loadConversationAttachments,
+  loadConversationFileContents,
   removeConversationFiles,
+  VISITOR_FILE_ANALYSIS_PROMPT_NOTE,
   VISITOR_FILE_PROMPT_NOTE,
 } from '@/lib/conversationFiles';
+import { buildFileContextBlock, hasReadableText } from '@/lib/fileContext';
 import {
   createConversation,
   listConversations,
@@ -319,12 +322,26 @@ export async function POST(request: Request) {
           .filter(Boolean)
           .join('\n\n');
 
+        // Files the visitor sent, read for the model (docs/roadmap.md item 63).
+        // A brand-new conversation can't have any yet.
+        const readsFiles = chatbot.allow_visitor_uploads && chatbot.analyze_visitor_files;
+        const fileEntries =
+          readsFiles && requestedConversationId ? await loadConversationFileContents(admin, conversationId) : [];
+        const fileContextBlock = buildFileContextBlock(fileEntries);
+        const hasReadableFile = fileEntries.some(hasReadableText);
+
+        const filesNote = !chatbot.allow_visitor_uploads
+          ? undefined
+          : readsFiles
+            ? [VISITOR_FILE_ANALYSIS_PROMPT_NOTE, fileContextBlock].filter(Boolean).join('\n\n')
+            : VISITOR_FILE_PROMPT_NOTE;
+
         const systemPrompt = buildSystemPrompt({
           systemPromptTemplate: chatbot.system_prompt_template,
           contextChunks: chunks,
           useDocuments: chatbot.use_documents,
           toolsNote: toolsNote || undefined,
-          filesNote: chatbot.allow_visitor_uploads ? VISITOR_FILE_PROMPT_NOTE : undefined,
+          filesNote,
         });
 
         controller.enqueue(encoder.encode(sseEvent('status', { step: 'writing' })));
@@ -342,7 +359,9 @@ export async function POST(request: Request) {
           question,
           answer,
           sources,
-          noContext: chatbot.use_documents && chunks.length === 0,
+          // A question about the visitor's own file is answered from that file,
+          // not from the documents: it isn't a gap in the knowledge base.
+          noContext: chatbot.use_documents && chunks.length === 0 && !hasReadableFile,
         });
 
         if (truncated) {

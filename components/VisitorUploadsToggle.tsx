@@ -57,7 +57,7 @@ export default function VisitorUploadsToggle({
           Un bouton d&apos;envoi apparaît dans le widget. Les fichiers sont enregistrés avec la
           conversation ({MAX_VISITOR_FILE_BYTES / (1024 * 1024)} Mo maximum, {MAX_FILES_PER_CONVERSATION}{' '}
           par conversation) et téléchargeables depuis la liste des conversations. Le chatbot ne les lit
-          pas.{' '}
+          pas, sauf si vous activez l&apos;option de lecture ci-dessous.{' '}
           {emailNotificationsReady
             ? "Ils sont joints à l'email de notification quand un visiteur demande à être recontacté."
             : "Activez la notification par email ci-dessus pour qu'ils soient aussi joints à l'email envoyé quand un visiteur demande à être recontacté."}

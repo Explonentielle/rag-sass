@@ -28,6 +28,13 @@ sous-traitants ultérieurs :
 | **Vercel** | Hébergement de l'application | Aucune donnée persistée côté Vercel (stateless, les données vivent dans Supabase/ES) — logs d'infra possibles | À vérifier selon la région de déploiement choisie |
 | **Stripe** | Paiement et gestion des abonnements (item 53/55) | Identité du client payeur, moyen de paiement (jamais stocké côté Corpus.ai, géré entièrement par Stripe) | UE/US selon traitement, couvert par les clauses contractuelles types de Stripe |
 
+**Lecture des fichiers par l'IA (item 63)** : quand le propriétaire d'un chatbot
+active la lecture des fichiers envoyés par ses visiteurs, le texte de ces
+fichiers (factures, devis, scans, pouvant contenir des données personnelles)
+est envoyé à OpenAI à chaque question de la conversation, et stocké chiffré
+dans Supabase avec la conversation (supprimé avec elle, rétention de 90 jours
+comprise). Le propriétaire doit en informer ses visiteurs dans sa mention.
+
 **À faire avant le premier client pilote réel** :
 - Confirmer/choisir la région Supabase (UE si possible).
 - Télécharger le Data Processing Addendum d'OpenAI (disponible sur leur

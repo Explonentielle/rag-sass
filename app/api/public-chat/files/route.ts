@@ -2,7 +2,8 @@ import { getAdminClient } from '@/lib/supabase/admin';
 import { getAccessibleChatbot, isValidVisitorId } from '@/lib/publicChatAccess';
 import { checkPublicChatRateLimit, getClientIp } from '@/lib/rateLimit';
 import { createConversation, getConversationForIdentity } from '@/lib/conversations';
-import { countConversationFiles, storeVisitorFile } from '@/lib/conversationFiles';
+import { countConversationFiles, saveFileExtraction, storeVisitorFile } from '@/lib/conversationFiles';
+import { analyzeVisitorFile } from '@/lib/visitorFileAnalysis';
 import {
   validateVisitorFile,
   MAX_FILES_PER_CONVERSATION,
@@ -14,7 +15,12 @@ import { logInfo, logWarn, logError } from '@/lib/logger';
 // Same anonymous trust model as ../route.ts: access = chatbotId + is_public +
 // allowed_origins + rate limit, identity = the visitorId persistence key.
 // Opt-in per chatbot (`allow_visitor_uploads`, off by default). The file is
-// only stored with the conversation — nothing reads or analyses its content.
+// stored with the conversation; only when `analyze_visitor_files` is also on
+// is its text extracted so the chatbot can answer about it (item 63).
+
+// Extraction (OCR for scans and images) runs inside this request, so it needs
+// more room than the default; analyzeVisitorFile gives up on its own before this.
+export const maxDuration = 60;
 
 // Multipart overhead (boundaries, the other form fields) on top of the file.
 const MAX_BODY_BYTES = MAX_VISITOR_FILE_BYTES + 64 * 1024;
@@ -103,6 +109,7 @@ export async function POST(request: Request) {
       createdConversation = true;
     }
 
+    const data = Buffer.from(await file.arrayBuffer());
     let stored;
     try {
       stored = await storeVisitorFile(admin, {
@@ -111,7 +118,7 @@ export async function POST(request: Request) {
         conversationId,
         filename: file.name,
         contentType: validation.contentType,
-        data: Buffer.from(await file.arrayBuffer()),
+        data,
       });
     } catch (err) {
       // Don't leave an empty conversation behind when it was created just for
@@ -122,13 +129,33 @@ export async function POST(request: Request) {
       throw err;
     }
 
+    // Reading the file for the chatbot (docs/roadmap.md item 63) is best
+    // effort: the file is already stored, so a failure here (unreadable file,
+    // OCR down) only means the chatbot will say it couldn't read it.
+    let readable: boolean | undefined;
+    if (chatbot.analyze_visitor_files) {
+      try {
+        const extraction = await analyzeVisitorFile(data, file.name, logCtx);
+        await saveFileExtraction(admin, stored.file.id, extraction);
+        readable = extraction.status === 'ok';
+      } catch (err) {
+        logWarn('public-chat-files.analysis_failed', {
+          ...logCtx,
+          conversationId,
+          error: err instanceof Error ? err.message : String(err),
+        });
+        readable = false;
+      }
+    }
+
     // Size only, never the filename or content — see the GDPR note in
     // lib/logger.ts.
-    logInfo('public-chat-files.stored', { ...logCtx, conversationId, sizeBytes: file.size });
+    logInfo('public-chat-files.stored', { ...logCtx, conversationId, sizeBytes: file.size, readable });
     return Response.json({
       conversationId,
       attachment: stored.file,
       content: stored.content,
+      readable,
     });
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Erreur inconnue.';

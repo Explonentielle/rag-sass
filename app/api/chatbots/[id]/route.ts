@@ -3,7 +3,7 @@ import { createClient } from '@/lib/supabase/server';
 import { normalizeOrigin } from '@/lib/embedAccess';
 import { deleteChatbotChunks } from '@/lib/elasticsearch';
 import { removeConversationFiles } from '@/lib/conversationFiles';
-import { AI_INDEXING_ALLOWED_PLANS } from '@/lib/plans';
+import { AI_INDEXING_ALLOWED_PLANS, VISITOR_FILE_ANALYSIS_ALLOWED_PLANS } from '@/lib/plans';
 import { getAdminClient } from '@/lib/supabase/admin';
 import { removeChatbotLogos } from '@/lib/chatbotLogo';
 import { isSourceRefreshFrequency } from '@/lib/sourceRefreshRules';
@@ -38,6 +38,7 @@ export async function PATCH(request: Request, { params }: { params: { id: string
   const useAiIndexing: boolean | undefined = body?.useAiIndexing;
   const allowEmailTool: boolean | undefined = body?.allowEmailTool;
   const allowVisitorUploads: boolean | undefined = body?.allowVisitorUploads;
+  const analyzeVisitorFiles: boolean | undefined = body?.analyzeVisitorFiles;
   const allowLeadQualification: boolean | undefined = body?.allowLeadQualification;
   const showLoadingSteps: boolean | undefined = body?.showLoadingSteps;
   const loadingMessagesInput: unknown = body?.loadingMessages;
@@ -197,6 +198,7 @@ export async function PATCH(request: Request, { params }: { params: { id: string
     useAiIndexing === undefined &&
     allowEmailTool === undefined &&
     allowVisitorUploads === undefined &&
+    analyzeVisitorFiles === undefined &&
     allowLeadQualification === undefined &&
     showLoadingSteps === undefined &&
     notificationEmail === undefined &&
@@ -249,6 +251,33 @@ export async function PATCH(request: Request, { params }: { params: { id: string
     }
   }
 
+  // Reading visitor files (docs/roadmap.md item 63) is premium — same shape
+  // as the AI indexing check above: only checked when turning it on.
+  if (analyzeVisitorFiles) {
+    const { data: chatbot } = await supabase
+      .from('chatbots')
+      .select('organization_id')
+      .eq('id', params.id)
+      .single();
+
+    if (!chatbot) {
+      return NextResponse.json({ error: 'Chatbot introuvable.' }, { status: 404 });
+    }
+
+    const { data: org } = await supabase
+      .from('organizations')
+      .select('plan')
+      .eq('id', chatbot.organization_id)
+      .single();
+
+    if (!org || !VISITOR_FILE_ANALYSIS_ALLOWED_PLANS.includes(org.plan)) {
+      return NextResponse.json(
+        { error: 'La lecture des fichiers par le chatbot nécessite le plan PME ou Métier.' },
+        { status: 403 }
+      );
+    }
+  }
+
   // A 'second_cerveau' or 'contract_analyzer' chatbot can never be made
   // public from here — their dashboard UI has no "Widget" section to
   // reach this in the first place (a defense-in-depth check: the real
@@ -285,6 +314,7 @@ export async function PATCH(request: Request, { params }: { params: { id: string
       ...(useAiIndexing !== undefined ? { use_ai_indexing: useAiIndexing } : {}),
       ...(allowEmailTool !== undefined ? { allow_email_tool: allowEmailTool } : {}),
       ...(allowVisitorUploads !== undefined ? { allow_visitor_uploads: allowVisitorUploads } : {}),
+      ...(analyzeVisitorFiles !== undefined ? { analyze_visitor_files: analyzeVisitorFiles } : {}),
       ...(allowLeadQualification !== undefined ? { allow_lead_qualification: allowLeadQualification } : {}),
       ...(showLoadingSteps !== undefined ? { show_loading_steps: showLoadingSteps } : {}),
       ...(notificationEmail !== undefined ? { notification_email: notificationEmail } : {}),

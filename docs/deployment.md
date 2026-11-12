@@ -84,7 +84,7 @@ l'étape 5 (`OCR_SERVICE_URL=https://<ES_DOMAIN>:8443`,
 
 ## 2. Supabase — appliquer les migrations
 
-**Aucune des 27 migrations n'est protégée contre une double exécution par
+**Aucune des 31 migrations n'est protégée contre une double exécution par
 un mécanisme de suivi automatique** (pas de CLI Supabase liée, voir
 `supabase/migrations/`) — mais la plupart sont écrites de façon
 idempotente (`create table if not exists`, `add column if not exists`,
@@ -120,6 +120,10 @@ Editor**, exécute-les dans l'ordre, une par une :
 | 25 | `0025_lead_qualification.sql` | Erreur de colonne existante → déjà appliquée |
 | 26 | `0026_paperwork_digitizer.sql` | Sans effet si déjà appliquée (`if not exists`, `drop constraint if exists`) |
 | 27 | `0027_message_feedback_and_stats.sql` | Sans effet si déjà appliquée (`add column if not exists`, `create or replace function`) |
+| 28 | `0028_widget_appearance.sql` | Sans effet si déjà appliquée (`add column if not exists`, `on conflict do nothing` sur le bucket) |
+| 29 | `0029_source_refresh.sql` | Sans effet si déjà appliquée (`add column if not exists`, `create index if not exists`) |
+| 30 | `0030_lead_webhook.sql` | Sans effet si déjà appliquée (`add column if not exists`) |
+| 31 | `0031_visitor_file_analysis.sql` | Sans effet si déjà appliquée (`add column if not exists`) |
 
 Pour les n° 1 à 4 : si l'exécution s'arrête sur une erreur
 `policy "..." already exists`, c'est le signal que cette migration (au

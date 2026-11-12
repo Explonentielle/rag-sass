@@ -548,6 +548,12 @@ export default function ChatWidget({
         ]);
         setActiveConversationId(body.conversationId);
       }
+      // Only set when the chatbot reads files (roadmap item 63): tell the
+      // visitor up front instead of letting them ask about a file the
+      // chatbot can't see.
+      if (body.readable === false) {
+        setUploadError("Fichier reçu, mais le chatbot n'a pas pu en lire le contenu.");
+      }
     } catch {
       setUploadError("Erreur lors de l'envoi du fichier.");
     } finally {

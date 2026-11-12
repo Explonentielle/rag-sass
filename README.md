@@ -49,7 +49,7 @@ cp .env.example .env.local
 npm run dev
 ```
 
-**Base de données** : dans le *SQL Editor* de Supabase, exécuter **toutes** les migrations de `supabase/migrations/` dans l'ordre (`0001` à `0026`). Pour un pilote, désactiver « Confirm email » dans Authentication > Providers > Email évite la friction des tests.
+**Base de données** : dans le *SQL Editor* de Supabase, exécuter **toutes** les migrations de `supabase/migrations/` dans l'ordre (`0001` à `0031`). Pour un pilote, désactiver « Confirm email » dans Authentication > Providers > Email évite la friction des tests.
 
 Ouvrir [http://localhost:3000](http://localhost:3000), créer un compte (`/signup`, cela crée aussi l'organisation), créer un chatbot, uploader un document puis poser une question.
 
