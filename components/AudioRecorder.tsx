@@ -119,7 +119,7 @@ export default function AudioRecorder({ chatbotId, allowed }: { chatbotId: strin
   }
 
   return (
-    <div className="flex flex-col items-end gap-1">
+    <div className="flex flex-col items-start gap-1">
       <div className="flex items-center gap-2">
         {!allowed && <Badge tone="blue">Premium</Badge>}
         {recording ? (
@@ -139,12 +139,12 @@ export default function AudioRecorder({ chatbotId, allowed }: { chatbotId: strin
         )}
       </div>
       {!allowed && (
-        <p className="max-w-xs text-right text-xs text-amber-600">
+        <p className="max-w-xs text-xs text-amber-600">
           Nécessite le plan PME ou Métier.
         </p>
       )}
       <p className="text-xs text-slate-400">90 min max, transcrite puis indexée automatiquement.</p>
-      {error && <p className="max-w-xs text-right text-sm text-red-600">{error}</p>}
+      {error && <p className="max-w-xs text-sm text-red-600">{error}</p>}
     </div>
   );
 }

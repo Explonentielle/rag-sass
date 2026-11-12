@@ -153,15 +153,15 @@ export default function UrlUploader({ chatbotId }: { chatbotId: string }) {
   const busy = submitting || progress !== null;
 
   return (
-    <div className="flex flex-col items-end gap-1">
-      <form onSubmit={handleSubmit} className="flex items-center gap-2">
+    <div className="flex flex-col items-start gap-1">
+      <form onSubmit={handleSubmit} className="flex w-full max-w-xl flex-wrap items-center gap-2">
         <Input
           type="url"
           value={url}
           onChange={(e) => setUrl(e.target.value)}
           placeholder="https://exemple.com/page"
           disabled={busy || pages !== null}
-          className="w-56 min-w-0"
+          className="min-w-[12rem] flex-1"
         />
         <label className="flex flex-shrink-0 items-center gap-1.5 whitespace-nowrap text-xs text-slate-600">
           <input

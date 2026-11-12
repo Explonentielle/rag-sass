@@ -12,7 +12,13 @@ interface UploadError {
   message: string;
 }
 
-export default function DocumentUploader({ chatbotId }: { chatbotId: string }) {
+export default function DocumentUploader({
+  chatbotId,
+  align = 'end',
+}: {
+  chatbotId: string;
+  align?: 'start' | 'end';
+}) {
   const router = useRouter();
   const inputRef = useRef<HTMLInputElement>(null);
   // Number of files whose initial upload request is still in flight — not
@@ -92,7 +98,7 @@ export default function DocumentUploader({ chatbotId }: { chatbotId: string }) {
   const uploading = pendingCount > 0;
 
   return (
-    <div className="flex flex-col items-end gap-1">
+    <div className={`flex flex-col gap-1 ${align === 'start' ? 'items-start' : 'items-end'}`}>
       <Button
         variant="secondary"
         size="sm"

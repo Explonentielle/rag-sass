@@ -122,14 +122,14 @@ export default async function ChatbotPage({ params }: { params: { id: string } }
       </section>
 
       <section className="space-y-3">
-        <div className="flex flex-wrap items-start justify-between gap-3">
-          <h2 className="flex items-center gap-2 font-semibold text-slate-900">
-            <Icon className="h-4 w-4 text-brand-600">{ICONS.document}</Icon>
-            Documents
-          </h2>
-          <div className="flex flex-wrap items-start gap-3">
-            <UrlUploader chatbotId={chatbot.id} />
-            <DocumentUploader chatbotId={chatbot.id} />
+        <h2 className="flex items-center gap-2 font-semibold text-slate-900">
+          <Icon className="h-4 w-4 text-brand-600">{ICONS.document}</Icon>
+          Documents
+        </h2>
+        <div className="space-y-3">
+          <UrlUploader chatbotId={chatbot.id} />
+          <div className="flex flex-wrap items-start gap-x-6 gap-y-3">
+            <DocumentUploader chatbotId={chatbot.id} align="start" />
             <AudioRecorder
               chatbotId={chatbot.id}
               allowed={!!org && AUDIO_TRANSCRIPTION_ALLOWED_PLANS.includes(org.plan)}
@@ -176,21 +176,6 @@ export default async function ChatbotPage({ params }: { params: { id: string } }
         </Card>
       </section>
 
-      <section className="space-y-3">
-        <div>
-          <h2 className="flex items-center gap-2 font-semibold text-slate-900">
-            <Icon className="h-4 w-4 text-brand-600">{ICONS.quote}</Icon>
-            Conversations
-          </h2>
-          <p className="mt-1 text-sm text-slate-500">
-            {isSecondCerveau
-              ? "Toutes les conversations de cet assistant interne, côté équipe."
-              : "Toutes les conversations de ce chatbot, côté équipe et côté visiteurs (widget public). Utile pour retrouver et supprimer la conversation d'un visiteur sur demande RGPD."}
-          </p>
-        </div>
-        <ConversationsPanel chatbotId={chatbot.id} initialConversations={conversations} />
-      </section>
-
       {!isSecondCerveau && (
         <section className="space-y-3">
           <h2 className="flex items-center gap-2 font-semibold text-slate-900">
@@ -216,6 +201,21 @@ export default async function ChatbotPage({ params }: { params: { id: string } }
           />
         </section>
       )}
+
+      <section className="space-y-3">
+        <div>
+          <h2 className="flex items-center gap-2 font-semibold text-slate-900">
+            <Icon className="h-4 w-4 text-brand-600">{ICONS.quote}</Icon>
+            Conversations
+          </h2>
+          <p className="mt-1 text-sm text-slate-500">
+            {isSecondCerveau
+              ? "Toutes les conversations de cet assistant interne, côté équipe."
+              : "Toutes les conversations de ce chatbot, côté équipe et côté visiteurs (widget public). Utile pour retrouver et supprimer la conversation d'un visiteur sur demande RGPD."}
+          </p>
+        </div>
+        <ConversationsPanel chatbotId={chatbot.id} initialConversations={conversations} />
+      </section>
 
       <section className="space-y-3">
         <h2 className="flex items-center gap-2 font-semibold text-slate-900">
