@@ -20,6 +20,8 @@ import LeadQualificationToggle from '@/components/LeadQualificationToggle';
 import LoadingMessagesForm from '@/components/LoadingMessagesForm';
 import ChatbotStatsPanel from '@/components/ChatbotStatsPanel';
 import WidgetAppearanceForm from '@/components/WidgetAppearanceForm';
+import SourceRefreshSelect from '@/components/SourceRefreshSelect';
+import RefreshDocumentButton from '@/components/RefreshDocumentButton';
 import { getLogoPublicUrl } from '@/lib/chatbotLogo';
 import { listAllConversationsForChatbot } from '@/lib/conversations';
 import { loadChatbotStats } from '@/lib/chatbotStats';
@@ -31,13 +33,23 @@ import {
 } from '@/lib/plans';
 import { Icon, IconBadge, ICONS } from '@/components/icons';
 
+function formatCheckedAt(iso: string): string {
+  return new Date(iso).toLocaleString('fr-FR', {
+    timeZone: 'Europe/Paris',
+    day: '2-digit',
+    month: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+}
+
 export default async function ChatbotPage({ params }: { params: { id: string } }) {
   const supabase = createClient();
 
   const { data: chatbotData, error: chatbotError } = await supabase
     .from('chatbots')
     .select(
-      'id, name, system_prompt_template, organization_id, is_public, allowed_origins, use_documents, use_ai_indexing, allow_email_tool, notification_email, allow_visitor_uploads, allow_lead_qualification, lead_qualification_criteria, meeting_link, show_loading_steps, loading_messages, use_case, bot_name, welcome_message, suggested_questions, logo_path'
+      'id, name, system_prompt_template, organization_id, is_public, allowed_origins, use_documents, use_ai_indexing, allow_email_tool, notification_email, allow_visitor_uploads, allow_lead_qualification, lead_qualification_criteria, meeting_link, show_loading_steps, loading_messages, use_case, bot_name, welcome_message, suggested_questions, logo_path, source_refresh'
     )
     .eq('id', params.id)
     .single();
@@ -52,7 +64,7 @@ export default async function ChatbotPage({ params }: { params: { id: string } }
   const [documentsResult, customTemplatesResult, orgResult, conversations, stats] = await Promise.all([
     supabase
       .from('documents')
-      .select('id, filename, status, error_message, chunk_count, uploaded_at')
+      .select('id, filename, file_type, status, error_message, chunk_count, last_checked_at, uploaded_at')
       .eq('chatbot_id', chatbot.id)
       .order('uploaded_at', { ascending: false }),
     supabase
@@ -161,6 +173,8 @@ export default async function ChatbotPage({ params }: { params: { id: string } }
           allowed={!!org && AI_INDEXING_ALLOWED_PLANS.includes(org.plan)}
         />
 
+        <SourceRefreshSelect chatbotId={chatbot.id} initialValue={chatbot.source_refresh} />
+
         <Card className="divide-y divide-slate-100">
           {(documents ?? []).map((doc) => (
             <div key={doc.id} className="flex items-center justify-between px-5 py-4 text-sm">
@@ -170,10 +184,18 @@ export default async function ChatbotPage({ params }: { params: { id: string } }
                   <p className="mt-0.5 text-xs text-red-600">{doc.error_message}</p>
                 )}
                 {doc.status === 'indexed' && (
-                  <p className="mt-0.5 text-xs text-slate-400">{doc.chunk_count} segments indexés</p>
+                  <p className="mt-0.5 text-xs text-slate-400">
+                    {doc.chunk_count} segments indexés
+                    {doc.file_type === 'url' && doc.last_checked_at
+                      ? ` · page vérifiée le ${formatCheckedAt(doc.last_checked_at)}`
+                      : ''}
+                  </p>
                 )}
               </div>
               <div className="flex items-center gap-3">
+                {doc.file_type === 'url' && (doc.status === 'indexed' || doc.status === 'error') && (
+                  <RefreshDocumentButton documentId={doc.id} />
+                )}
                 <DocumentStatusBadge status={doc.status} />
                 {doc.status === 'indexed' && <ViewChunksButton documentId={doc.id} />}
                 <DeleteDocumentButton documentId={doc.id} />

@@ -6,6 +6,8 @@ import { removeConversationFiles } from '@/lib/conversationFiles';
 import { AI_INDEXING_ALLOWED_PLANS } from '@/lib/plans';
 import { getAdminClient } from '@/lib/supabase/admin';
 import { removeChatbotLogos } from '@/lib/chatbotLogo';
+import { isSourceRefreshFrequency } from '@/lib/sourceRefreshRules';
+import type { SourceRefreshFrequency } from '@/types/database';
 import {
   parseOptionalText,
   parseSuggestedQuestions,
@@ -43,6 +45,16 @@ export async function PATCH(request: Request, { params }: { params: { id: string
   const botNameInput: unknown = body?.botName;
   const welcomeMessageInput: unknown = body?.welcomeMessage;
   const suggestedQuestionsInput: unknown = body?.suggestedQuestions;
+  const sourceRefreshInput: unknown = body?.sourceRefresh;
+
+  // Automatic refresh of web pages (docs/roadmap.md item 61).
+  let sourceRefresh: SourceRefreshFrequency | undefined;
+  if (sourceRefreshInput !== undefined) {
+    if (!isSourceRefreshFrequency(sourceRefreshInput)) {
+      return NextResponse.json({ error: 'sourceRefresh doit valoir off, daily ou weekly.' }, { status: 400 });
+    }
+    sourceRefresh = sourceRefreshInput;
+  }
 
   // Widget appearance (docs/roadmap.md item 60) — plain display text shown to
   // visitors; null or empty clears it.
@@ -180,7 +192,8 @@ export async function PATCH(request: Request, { params }: { params: { id: string
     meetingLink === undefined &&
     botName === undefined &&
     welcomeMessage === undefined &&
-    suggestedQuestions === undefined
+    suggestedQuestions === undefined &&
+    sourceRefresh === undefined
   ) {
     return NextResponse.json({ error: 'Rien à mettre à jour.' }, { status: 400 });
   }
@@ -260,6 +273,7 @@ export async function PATCH(request: Request, { params }: { params: { id: string
       ...(botName !== undefined ? { bot_name: botName } : {}),
       ...(welcomeMessage !== undefined ? { welcome_message: welcomeMessage } : {}),
       ...(suggestedQuestions !== undefined ? { suggested_questions: suggestedQuestions } : {}),
+      ...(sourceRefresh !== undefined ? { source_refresh: sourceRefresh } : {}),
     })
     .eq('id', params.id);
 

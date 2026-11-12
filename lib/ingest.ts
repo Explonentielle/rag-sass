@@ -3,7 +3,14 @@ import type { Database } from '@/types/database';
 import { extractText, extractFromUrl, UnsupportedDocumentError, type SupportedFileType } from '@/lib/extract';
 import { chunkText } from '@/lib/chunking';
 import { embedTexts, structureChunksWithAI, extractContractClauses, extractDocumentFields } from '@/lib/openai';
-import { ensureChunksIndex, getEsClient, CHUNKS_INDEX, type ChunkDoc } from '@/lib/elasticsearch';
+import {
+  ensureChunksIndex,
+  getEsClient,
+  deleteDocumentChunks,
+  CHUNKS_INDEX,
+  type ChunkDoc,
+} from '@/lib/elasticsearch';
+import { hashText } from '@/lib/sourceRefreshRules';
 import { logInfo, logError, logWarn } from '@/lib/logger';
 
 const EMBEDDING_BATCH_SIZE = 50;
@@ -275,8 +282,47 @@ export async function processUrlDocument(
 ): Promise<{ status: 'indexed' | 'error'; errorMessage?: string; chunkCount?: number }> {
   const { documentId, chatbotId, organizationId, url, useAiIndexing } = params;
 
-  return runIngestion(supabase, { documentId, chatbotId, organizationId, filename: url }, async () => {
+  const captured: { hash: string | null } = { hash: null };
+  const result = await runIngestion(supabase, { documentId, chatbotId, organizationId, filename: url }, async () => {
     const text = await extractFromUrl(url);
+    captured.hash = hashText(text);
     return resolveChunks(text, useAiIndexing);
   });
+
+  // Remembered so the automatic refresh (docs/roadmap.md item 61) can tell
+  // later that the page hasn't changed instead of re-embedding it.
+  if (result.status === 'indexed' && captured.hash) {
+    await supabase
+      .from('documents')
+      .update({ content_hash: captured.hash, last_checked_at: new Date().toISOString() })
+      .eq('id', documentId);
+  }
+  return result;
+}
+
+export interface ReindexFromTextParams {
+  documentId: string;
+  chatbotId: string;
+  organizationId: string;
+  filename: string;
+  text: string;
+  useAiIndexing?: boolean;
+}
+
+/**
+ * Replaces a document's indexed chunks with a fresh indexing of `text`
+ * (docs/roadmap.md item 61, automatic refresh of web pages). The caller has
+ * already fetched and extracted the new content, so a failing fetch never
+ * reaches this point and never costs the document its existing chunks; the
+ * old chunks are removed only right before the new ones are written.
+ */
+export async function reindexDocumentFromText(
+  supabase: SupabaseClient<Database>,
+  params: ReindexFromTextParams
+): Promise<{ status: 'indexed' | 'error'; errorMessage?: string; chunkCount?: number }> {
+  const { documentId, chatbotId, organizationId, filename, text, useAiIndexing } = params;
+  await deleteDocumentChunks(documentId);
+  return runIngestion(supabase, { documentId, chatbotId, organizationId, filename }, () =>
+    resolveChunks(text, useAiIndexing)
+  );
 }

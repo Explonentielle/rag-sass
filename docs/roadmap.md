@@ -67,6 +67,7 @@ fixe — sert de mémoire centralisée plutôt que de planning strict.
 | 58 | Méthode | Méthode de travail inspirée de Spec Kit (spec, clarification, plan avant de coder) + `CLAUDE.md` | Faible | ✅ Fait (`CLAUDE.md` créé) : étapes "clarifier" et "analyser" appliquées aux grosses features, outil Spec Kit non installé |
 | 59 | Produit | Retour 👍/👎 sur les réponses + statistiques et questions sans réponse par chatbot | Moyen | ✅ Fait côté code (2026-11-12), migration `0027` à appliquer, à tester |
 | 60 | Produit | Personnalisation du widget : logo, nom, message d'accueil, questions suggérées, mention « Propulsé par » selon le plan | Faible-moyen | ✅ Fait côté code (2026-11-12), migration `0028` à appliquer, à tester |
+| 61 | Ingestion | Re-scan automatique des pages web indexées (cron quotidien, ré-indexation seulement si le contenu change) | Moyen | ✅ Fait côté code (2026-11-12), migration `0029` à appliquer, à tester |
 
 ---
 
@@ -2947,3 +2948,59 @@ questions, détection du type réel du logo, SVG et fichier trop gros refusés).
 questions, vérifier le rendu dans l'iframe sur le site client et dans le test de
 chat, cliquer une question suggérée, retirer le logo, vérifier la mention sur un
 plan gratuit puis son absence en passant l'organisation en PME.
+
+---
+
+### 61. Re-scan automatique des pages web indexées : ✅ Fait côté code (migration à appliquer, à tester)
+
+**Besoin** : une base construite à partir d'un site (item 18 point 5, item
+50) se périme dès que le site change : prix, horaires, offres. Sans mise à
+jour, le chatbot répond avec d'anciennes informations et le client doit
+supprimer et rajouter ses pages à la main. C'est exactement le cas de
+votreaccompagnateur.fr.
+
+**Ce qui est fait** :
+- **Réglage par chatbot** (`chatbots.source_refresh` : désactivée par défaut,
+  tous les jours, toutes les semaines), sous la liste des documents. Ne
+  concerne que les documents ajoutés par adresse (`file_type = 'url'`), pas
+  les fichiers envoyés.
+- **Cron quotidien** `/api/cron/refresh-sources` (05:00 UTC, `vercel.json`),
+  protégé par `CRON_SECRET` et qui refuse tout accès si ce secret est absent
+  (il déclenche des lectures réseau et des embeddings payants, comme le cron de
+  débit). Il traite au plus 20 pages par passage, les moins récemment vérifiées
+  d'abord, avec une garde de temps (240 s) : un gros stock est absorbé sur
+  plusieurs jours au lieu d'expirer.
+- **Ré-indexation seulement si le contenu change** : chaque indexation réussie
+  mémorise l'empreinte SHA-256 du texte extrait (`documents.content_hash`). Une
+  page identique ne coûte qu'une lecture, aucun embedding.
+- **Sécurité du contenu existant** : la page est d'abord lue et extraite. Si
+  cela échoue (site indisponible, bloqué), l'ancien contenu reste en place et
+  la date de vérification est simplement mise à jour. Les anciens segments ne
+  sont supprimés qu'au moment d'écrire les nouveaux.
+- **Bouton « Actualiser »** sur chaque page web de la liste (même logique que
+  le cron, à la demande, avec le résultat affiché : mise à jour ou déjà à
+  jour), et date de dernière vérification affichée sous le document. Utile
+  juste après avoir modifié son site, et pour tester sans attendre le cron.
+
+**Limites assumées** :
+- Les documents indexés avant cette fonction n'ont pas d'empreinte : leur
+  première actualisation les ré-indexe une fois, même sans changement.
+- Une page dont le texte change à chaque lecture (date du jour, compteur,
+  publicité) est ré-indexée à chaque passage ; le coût reste de quelques
+  embeddings par page.
+- Seules les pages déjà ajoutées sont suivies : une nouvelle page apparue sur
+  le site n'est pas découverte automatiquement (le scan « tout le site » de
+  l'item 50 reste manuel). Piste : relancer la découverte et proposer les
+  nouvelles pages.
+- Pas de limitation par palier : tous les plans y ont accès.
+
+**À appliquer** : migration `0029_source_refresh.sql`, puis déployer (la nouvelle
+entrée de `vercel.json` active le cron). `CRON_SECRET` doit être défini sur
+Vercel, comme pour les autres crons.
+
+**Tests** : `lib/sourceRefreshRules.test.ts` (calcul d'échéance quotidien et
+hebdomadaire, empreinte stable). **À tester en conditions réelles** : activer
+« Tous les jours » sur le chatbot de votreaccompagnateur.fr, cliquer sur
+« Actualiser » sur une page (première fois : « Page mise à jour », seconde fois :
+« Déjà à jour »), modifier un texte sur le site puis actualiser et poser la
+question au chatbot, vérifier dans les logs Vercel le passage du cron.

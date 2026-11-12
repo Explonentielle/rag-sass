@@ -8,6 +8,7 @@ export type MessageRole = 'user' | 'assistant';
 export type MessageFeedback = 1 | -1;
 export type OrgPlan = 'free' | 'solo' | 'pme' | 'metier';
 export type OrgOverageMode = 'block' | 'auto_bill';
+export type SourceRefreshFrequency = 'off' | 'daily' | 'weekly';
 export type OverageChargeStatus = 'succeeded' | 'failed';
 export type ChatbotUseCase = 'site_widget' | 'second_cerveau' | 'contract_analyzer' | 'paperwork_digitizer';
 
@@ -108,6 +109,7 @@ export interface Database {
           welcome_message: string | null;
           suggested_questions: string[] | null;
           logo_path: string | null;
+          source_refresh: SourceRefreshFrequency;
           created_at: string;
         };
         Insert: {
@@ -134,6 +136,7 @@ export interface Database {
           welcome_message?: string | null;
           suggested_questions?: string[] | null;
           logo_path?: string | null;
+          source_refresh?: SourceRefreshFrequency;
           created_at?: string;
         };
         Update: {
@@ -160,6 +163,7 @@ export interface Database {
           welcome_message?: string | null;
           suggested_questions?: string[] | null;
           logo_path?: string | null;
+          source_refresh?: SourceRefreshFrequency;
           created_at?: string;
         };
       };
@@ -198,6 +202,8 @@ export interface Database {
           error_message: string | null;
           chunk_count: number | null;
           extracted_fields: ExtractedFieldsJson | null;
+          content_hash: string | null;
+          last_checked_at: string | null;
           uploaded_at: string;
           indexed_at: string | null;
         };
@@ -212,6 +218,8 @@ export interface Database {
           error_message?: string | null;
           chunk_count?: number | null;
           extracted_fields?: ExtractedFieldsJson | null;
+          content_hash?: string | null;
+          last_checked_at?: string | null;
           uploaded_at?: string;
           indexed_at?: string | null;
         };
@@ -226,6 +234,8 @@ export interface Database {
           error_message?: string | null;
           chunk_count?: number | null;
           extracted_fields?: ExtractedFieldsJson | null;
+          content_hash?: string | null;
+          last_checked_at?: string | null;
           uploaded_at?: string;
           indexed_at?: string | null;
         };

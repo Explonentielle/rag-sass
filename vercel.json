@@ -7,6 +7,10 @@
     {
       "path": "/api/cron/charge-overage",
       "schedule": "0 4 * * *"
+    },
+    {
+      "path": "/api/cron/refresh-sources",
+      "schedule": "0 5 * * *"
     }
   ]
 }
