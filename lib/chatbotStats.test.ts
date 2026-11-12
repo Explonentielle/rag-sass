@@ -76,6 +76,18 @@ describe('computeChatbotStats', () => {
     expect(stats.unanswered[0].question).toBe('Vendez-vous des licences ?');
   });
 
+  it('ne compte pas une salutation ou un remerciement comme une question sans réponse', () => {
+    const rows = [
+      ...turn('c1', '2026-11-12T09:00:00Z', 'Bonjour', { no_context: true }),
+      ...turn('c1', '2026-11-12T09:05:00Z', 'ok tres bien merci', { no_context: true }),
+      ...turn('c1', '2026-11-12T09:06:00Z', 'tu bug ?', { no_context: true }),
+      ...turn('c1', '2026-11-12T09:07:00Z', 'Vendez-vous des licences ?', { no_context: true }),
+    ];
+    const stats = computeChatbotStats(rows, { days: 30, now: NOW });
+    expect(stats.unansweredQuestions).toBe(1);
+    expect(stats.unanswered.map((q) => q.question)).toEqual(['Vendez-vous des licences ?']);
+  });
+
   it("associe la réponse mal notée à la question du même tour, pas à celle d'un tour précédent", () => {
     const rows = [
       ...turn('c1', '2026-11-12T08:00:00Z', 'Première question'),

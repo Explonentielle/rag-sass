@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { getAdminClient } from '@/lib/supabase/admin';
-import { reportDbError, reportError } from '@/lib/userErrors';
+import { reportDbError, reportError } from '@/lib/reportError';
 import { PLAN_MEMBER_LIMITS, PLAN_LABELS } from '@/lib/plans';
 import type { OrgPlan } from '@/types/database';
 

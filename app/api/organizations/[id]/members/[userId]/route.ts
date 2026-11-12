@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { logError } from '@/lib/logger';
-import { reportDbError } from '@/lib/userErrors';
+import { reportDbError } from '@/lib/reportError';
 import type { OrgRole } from '@/types/database';
 
 async function getMembership(

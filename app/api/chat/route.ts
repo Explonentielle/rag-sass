@@ -11,7 +11,7 @@ import {
 import { hybridSearch } from '@/lib/elasticsearch';
 import { buildSystemPrompt } from '@/lib/prompts';
 import { logInfo, logWarn } from '@/lib/logger';
-import { reportDbError, reportError } from '@/lib/userErrors';
+import { reportDbError, reportError } from '@/lib/reportError';
 import { checkRateLimit } from '@/lib/rateLimit';
 import { checkQuota } from '@/lib/usage';
 import {
@@ -240,8 +240,11 @@ export async function POST(request: Request) {
         // from documents" instruction with zero chunks would make the model
         // refuse every question instead of using what's in the prompt.
         let chunks: Awaited<ReturnType<typeof hybridSearch>> = [];
+        let isSmallTalk = false;
         if (chatbot.use_documents) {
-          const { semanticQuery, keywordQuery } = await rewriteQuery(question);
+          const rewritten = await rewriteQuery(question);
+          const { semanticQuery, keywordQuery } = rewritten;
+          isSmallTalk = rewritten.isSmallTalk;
           // Real progress for widgets that show steps instead of rotating
           // messages (docs/roadmap.md item 51).
           controller.enqueue(encoder.encode(sseEvent('status', { step: 'searching', topic: keywordQuery })));
@@ -302,7 +305,7 @@ export async function POST(request: Request) {
           question,
           answer,
           sources,
-          noContext: chatbot.use_documents && chunks.length === 0,
+          noContext: chatbot.use_documents && chunks.length === 0 && !isSmallTalk,
         });
 
         if (truncated) {

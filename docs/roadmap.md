@@ -3273,3 +3273,28 @@ l'entrée active se déplie en liste de sections cliquables.
 **Pour ajouter un sous-menu à une autre page** : donner un `id` et la classe
 `scroll-mt-6` à chaque bloc, puis rendre `<PageSections>` avec la liste
 `{ id, label }` en tête de page.
+
+---
+
+### 67. Correctifs du 2026-11-12 après déploiement (build, cache, statistiques) : ✅ Fait
+
+- **Build Vercel en échec** sur les commits `228e0aa` et `37d5816` : `lib/userErrors.ts`
+  importait `lib/logger.ts` (qui utilise `node:fs`), et des composants du navigateur
+  (widget, pages de connexion) importaient `userErrors`. TypeScript et les tests
+  unitaires ne le voient pas, seul le build de production le détecte. Corrigé en
+  séparant la partie sans serveur (`lib/userErrors.ts`) de la partie qui journalise
+  (`lib/reportError.ts`), et un test (`lib/clientBundleSafety.test.ts`) suit désormais
+  les imports de chaque composant client et refuse tout module serveur, même indirect.
+  Vérifié : il échoue si l'import fautif est réintroduit.
+- **Lectures de base figées** : Next 14 met en cache les `fetch` côté serveur par défaut,
+  d'un déploiement à l'autre. Le client service-role (`lib/supabase/admin.ts`), utilisé par
+  la page du widget et l'accès public, pouvait donc continuer à servir la valeur lue à la
+  première requête (logo, nom, message d'accueil, réglages d'accès). Il force maintenant
+  `cache: 'no-store'`.
+- **« Questions sans réponse »** : un « Bonjour », « merci » ou « tu bugs ? » ne trouve
+  rien dans les documents, sans que ce soit un manque. Le classement se fait à la source,
+  dans l'appel de reformulation déjà existant (champ `isSmallTalk`, sans appel
+  supplémentaire), et une règle simple (`lib/smallTalk.ts`) nettoie aussi les messages
+  déjà enregistrés. La recherche, elle, n'est jamais court-circuitée : le classement ne
+  sert qu'aux statistiques.
+- Libellé du lien de rendez-vous reformulé (« Lien de prise de rendez-vous »).

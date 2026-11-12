@@ -5,7 +5,7 @@ import {
   deleteConversationForChatbot,
   loadHistoryForChatbot,
 } from '@/lib/conversations';
-import { reportError } from '@/lib/userErrors';
+import { reportError } from '@/lib/reportError';
 
 // Dashboard admin tool (roadmap.md item 20-B): lists and deletes any
 // conversation on a chatbot, across every identity (org test-chat users and

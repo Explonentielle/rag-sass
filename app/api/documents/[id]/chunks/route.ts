@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { getDocumentChunks } from '@/lib/elasticsearch';
-import { reportError } from '@/lib/userErrors';
+import { reportError } from '@/lib/reportError';
 
 // Lets someone inspect what ingestion actually indexed for a document
 // (docs/roadmap.md item 45) — especially useful with AI-assisted indexing

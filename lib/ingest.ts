@@ -11,7 +11,7 @@ import {
   type ChunkDoc,
 } from '@/lib/elasticsearch';
 import { hashText } from '@/lib/sourceRefreshRules';
-import { reportError } from '@/lib/userErrors';
+import { reportError } from '@/lib/reportError';
 import { logInfo, logWarn } from '@/lib/logger';
 
 const EMBEDDING_BATCH_SIZE = 50;

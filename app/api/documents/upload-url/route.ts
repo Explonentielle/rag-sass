@@ -3,7 +3,7 @@ import { waitUntil } from '@vercel/functions';
 import { createClient } from '@/lib/supabase/server';
 import { processUrlDocument } from '@/lib/ingest';
 import { logWarn, logError } from '@/lib/logger';
-import { reportError } from '@/lib/userErrors';
+import { reportError } from '@/lib/reportError';
 
 // Same reasoning as app/api/documents/upload/route.ts: ingestion runs in
 // the background (waitUntil below), this only bounds that background work.

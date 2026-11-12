@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { reportDbError } from '@/lib/userErrors';
+import { reportDbError } from '@/lib/reportError';
 import { createClient } from '@/lib/supabase/server';
 import { deleteDocumentChunks } from '@/lib/elasticsearch';
 import { logInfo, logError } from '@/lib/logger';

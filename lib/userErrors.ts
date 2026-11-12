@@ -1,13 +1,14 @@
-import { logError } from '@/lib/logger';
-
-// Gestion d'erreur côté API : ce que l'utilisateur voit n'est jamais le texte
-// brut d'une exception (message Postgres, erreur OpenAI, pile d'appel...).
-// Deux familles :
+// Gestion d'erreur : ce que l'utilisateur voit n'est jamais le texte brut d'une
+// exception (message Postgres, erreur OpenAI, pile d'appel...). Deux familles :
 // - une UserFacingError est écrite pour l'utilisateur et s'affiche telle quelle ;
 // - tout le reste est journalisé en entier côté serveur avec une référence
-//   courte, et l'utilisateur ne reçoit qu'une phrase claire plus cette
-//   référence, que le support retrouve dans les logs.
-// Sans dépendance serveur : le widget peut importer les messages génériques.
+//   courte (lib/reportError.ts), et l'utilisateur ne reçoit qu'une phrase claire
+//   plus cette référence, que le support retrouve dans les logs.
+//
+// CE MODULE DOIT RESTER SANS DÉPENDANCE SERVEUR : le widget et les pages de
+// connexion (composants du navigateur) l'importent. Ne jamais y importer
+// lib/logger.ts (système de fichiers) : le build échouerait. La journalisation
+// vit dans lib/reportError.ts. Un test (lib/clientBundleSafety.test.ts) le vérifie.
 
 /** Erreur dont le message est rédigé pour l'utilisateur final et sûr à afficher. */
 export class UserFacingError extends Error {}
@@ -150,39 +151,4 @@ export function describeDbError(err: { code?: string | null } | null | undefined
     default:
       return GENERIC_ERROR_MESSAGE;
   }
-}
-
-/**
- * Journalise l'erreur en entier (message, pile, contexte) avec une référence,
- * et renvoie le message à montrer. La référence est ajoutée seulement aux
- * erreurs inattendues : une UserFacingError n'a rien à faire retrouver dans
- * les logs.
- */
-export function reportError(
-  event: string,
-  err: unknown,
-  ctx: Record<string, unknown> = {}
-): { message: string; ref: string } {
-  const ref = newErrorRef();
-  const userFacing = err instanceof UserFacingError;
-  logError(event, {
-    ...ctx,
-    ref,
-    error: err instanceof Error ? err.message : String(err),
-    stack: err instanceof Error ? err.stack : undefined,
-  });
-  const message = toUserMessage(err);
-  return { message: userFacing ? message : `${message} (réf. ${ref})`, ref };
-}
-
-/** Pareil pour une erreur de base de données renvoyée sous forme { code, message } (pas une exception). */
-export function reportDbError(
-  event: string,
-  dbError: { code?: string | null; message: string },
-  ctx: Record<string, unknown> = {}
-): { message: string; ref: string } {
-  const ref = newErrorRef();
-  logError(event, { ...ctx, ref, code: dbError.code, error: dbError.message });
-  const base = describeDbError(dbError);
-  return { message: base === GENERIC_ERROR_MESSAGE ? `${base} (réf. ${ref})` : base, ref };
 }

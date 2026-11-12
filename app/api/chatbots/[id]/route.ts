@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { reportDbError } from '@/lib/userErrors';
+import { reportDbError } from '@/lib/reportError';
 import { createClient } from '@/lib/supabase/server';
 import { normalizeOrigin } from '@/lib/embedAccess';
 import { deleteChatbotChunks } from '@/lib/elasticsearch';

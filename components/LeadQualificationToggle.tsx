@@ -116,8 +116,12 @@ export default function LeadQualificationToggle({
 
         <div>
           <label htmlFor={`meeting-link-${chatbotId}`} className="text-xs font-medium text-slate-700">
-            Lien de rendez-vous partagé si le lead est chaud (optionnel)
+            Lien de prise de rendez-vous (optionnel)
           </label>
+          <p className="mt-0.5 text-xs text-slate-500">
+            Le chatbot le propose au visiteur quand son projet est concret et qu&apos;il semble prêt à avancer
+            (lead « chaud »). Calendly, Cal.com, une page de contact : toute adresse web convient.
+          </p>
           <div className="mt-1 flex gap-2">
             <Input
               id={`meeting-link-${chatbotId}`}

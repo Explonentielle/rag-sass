@@ -17,7 +17,15 @@ export function getAdminClient() {
     client = createSupabaseClient<Database>(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
       process.env.SUPABASE_SERVICE_ROLE_KEY!,
-      { auth: { persistSession: false, autoRefreshToken: false } }
+      {
+        auth: { persistSession: false, autoRefreshToken: false },
+        // Next 14 caches server-side fetch() calls in its Data Cache by default,
+        // across requests and deployments: without this, a read of a chatbot's
+        // settings (the embed page's logo, name, welcome message, the public
+        // access flags...) kept returning the value from the first request after
+        // the owner changed it. Every read here must see the current row.
+        global: { fetch: (input, init) => fetch(input, { ...init, cache: 'no-store' }) },
+      }
     );
   }
   return client;

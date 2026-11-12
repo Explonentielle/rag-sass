@@ -2,6 +2,8 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import type { Database, MessageFeedback, MessageRole } from '@/types/database';
 import { decryptText } from '@/lib/crypto';
 import { ATTACHMENT_MESSAGE_PREFIX } from '@/lib/conversationFiles';
+import { isSmallTalk } from '@/lib/smallTalk';
+import { normalizeQuestion } from '@/lib/normalizeText';
 import { logError } from '@/lib/logger';
 
 // Statistiques par chatbot (docs/roadmap.md item 59). Tout est calculé à la
@@ -52,15 +54,7 @@ export interface ChatbotStats {
   truncated: boolean;
 }
 
-/** Casse, accents et ponctuation neutralisés pour regrouper les formulations identiques. */
-export function normalizeQuestion(text: string): string {
-  return text
-    .toLowerCase()
-    .normalize('NFD')
-    .replace(/[̀-ͯ]/g, '')
-    .replace(/[^a-z0-9]+/g, ' ')
-    .trim();
-}
+export { normalizeQuestion };
 
 const dayFormatter = new Intl.DateTimeFormat('en-CA', {
   timeZone: 'Europe/Paris',
@@ -142,7 +136,9 @@ export function computeChatbotStats(
 
     if (answer.no_context) {
       const q = questionFor(answer);
-      if (q) unansweredEntries.push({ question: q.content, createdAt: answer.created_at });
+      // Rows saved before small talk was classified at the source still carry
+      // the flag for a "Bonjour" or a "merci": not a gap in the documents.
+      if (q && !isSmallTalk(q.content)) unansweredEntries.push({ question: q.content, createdAt: answer.created_at });
     }
     if (answer.feedback === -1 && answer.content && downvoted.length < MAX_LIST_ITEMS) {
       downvoted.push({

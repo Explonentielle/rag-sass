@@ -147,7 +147,7 @@ export default function ChatbotStatsPanel({
         {useDocuments && (
           <QuestionList
             title="Questions sans réponse"
-            description="Le chatbot n'a trouvé aucun passage pertinent dans vos documents. Ajoutez ces informations pour qu'il puisse répondre."
+            description="Vraies questions pour lesquelles le chatbot n'a trouvé aucun passage dans vos documents : ajoutez ces informations pour qu'il puisse y répondre. Les salutations, remerciements et remarques sur le chat ne sont pas comptés."
             empty="Aucune question sans réponse sur la période."
             items={stats.unanswered}
           />

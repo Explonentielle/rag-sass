@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { reportDbError } from '@/lib/userErrors';
+import { reportDbError } from '@/lib/reportError';
 import { File } from 'node:buffer';
 import { v4 as uuidv4 } from 'uuid';
 import { waitUntil } from '@vercel/functions';

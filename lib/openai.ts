@@ -184,12 +184,16 @@ export async function* streamAnswer(params: {
 export interface RewrittenQuery {
   semanticQuery: string;
   keywordQuery: string;
+  /** Greeting, thanks, acknowledgement or remark about the chat itself: not a
+   * knowledge gap if the documents have nothing on it (statistics, item 59). */
+  isSmallTalk: boolean;
 }
 
 const QUERY_REWRITE_SYSTEM_PROMPT = `Tu reformules la question d'un utilisateur en deux versions optimisées pour la recherche documentaire dans une base de connaissances. Tu ne réponds jamais à la question, tu la reformules seulement.
 
 - semanticQuery : une reformulation claire et complète de l'intention de la question, adaptée à une recherche par similarité sémantique. Si la question a plusieurs volets, résume l'ensemble en une phrase cohérente.
 - keywordQuery : les termes clés et mots importants de la question (noms, termes techniques, références précises), adaptés à une recherche par mots-clés. Plus court que semanticQuery, pas une phrase complète.
+- isSmallTalk : true UNIQUEMENT si le message n'est pas une demande d'information et n'a rien à chercher dans une base de connaissances : salutation, remerciement, accusé de réception ("ok", "d'accord", "très bien"), au revoir, ou remarque sur le chat lui-même ("tu bugs ?", "tu m'entends ?"). false pour toute question ou demande, même courte ou maladroite, et en cas de doute.
 
 Si la question est déjà claire et simple, renvoie une version très proche de l'originale.`;
 
@@ -199,7 +203,7 @@ Si la question est déjà claire et simple, renvoie une version très proche de 
  * rewrite call fails or returns something unusable.
  */
 export async function rewriteQuery(question: string): Promise<RewrittenQuery> {
-  const fallback: RewrittenQuery = { semanticQuery: question, keywordQuery: question };
+  const fallback: RewrittenQuery = { semanticQuery: question, keywordQuery: question, isSmallTalk: false };
 
   try {
     const openai = getOpenAiClient();
@@ -216,8 +220,9 @@ export async function rewriteQuery(question: string): Promise<RewrittenQuery> {
             properties: {
               semanticQuery: { type: 'string' },
               keywordQuery: { type: 'string' },
+              isSmallTalk: { type: 'boolean' },
             },
-            required: ['semanticQuery', 'keywordQuery'],
+            required: ['semanticQuery', 'keywordQuery', 'isSmallTalk'],
             additionalProperties: false,
           },
         },
@@ -236,7 +241,13 @@ export async function rewriteQuery(question: string): Promise<RewrittenQuery> {
       throw new Error('Champs manquants dans la sortie structurée');
     }
 
-    return { semanticQuery: parsed.semanticQuery, keywordQuery: parsed.keywordQuery };
+    return {
+      semanticQuery: parsed.semanticQuery,
+      keywordQuery: parsed.keywordQuery,
+      // Only ever true when the model said so explicitly; anything else keeps
+      // the message counted as a real question.
+      isSmallTalk: parsed.isSmallTalk === true,
+    };
   } catch (err) {
     logWarn('query_rewrite.failed', {
       questionLength: question.length,

@@ -10,7 +10,7 @@ import {
   MAX_VISITOR_FILE_BYTES,
 } from '@/lib/visitorFileRules';
 import { logInfo, logWarn } from '@/lib/logger';
-import { reportError } from '@/lib/userErrors';
+import { reportError } from '@/lib/reportError';
 
 // Visitor file upload for the public chat widget (docs/roadmap.md item 48).
 // Same anonymous trust model as ../route.ts: access = chatbotId + is_public +

@@ -9,7 +9,7 @@ import {
 import { hybridSearch } from '@/lib/elasticsearch';
 import { buildSystemPrompt } from '@/lib/prompts';
 import { logInfo, logWarn } from '@/lib/logger';
-import { reportDbError, reportError } from '@/lib/userErrors';
+import { reportDbError, reportError } from '@/lib/reportError';
 import { checkPublicChatRateLimit, checkRateLimit, getClientIp } from '@/lib/rateLimit';
 import { isUuid, parseFeedbackValue, setAssistantMessageFeedback } from '@/lib/feedback';
 import { createLeadWebhookNotifier, resolveWebhookTarget } from '@/lib/leadWebhook';
@@ -260,8 +260,11 @@ export async function POST(request: Request) {
         // Prompt-only chatbots (docs/roadmap.md item 23) skip retrieval
         // entirely — see the matching comment in app/api/chat/route.ts.
         let chunks: Awaited<ReturnType<typeof hybridSearch>> = [];
+        let isSmallTalk = false;
         if (chatbot.use_documents) {
-          const { semanticQuery, keywordQuery } = await rewriteQuery(question);
+          const rewritten = await rewriteQuery(question);
+          const { semanticQuery, keywordQuery } = rewritten;
+          isSmallTalk = rewritten.isSmallTalk;
           // Real progress for widgets that show steps instead of rotating
           // messages (docs/roadmap.md item 51).
           controller.enqueue(encoder.encode(sseEvent('status', { step: 'searching', topic: keywordQuery })));
@@ -358,7 +361,9 @@ export async function POST(request: Request) {
           sources,
           // A question about the visitor's own file is answered from that file,
           // not from the documents: it isn't a gap in the knowledge base.
-          noContext: chatbot.use_documents && chunks.length === 0 && !hasReadableFile,
+          // "Bonjour" or "merci" find nothing in the documents and shouldn't:
+          // not a gap in the knowledge base either (see rewriteQuery).
+          noContext: chatbot.use_documents && chunks.length === 0 && !hasReadableFile && !isSmallTalk,
         });
 
         if (truncated) {

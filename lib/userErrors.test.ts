@@ -5,12 +5,11 @@ import {
   describeFailedResponse,
   describeAuthError,
   describeDbError,
-  reportError,
-  reportDbError,
   GENERIC_ERROR_MESSAGE,
   OVERLOADED_ERROR_MESSAGE,
   TIMEOUT_ERROR_MESSAGE,
 } from './userErrors';
+import { reportError, reportDbError } from './reportError';
 
 const RAW_DB_ERROR =
   'null value in column "no_context" of relation "messages" violates not-null constraint';
