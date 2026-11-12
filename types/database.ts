@@ -8,13 +8,24 @@ export type MessageRole = 'user' | 'assistant';
 export type OrgPlan = 'free' | 'solo' | 'pme' | 'metier';
 export type OrgOverageMode = 'block' | 'auto_bill';
 export type OverageChargeStatus = 'succeeded' | 'failed';
-export type ChatbotUseCase = 'site_widget' | 'second_cerveau' | 'contract_analyzer';
+export type ChatbotUseCase = 'site_widget' | 'second_cerveau' | 'contract_analyzer' | 'paperwork_digitizer';
 
 // Structured clause extraction (lib/openai.ts ContractSummary), stored as
 // jsonb on chatbots.contract_summary — kept loose here (not importing
 // lib/openai.ts's richer ContractSummary type into this file) since this
 // module only describes the DB shape, not the app-level contract.
 export type ContractSummaryJson = Record<string, string | null>;
+
+// Format choisi à la création d'un digitaliseur de paperasse (item 24),
+// oriente l'extraction (lib/openai.ts extractDocumentFields). Stocké sur
+// chatbots.document_format, null pour les autres use_cases.
+export type DocumentFormat = 'facture' | 'libre';
+
+// Paires label/valeur extraites d'un document (lib/openai.ts
+// ExtractedField), stockées telles quelles sur documents.extracted_fields —
+// un tableau plutôt qu'un objet pour autoriser des labels non uniques et
+// préserver l'ordre produit par le modèle.
+export type ExtractedFieldsJson = { label: string; value: string }[];
 
 export interface Database {
   public: {
@@ -88,6 +99,7 @@ export interface Database {
           loading_messages: string[] | null;
           use_case: ChatbotUseCase;
           contract_summary: ContractSummaryJson | null;
+          document_format: DocumentFormat | null;
           allow_lead_qualification: boolean;
           lead_qualification_criteria: string | null;
           meeting_link: string | null;
@@ -109,6 +121,7 @@ export interface Database {
           loading_messages?: string[] | null;
           use_case?: ChatbotUseCase;
           contract_summary?: ContractSummaryJson | null;
+          document_format?: DocumentFormat | null;
           allow_lead_qualification?: boolean;
           lead_qualification_criteria?: string | null;
           meeting_link?: string | null;
@@ -130,6 +143,7 @@ export interface Database {
           loading_messages?: string[] | null;
           use_case?: ChatbotUseCase;
           contract_summary?: ContractSummaryJson | null;
+          document_format?: DocumentFormat | null;
           allow_lead_qualification?: boolean;
           lead_qualification_criteria?: string | null;
           meeting_link?: string | null;
@@ -170,6 +184,7 @@ export interface Database {
           status: DocumentStatus;
           error_message: string | null;
           chunk_count: number | null;
+          extracted_fields: ExtractedFieldsJson | null;
           uploaded_at: string;
           indexed_at: string | null;
         };
@@ -183,6 +198,7 @@ export interface Database {
           status?: DocumentStatus;
           error_message?: string | null;
           chunk_count?: number | null;
+          extracted_fields?: ExtractedFieldsJson | null;
           uploaded_at?: string;
           indexed_at?: string | null;
         };
@@ -196,6 +212,7 @@ export interface Database {
           status?: DocumentStatus;
           error_message?: string | null;
           chunk_count?: number | null;
+          extracted_fields?: ExtractedFieldsJson | null;
           uploaded_at?: string;
           indexed_at?: string | null;
         };

@@ -348,12 +348,14 @@ function Catalogue() {
     { title: 'Assistant sans documents', body: 'Le savoir tient dans quelques consignes : zéro upload, zéro indexation, en ligne en minutes.', who: 'Indépendants, artisans' },
     { title: 'Support client', body: 'Réponses immédiates à partir de vos FAQ, procédures et guides, sourcées comme le reste.', who: 'Infopreneurs, SaaS, équipes support' },
     { title: 'Indexation assistée par IA', body: 'Déposez un document brut, sans rien préparer : une IA nettoie et structure le contenu avant indexation.', who: 'Tout document mal formaté' },
+    { title: 'Agent de qualification', body: 'Engage un visiteur, pose les bonnes questions, score et route le contact.', who: 'B2B à cycle de vente long' },
+    { title: 'Analyseur de contrats', body: "Dépose un contrat, obtiens l'extraction des clauses clés et pose tes questions dessus.", who: 'PME sans juriste interne' },
+    { title: 'Digitaliseur de paperasse', body: 'Uploadez vos factures ou documents administratifs au fil du temps, les champs clés sont extraits automatiquement.', who: 'PME, comptabilité, administratif' },
+    { title: 'Transcription de réunions', body: 'Enregistrez une réunion depuis le dashboard, elle est transcrite et indexée automatiquement : posez vos questions dessus ensuite.', who: 'Équipes, assistant interne' },
   ];
 
   const roadmap: CatalogueEntry[] = [
-    { title: 'Agent de qualification', body: 'Engage un visiteur, pose les bonnes questions, score et route le contact.', who: 'B2B à cycle de vente long' },
     { title: 'Brouillon de réponse email', body: 'Rédige une réponse client à partir de la base de connaissance, à valider avant envoi.', who: 'Support à fort volume' },
-    { title: 'Analyseur de contrats', body: "Dépose un contrat, obtiens l'extraction des clauses clés et pose tes questions dessus.", who: 'PME sans juriste interne' },
     { title: 'Standard IA téléphone / WhatsApp', body: 'Le même assistant, sur un canal vocal ou messagerie.', who: 'Commerces de proximité' },
     { title: 'Veille & synthèse', body: 'Surveille un corpus interne ou externe, pousse un résumé périodique des nouveautés.', who: 'Veille concurrentielle, R&D' },
   ];
@@ -443,6 +445,8 @@ function Pricing({ isLoggedIn }: { isLoggedIn: boolean }) {
         'Formats étendus : CSV, Excel, multi-documents',
         "Membres d'équipe multiples",
         'Analyseur de contrats (IA)',
+        'Digitaliseur de paperasse (IA)',
+        'Transcription de réunions (IA)',
       ],
       cta: 'Commencer gratuitement',
       featured: true,

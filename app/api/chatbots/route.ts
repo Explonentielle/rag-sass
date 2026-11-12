@@ -1,10 +1,16 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { PROMPT_TEMPLATES } from '@/lib/prompts';
-import { PLAN_CHATBOT_LIMITS, PLAN_LABELS, CONTRACT_ANALYZER_ALLOWED_PLANS } from '@/lib/plans';
-import type { ChatbotUseCase, OrgPlan } from '@/types/database';
+import {
+  PLAN_CHATBOT_LIMITS,
+  PLAN_LABELS,
+  CONTRACT_ANALYZER_ALLOWED_PLANS,
+  PAPERWORK_DIGITIZER_ALLOWED_PLANS,
+} from '@/lib/plans';
+import type { ChatbotUseCase, DocumentFormat, OrgPlan } from '@/types/database';
 
-const USE_CASES: ChatbotUseCase[] = ['site_widget', 'second_cerveau', 'contract_analyzer'];
+const USE_CASES: ChatbotUseCase[] = ['site_widget', 'second_cerveau', 'contract_analyzer', 'paperwork_digitizer'];
+const DOCUMENT_FORMATS: DocumentFormat[] = ['facture', 'libre'];
 
 export async function POST(request: Request) {
   const supabase = createClient();
@@ -32,6 +38,14 @@ export async function POST(request: Request) {
   const useCase: ChatbotUseCase = USE_CASES.includes(useCaseInput as ChatbotUseCase)
     ? (useCaseInput as ChatbotUseCase)
     : 'site_widget';
+  // Digitaliseur de paperasse (docs/roadmap.md item 24) : format choisi à la
+  // création, oriente l'extraction par document (lib/openai.ts
+  // extractDocumentFields). Sans valeur reconnue, retombe sur 'libre'
+  // plutôt que de bloquer la création.
+  const documentFormatInput: string | undefined = body?.documentFormat;
+  const documentFormat: DocumentFormat = DOCUMENT_FORMATS.includes(documentFormatInput as DocumentFormat)
+    ? (documentFormatInput as DocumentFormat)
+    : 'libre';
 
   if (!organizationId || !name) {
     return NextResponse.json({ error: 'organizationId et name sont requis.' }, { status: 400 });
@@ -64,6 +78,14 @@ export async function POST(request: Request) {
     );
   }
 
+  // Même logique de gating, docs/roadmap.md item 24.
+  if (useCase === 'paperwork_digitizer' && !PAPERWORK_DIGITIZER_ALLOWED_PLANS.includes(plan)) {
+    return NextResponse.json(
+      { error: 'Le digitaliseur de paperasse nécessite le plan PME ou Métier.' },
+      { status: 403 }
+    );
+  }
+
   const chatbotLimit = PLAN_CHATBOT_LIMITS[plan];
   if (chatbotLimit !== null) {
     const { count, error: countError } = await supabase
@@ -91,6 +113,7 @@ export async function POST(request: Request) {
       system_prompt_template: systemPromptTemplate || PROMPT_TEMPLATES[0].template,
       use_documents: useDocuments,
       use_case: useCase,
+      document_format: useCase === 'paperwork_digitizer' ? documentFormat : null,
       // chatbots.is_public defaults to true at the column level (migration
       // 0007, meant for 'site_widget': no extra step to start embedding).
       // Set explicitly here rather than relying on that default — it's

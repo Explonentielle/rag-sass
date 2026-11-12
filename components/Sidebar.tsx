@@ -12,6 +12,7 @@ const NAV_ITEMS = [
   { href: '/dashboard/chatbots', label: 'Chatbots', icon: ICONS.chat },
   { href: '/dashboard/second-cerveau', label: 'Assistant interne', icon: ICONS.index },
   { href: '/dashboard/contrats', label: 'Analyseur de contrats', icon: ICONS.briefcase },
+  { href: '/dashboard/paperasse', label: 'Digitaliseur de paperasse', icon: ICONS.layers },
   { href: '/dashboard/documents', label: 'Documents', icon: ICONS.document },
   { href: '/dashboard/templates', label: 'Templates', icon: ICONS.layers },
   { href: '/dashboard/docs', label: 'Documentation', icon: ICONS.book },

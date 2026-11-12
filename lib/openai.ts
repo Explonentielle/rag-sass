@@ -1,4 +1,4 @@
-import OpenAI from 'openai';
+import OpenAI, { toFile } from 'openai';
 import { logWarn } from '@/lib/logger';
 
 let client: OpenAI | null = null;
@@ -575,6 +575,141 @@ export async function extractContractClauses(rawText: string): Promise<ContractS
     return parsed as ContractSummary;
   } catch (err) {
     logWarn('contract_summary.failed', {
+      textLength: text.length,
+      error: err instanceof Error ? err.message : String(err),
+    });
+    return null;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Audio transcription (docs/roadmap.md item 46, reformulé en "réunions
+// vocales indexées" plutôt qu'un widget vocal) : un enregistrement devient
+// un document comme un autre dans lib/extract.ts, via Whisper plutôt que
+// mammoth/pdf-parse. Contrairement aux extractions "best-effort" ci-dessus
+// (clauses de contrat, champs de document), une transcription manquante
+// rend le document entier inutile : cette fonction lève une erreur sur tout
+// échec, traitée par lib/extract.ts comme n'importe quel autre échec
+// d'extraction (PDF scanné sans OCR, docx vide...), pas comme un
+// enrichissement optionnel.
+// ---------------------------------------------------------------------------
+
+// Configurable comme DEFAULT_CHAT_MODEL ci-dessus, pour pouvoir basculer
+// vers un modèle de transcription plus récent sans changement de code.
+const TRANSCRIBE_MODEL = process.env.OPENAI_TRANSCRIBE_MODEL || 'whisper-1';
+
+/** Transcrit un enregistrement audio en texte brut, en français. */
+export async function transcribeAudio(buffer: Buffer, filename: string): Promise<string> {
+  const openai = getOpenAiClient();
+  const file = await toFile(buffer, filename);
+  const response = await openai.audio.transcriptions.create({
+    file,
+    model: TRANSCRIBE_MODEL,
+    language: 'fr',
+  });
+  return response.text;
+}
+
+// ---------------------------------------------------------------------------
+// Document field extraction (docs/roadmap.md item 24, "Digitaliseur de
+// paperasse"), premium (chatbots.use_case === 'paperwork_digitizer', gated by
+// PAPERWORK_DIGITIZER_ALLOWED_PLANS in lib/plans.ts). Unlike
+// extractContractClauses above (one fixed summary shared by the whole
+// chatbot), this runs once per uploaded document and is stored on
+// documents.extracted_fields — a digitizer chatbot accumulates one set of
+// fields per document, not a single summary. Same best-effort philosophy: a
+// failure leaves extracted_fields null, the document still indexes normally.
+// ---------------------------------------------------------------------------
+const DOCUMENT_FIELDS_MAX_CHARS = 60_000;
+
+export interface ExtractedField {
+  label: string;
+  value: string;
+}
+
+const FACTURE_FIELDS_SYSTEM_PROMPT = `Tu extrais les informations clés d'une facture pour une liste structurée. Base-toi uniquement sur le texte fourni, n'invente rien.
+
+Renvoie exactement ces champs, dans cet ordre, sous forme de paires label/valeur : "Numéro de facture", "Date d'émission", "Fournisseur", "Client", "Montant HT", "Montant TTC", "TVA", "Date d'échéance", "Mode de paiement".
+Si une information est absente du document, utilise la valeur "Non précisé" plutôt que d'inventer.`;
+
+const LIBRE_FIELDS_SYSTEM_PROMPT = `Tu extrais les informations clés d'un document administratif pour une liste structurée. Base-toi uniquement sur le texte fourni, n'invente rien.
+
+Identifie toi-même les paires label/valeur les plus pertinentes du document (par exemple des références, dates, montants, noms de parties...), au maximum 15. Les labels doivent être courts et en français. N'invente pas de champ dont la valeur serait absente du document.`;
+
+/**
+ * Extracts a structured list of label/value fields from a document's full
+ * text, oriented by `format`: 'facture' uses a fixed set of expected fields,
+ * 'libre' lets the model identify its own relevant fields. Returns null on
+ * any failure (API error, unusable output) — lib/ingest.ts leaves
+ * documents.extracted_fields null in that case rather than failing the
+ * document's ingestion over it.
+ */
+export async function extractDocumentFields(
+  rawText: string,
+  format: 'facture' | 'libre'
+): Promise<ExtractedField[] | null> {
+  const text =
+    rawText.length > DOCUMENT_FIELDS_MAX_CHARS ? rawText.slice(0, DOCUMENT_FIELDS_MAX_CHARS) : rawText;
+  const systemPrompt = format === 'facture' ? FACTURE_FIELDS_SYSTEM_PROMPT : LIBRE_FIELDS_SYSTEM_PROMPT;
+
+  try {
+    const openai = getOpenAiClient();
+    const response = await openai.chat.completions.create({
+      model: DEFAULT_CHAT_MODEL,
+      max_completion_tokens: 1200,
+      response_format: {
+        type: 'json_schema',
+        json_schema: {
+          name: 'document_fields',
+          strict: true,
+          schema: {
+            type: 'object',
+            properties: {
+              fields: {
+                type: 'array',
+                items: {
+                  type: 'object',
+                  properties: {
+                    label: { type: 'string' },
+                    value: { type: 'string' },
+                  },
+                  required: ['label', 'value'],
+                  additionalProperties: false,
+                },
+              },
+            },
+            required: ['fields'],
+            additionalProperties: false,
+          },
+        },
+      },
+      messages: [
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: text },
+      ],
+    });
+
+    const raw = response.choices[0]?.message?.content;
+    if (!raw) throw new Error('Réponse vide');
+
+    const parsed = JSON.parse(raw);
+    if (
+      !Array.isArray(parsed.fields) ||
+      !parsed.fields.every(
+        (f: unknown) =>
+          typeof f === 'object' &&
+          f !== null &&
+          typeof (f as ExtractedField).label === 'string' &&
+          typeof (f as ExtractedField).value === 'string'
+      )
+    ) {
+      throw new Error('Champ fields manquant ou invalide');
+    }
+
+    return parsed.fields as ExtractedField[];
+  } catch (err) {
+    logWarn('document_fields.failed', {
+      format,
       textLength: text.length,
       error: err instanceof Error ? err.message : String(err),
     });

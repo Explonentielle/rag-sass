@@ -1,6 +1,8 @@
 // Tests pour lib/openai.ts — rerankChunks (roadmap item 4),
 // structureChunksWithAI (item 18, indexation assistée par IA),
-// extractContractClauses (item 23, analyseur de contrats), et la boucle de
+// extractContractClauses (item 23, analyseur de contrats),
+// extractDocumentFields (item 24, digitaliseur de paperasse),
+// transcribeAudio (item 46, transcription de réunions), et la boucle de
 // function calling de streamAnswer (item 33, agentique). rewriteQuery et
 // embedTexts ne sont pas testés ici : ce fichier se concentre sur la
 // logique ajoutée (parsing de la sortie structurée, repli en cas d'échec),
@@ -10,22 +12,36 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // On mock le SDK `openai` en entier : `getOpenAiClient()` (dans openai.ts)
 // fait `new OpenAI({...})`, donc il faut que `import OpenAI from 'openai'`
-// renvoie une fausse classe dont on contrôle `chat.completions.create`.
-// `createMock` est un `vi.fn()` qu'on reconfigure dans chaque test avec
+// renvoie une fausse classe dont on contrôle `chat.completions.create`
+// (et, pour transcribeAudio, `audio.transcriptions.create`). `createMock`
+// est un `vi.fn()` qu'on reconfigure dans chaque test avec
 // `mockResolvedValueOnce`/`mockRejectedValueOnce` pour simuler la réponse
-// (ou l'échec) de l'API à ce moment précis.
+// (ou l'échec) de l'API à ce moment précis. `toFile` (export nommé utilisé
+// par transcribeAudio) est mocké en passthrough : on ne teste pas le SDK
+// lui-même, juste que transcribeAudio lui transmet bien le bon buffer/nom.
 const createMock = vi.fn();
+const transcribeMock = vi.fn();
+const toFileMock = vi.fn(async (buffer: Buffer, filename: string) => ({ buffer, filename }));
 vi.mock('openai', () => ({
   default: class {
     chat = { completions: { create: createMock } };
+    audio = { transcriptions: { create: transcribeMock } };
   },
+  toFile: (...args: [Buffer, string]) => toFileMock(...args),
 }));
 
 // Même raison que dans rateLimit.test.ts : éviter de vrais logs sur disque
 // pendant les tests.
 vi.mock('@/lib/logger', () => ({ logWarn: vi.fn(), logInfo: vi.fn(), logError: vi.fn() }));
 
-const { rerankChunks, structureChunksWithAI, extractContractClauses, streamAnswer } = await import('./openai');
+const {
+  rerankChunks,
+  structureChunksWithAI,
+  extractContractClauses,
+  extractDocumentFields,
+  transcribeAudio,
+  streamAnswer,
+} = await import('./openai');
 
 // Fabrique un faux stream OpenAI (async itérable de "chunks") — chaque
 // entrée de `pieces` devient un chunk avec un `delta.content` et/ou un
@@ -92,6 +108,8 @@ function fakeStructuredResponse(body: unknown) {
 
 beforeEach(() => {
   createMock.mockReset();
+  transcribeMock.mockReset();
+  toFileMock.mockClear();
 });
 
 describe('rerankChunks', () => {
@@ -284,6 +302,109 @@ describe('extractContractClauses', () => {
     const sentMessages = createMock.mock.calls[0][0].messages;
     const userMessage = sentMessages.find((m: { role: string }) => m.role === 'user');
     expect(userMessage.content.length).toBe(60_000);
+  });
+});
+
+describe('extractDocumentFields', () => {
+  const validFields = [
+    { label: 'Numéro de facture', value: 'F-2026-042' },
+    { label: 'Montant TTC', value: '1 200,00 €' },
+  ];
+
+  it('returns the structured fields on success', async () => {
+    createMock.mockResolvedValueOnce(fakeStructuredResponse({ fields: validFields }));
+
+    const result = await extractDocumentFields('Texte de la facture...', 'facture');
+
+    expect(result).toEqual(validFields);
+  });
+
+  it('returns null when the API call fails, never throwing', async () => {
+    createMock.mockRejectedValueOnce(new Error('timeout'));
+
+    const result = await extractDocumentFields('Texte...', 'libre');
+
+    expect(result).toBeNull();
+  });
+
+  it('returns null when fields is missing or not an array', async () => {
+    createMock.mockResolvedValueOnce(fakeStructuredResponse({}));
+
+    const result = await extractDocumentFields('Texte...', 'facture');
+
+    expect(result).toBeNull();
+  });
+
+  it('returns null when an item is missing label or value', async () => {
+    createMock.mockResolvedValueOnce(
+      fakeStructuredResponse({ fields: [{ label: 'Numéro de facture' }] })
+    );
+
+    const result = await extractDocumentFields('Texte...', 'facture');
+
+    expect(result).toBeNull();
+  });
+
+  it('returns null on an unparseable response instead of throwing', async () => {
+    createMock.mockResolvedValueOnce({ choices: [{ message: { content: '{"fields": ' } }] });
+
+    const result = await extractDocumentFields('Texte...', 'libre');
+
+    expect(result).toBeNull();
+  });
+
+  it('uses a different system prompt for facture vs libre', async () => {
+    createMock.mockResolvedValueOnce(fakeStructuredResponse({ fields: validFields }));
+    await extractDocumentFields('Texte...', 'facture');
+    const factureSystemPrompt = createMock.mock.calls[0][0].messages.find(
+      (m: { role: string }) => m.role === 'system'
+    ).content;
+
+    createMock.mockResolvedValueOnce(fakeStructuredResponse({ fields: validFields }));
+    await extractDocumentFields('Texte...', 'libre');
+    const libreSystemPrompt = createMock.mock.calls[1][0].messages.find(
+      (m: { role: string }) => m.role === 'system'
+    ).content;
+
+    expect(factureSystemPrompt).not.toBe(libreSystemPrompt);
+  });
+
+  it('truncates very long documents before sending them to the model', async () => {
+    createMock.mockResolvedValueOnce(fakeStructuredResponse({ fields: validFields }));
+
+    await extractDocumentFields('a'.repeat(100_000), 'facture');
+
+    const sentMessages = createMock.mock.calls[0][0].messages;
+    const userMessage = sentMessages.find((m: { role: string }) => m.role === 'user');
+    expect(userMessage.content.length).toBe(60_000);
+  });
+});
+
+describe('transcribeAudio', () => {
+  it('returns the transcribed text on success', async () => {
+    transcribeMock.mockResolvedValueOnce({ text: 'Bonjour, ceci est une réunion.' });
+
+    const result = await transcribeAudio(Buffer.from('fake-audio-bytes'), 'reunion.webm');
+
+    expect(result).toBe('Bonjour, ceci est une réunion.');
+  });
+
+  it('wraps the buffer via toFile with the given filename', async () => {
+    transcribeMock.mockResolvedValueOnce({ text: 'texte' });
+    const buffer = Buffer.from('fake-audio-bytes');
+
+    await transcribeAudio(buffer, 'reunion.webm');
+
+    expect(toFileMock).toHaveBeenCalledWith(buffer, 'reunion.webm');
+    expect(transcribeMock.mock.calls[0][0]).toMatchObject({ language: 'fr' });
+  });
+
+  it('propagates the API error on failure, letting the caller decide how to handle it', async () => {
+    transcribeMock.mockRejectedValueOnce(new Error('503 service unavailable'));
+
+    await expect(transcribeAudio(Buffer.from('fake-audio-bytes'), 'reunion.webm')).rejects.toThrow(
+      '503 service unavailable'
+    );
   });
 });
 

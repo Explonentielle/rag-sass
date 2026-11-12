@@ -7,6 +7,7 @@ import { isIP } from 'node:net';
 import dns from 'node:dns/promises';
 import { logWarn } from '@/lib/logger';
 import { runOcr } from '@/lib/ocrService';
+import { transcribeAudio } from '@/lib/openai';
 import {
   extractHrefs,
   extractSitemapLocs,
@@ -29,6 +30,17 @@ const MIN_OCR_CHARS = 50;
 // straight through OCR (runOcr detects the actual format itself from the
 // file's bytes, see lib/ocrService.ts).
 const IMAGE_EXTENSIONS = new Set(['png', 'jpg', 'jpeg', 'webp']);
+
+// Formats acceptés par l'API de transcription (docs/roadmap.md item 46) —
+// webm/mp4 couvrent ce que produit l'enregistreur du dashboard
+// (components/AudioRecorder.tsx) selon le navigateur, les autres pour un
+// fichier audio uploadé directement (ex. export Zoom/Teams).
+const AUDIO_EXTENSIONS = new Set(['webm', 'mp4', 'm4a', 'mp3', 'wav', 'mpga', 'mpeg']);
+
+// Marge sous la limite de 25 Mo de l'API Whisper (~90 minutes à 32 kbit/s,
+// le débit fixé par l'enregistreur du dashboard) : rejeté proprement plutôt
+// que de laisser échouer l'appel à l'API avec une erreur moins claire.
+const MAX_AUDIO_BYTES = 24 * 1024 * 1024;
 
 // Row count above which we warn in logs (not block) — CSV/XLSX ingestion
 // packs rows into Markdown-like text and runs them through the normal
@@ -60,7 +72,7 @@ async function ocrOrThrow(buffer: Buffer, context: string): Promise<string> {
   return ocrText;
 }
 
-export type SupportedFileType = 'pdf' | 'docx' | 'txt' | 'md' | 'csv' | 'xlsx' | 'image';
+export type SupportedFileType = 'pdf' | 'docx' | 'txt' | 'md' | 'csv' | 'xlsx' | 'image' | 'audio';
 
 export function detectFileType(filename: string): SupportedFileType | null {
   const ext = filename.toLowerCase().split('.').pop();
@@ -71,6 +83,7 @@ export function detectFileType(filename: string): SupportedFileType | null {
   if (ext === 'csv') return 'csv';
   if (ext === 'xlsx' || ext === 'xls') return 'xlsx';
   if (ext && IMAGE_EXTENSIONS.has(ext)) return 'image';
+  if (ext && AUDIO_EXTENSIONS.has(ext)) return 'audio';
   return null;
 }
 
@@ -99,7 +112,14 @@ function rowsToMarkdown(rows: TabularRow[], sheetLabel?: string): string {
     .join('\n\n');
 }
 
-export async function extractText(buffer: Buffer, fileType: SupportedFileType): Promise<string> {
+export async function extractText(
+  buffer: Buffer,
+  fileType: SupportedFileType,
+  // Nom d'origine, utilisé seulement par la branche 'audio' (extension
+  // réelle transmise à l'API de transcription) — les autres branches n'en
+  // ont pas besoin, le type suffit.
+  filename?: string
+): Promise<string> {
   // Markdown is plain text for chunking/embedding purposes — the raw syntax
   // (#, **, ```) adds a little noise but doesn't hurt retrieval quality.
   if (fileType === 'txt' || fileType === 'md') {
@@ -140,6 +160,23 @@ export async function extractText(buffer: Buffer, fileType: SupportedFileType): 
 
   if (fileType === 'image') {
     return ocrOrThrow(buffer, 'Cette image ne contient aucun texte extractible nativement.');
+  }
+
+  if (fileType === 'audio') {
+    if (buffer.length > MAX_AUDIO_BYTES) {
+      throw new UnsupportedDocumentError(
+        `Cet enregistrement est trop volumineux pour être transcrit (limite ${Math.floor(MAX_AUDIO_BYTES / (1024 * 1024))} Mo, environ 90 minutes).`
+      );
+    }
+    const text = await transcribeAudio(buffer, filename || 'audio.webm').catch((err) => {
+      throw new UnsupportedDocumentError(
+        `La transcription a échoué : ${err instanceof Error ? err.message : 'erreur inconnue'}.`
+      );
+    });
+    if (!text.trim()) {
+      throw new UnsupportedDocumentError("La transcription n'a produit aucun texte exploitable.");
+    }
+    return text;
   }
 
   if (fileType === 'csv') {

@@ -76,6 +76,8 @@ export const PLAN_FEATURES: Record<OrgPlan, string[]> = {
     'Formats étendus : CSV, Excel, multi-documents',
     "Membres d'équipe multiples",
     'Analyseur de contrats (IA)',
+    'Digitaliseur de paperasse (IA)',
+    'Transcription de réunions (IA)',
   ],
   metier: ['Fonctionnalités de la feuille de route en priorité', 'Accompagnement à la mise en place', 'Facturation adaptée au volume réel'],
 };
@@ -95,6 +97,23 @@ export const AI_INDEXING_ALLOWED_PLANS: OrgPlan[] = ['pme', 'metier'];
  * LLM cost). Enforced at creation time in app/api/chatbots/route.ts.
  */
 export const CONTRACT_ANALYZER_ALLOWED_PLANS: OrgPlan[] = ['pme', 'metier'];
+
+/**
+ * Plans entitled to the paperwork digitizer (docs/roadmap.md item 24), a
+ * premium feature for the same reason as the contract analyzer above (real
+ * per-document LLM cost). Enforced at creation time in
+ * app/api/chatbots/route.ts.
+ */
+export const PAPERWORK_DIGITIZER_ALLOWED_PLANS: OrgPlan[] = ['pme', 'metier'];
+
+/**
+ * Plans entitled to the meeting audio recorder (docs/roadmap.md item 46),
+ * same reasoning as AI indexing above (real per-minute transcription cost
+ * via Whisper). Enforced in app/api/documents/upload/route.ts (the
+ * recorder reuses the generic upload endpoint — see lib/extract.ts's
+ * 'audio' file type).
+ */
+export const AUDIO_TRANSCRIPTION_ALLOWED_PLANS: OrgPlan[] = ['pme', 'metier'];
 
 /**
  * Overage billing (docs/roadmap.md items 17/36). Messages per block and

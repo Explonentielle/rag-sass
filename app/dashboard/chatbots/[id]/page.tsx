@@ -13,13 +13,14 @@ import ConversationsPanel from '@/components/ConversationsPanel';
 import EmbedSettingsForm from '@/components/EmbedSettingsForm';
 import DeleteChatbotSection from '@/components/DeleteChatbotSection';
 import AiIndexingToggle from '@/components/AiIndexingToggle';
+import AudioRecorder from '@/components/AudioRecorder';
 import EmailToolToggle from '@/components/EmailToolToggle';
 import VisitorUploadsToggle from '@/components/VisitorUploadsToggle';
 import LeadQualificationToggle from '@/components/LeadQualificationToggle';
 import LoadingMessagesForm from '@/components/LoadingMessagesForm';
 import { listAllConversationsForChatbot } from '@/lib/conversations';
 import { logQueryError } from '@/lib/supabaseResult';
-import { AI_INDEXING_ALLOWED_PLANS } from '@/lib/plans';
+import { AI_INDEXING_ALLOWED_PLANS, AUDIO_TRANSCRIPTION_ALLOWED_PLANS } from '@/lib/plans';
 import { Icon, IconBadge, ICONS } from '@/components/icons';
 
 export default async function ChatbotPage({ params }: { params: { id: string } }) {
@@ -129,6 +130,10 @@ export default async function ChatbotPage({ params }: { params: { id: string } }
           <div className="flex flex-wrap items-start gap-3">
             <UrlUploader chatbotId={chatbot.id} />
             <DocumentUploader chatbotId={chatbot.id} />
+            <AudioRecorder
+              chatbotId={chatbot.id}
+              allowed={!!org && AUDIO_TRANSCRIPTION_ALLOWED_PLANS.includes(org.plan)}
+            />
           </div>
         </div>
         {!chatbot.use_documents && (

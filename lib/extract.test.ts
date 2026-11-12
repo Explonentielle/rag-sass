@@ -17,6 +17,13 @@ import { detectFileType, extractText, extractFromUrl, UnsupportedDocumentError }
 const dnsLookupMock = vi.fn();
 vi.mock('node:dns/promises', () => ({ default: { lookup: (...args: unknown[]) => dnsLookupMock(...args) } }));
 
+// La branche 'audio' d'extractText appelle lib/openai.ts transcribeAudio —
+// mocké ici (déjà testé pour lui-même dans lib/openai.test.ts) pour que ces
+// tests portent uniquement sur le câblage (garde-fou de taille, erreur si
+// transcription vide, propagation d'échec), pas sur l'API OpenAI elle-même.
+const transcribeAudioMock = vi.fn();
+vi.mock('@/lib/openai', () => ({ transcribeAudio: (...args: unknown[]) => transcribeAudioMock(...args) }));
+
 const fetchMock = vi.fn();
 
 function htmlResponse(html: string, status = 200, contentType = 'text/html; charset=utf-8') {
@@ -56,6 +63,11 @@ describe('detectFileType', () => {
     ['photo.JPG', 'image'], // insensible à la casse
     ['scan.jpeg', 'image'],
     ['dessin.webp', 'image'],
+    ['reunion.webm', 'audio'],
+    ['export.mp4', 'audio'],
+    ['note-vocale.m4a', 'audio'],
+    ['appel.MP3', 'audio'], // insensible à la casse
+    ['enregistrement.wav', 'audio'],
   ])('detects %s as %s', (filename, expected) => {
     expect(detectFileType(filename)).toBe(expected);
   });
@@ -229,6 +241,52 @@ describe('extractText: image (via le service OCR)', () => {
       UnsupportedDocumentError
     );
     expect(fetchMock).not.toHaveBeenCalled();
+  });
+});
+
+describe('extractText: audio (transcription, docs/roadmap.md item 46)', () => {
+  beforeEach(() => {
+    transcribeAudioMock.mockReset();
+  });
+
+  it('returns the transcribed text on success, passing the filename through', async () => {
+    transcribeAudioMock.mockResolvedValueOnce('Bonjour, ceci est une réunion.');
+
+    const text = await extractText(Buffer.from('fake-audio-bytes'), 'audio', 'reunion.webm');
+
+    expect(text).toBe('Bonjour, ceci est une réunion.');
+    expect(transcribeAudioMock).toHaveBeenCalledWith(expect.anything(), 'reunion.webm');
+  });
+
+  it('falls back to a generic filename when none is given', async () => {
+    transcribeAudioMock.mockResolvedValueOnce('texte');
+
+    await extractText(Buffer.from('fake-audio-bytes'), 'audio');
+
+    expect(transcribeAudioMock).toHaveBeenCalledWith(expect.anything(), 'audio.webm');
+  });
+
+  it('rejects when the transcription comes back empty', async () => {
+    transcribeAudioMock.mockResolvedValueOnce('   ');
+
+    await expect(extractText(Buffer.from('fake-audio-bytes'), 'audio', 'reunion.webm')).rejects.toThrow(
+      UnsupportedDocumentError
+    );
+  });
+
+  it('wraps a transcription failure in UnsupportedDocumentError', async () => {
+    transcribeAudioMock.mockRejectedValueOnce(new Error('503 service unavailable'));
+
+    await expect(extractText(Buffer.from('fake-audio-bytes'), 'audio', 'reunion.webm')).rejects.toThrow(
+      UnsupportedDocumentError
+    );
+  });
+
+  it('rejects an oversized recording without calling the transcription API', async () => {
+    const tooLarge = Buffer.alloc(25 * 1024 * 1024);
+
+    await expect(extractText(tooLarge, 'audio', 'reunion.webm')).rejects.toThrow(UnsupportedDocumentError);
+    expect(transcribeAudioMock).not.toHaveBeenCalled();
   });
 });
 

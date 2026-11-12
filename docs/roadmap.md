@@ -1203,11 +1203,53 @@ lignes déjà existantes concernées. Testé : `tsc --noEmit` propre, 181
 tests au vert (5 nouveaux pour `getAccessibleChatbot`), `npm run build`
 propre.
 
-### 24. Digitaliseur de paperasse
+### 24. Digitaliseur de paperasse : ✅ Fait (MVP)
 
 **Idée** : factures et formulaires papier transformés en données
-structurées exploitables. **Dépend de** l'item 7 (OCR) — sans texte
+structurées exploitables. **Dépend de** l'item 7 (OCR) : sans texte
 extractible, rien à structurer derrière.
+
+**Décisions prises (2026-11-12)**, avant de coder : contrairement à
+l'analyseur de contrats (item 23, un document = une analyse isolée), le
+digitaliseur accumule plusieurs documents dans le temps (liste accumulée,
+pas un document isolé). Format choisi par le propriétaire à la création
+("Facture" : schéma fixe de champs attendus, ou "Libre" : le modèle
+identifie lui-même les paires clé/valeur pertinentes), réservé au palier
+PME/Métier comme l'analyseur de contrats. MVP sans chat Q&A (pur outil
+d'extraction, pas un assistant conversationnel comme le reste du produit)
+et sans export CSV/Excel.
+
+**Implémenté** : nouveau use_case `paperwork_digitizer` sur `chatbots` +
+colonne `document_format` ('facture'|'libre') + colonne
+`documents.extracted_fields` (jsonb, paires label/valeur) (migration
+`0026_paperwork_digitizer.sql`). Pipeline : `lib/openai.ts`
+`extractDocumentFields` (sortie structurée, même pattern que
+`extractContractClauses`, jamais bloquant : un échec laisse
+`extracted_fields` à null, le document s'indexe normalement), prompt
+système différent selon le format, déclenchée depuis `lib/ingest.ts`
+`processDocument` en parallèle du chunking, par document (pas par
+chatbot comme `contract_summary`).
+
+Nouvelle section dashboard `/dashboard/paperasse` (liste, upsell si palier
+non éligible, création via `components/CreateDigitizerForm.tsx` : nom +
+format, sans upload immédiat) et `/dashboard/paperasse/[id]` (upload au
+fil du temps via `components/DocumentUploader.tsx` réutilisé tel quel,
+une carte par document avec ses champs extraits via
+`components/DocumentFieldsList.tsx`, suppression). `components/
+ContractStatusPoller.tsx` réutilisé aussi tel quel (une instance par
+document en cours de traitement, pas qu'un seul comme pour un contrat).
+
+**Limites connues du MVP** : le texte du document est tronqué à 60 000
+caractères avant extraction, comme l'analyseur de contrats. Pas de chat
+Q&A, pas d'export, pas de tableau à colonnes dynamiques (une carte par
+document plutôt qu'un tableau, pour rester fiable même avec des labels
+différents d'un document "Libre" à l'autre).
+
+Testé : `tsc --noEmit` propre, `npx vitest run` au vert (nouveaux tests
+pour `extractDocumentFields`, même pattern que `extractContractClauses`),
+`npm run build` propre (routes `/dashboard/paperasse` et `/dashboard/
+paperasse/[id]` générées). Pas encore testé en conditions réelles (upload
+d'un vrai document).
 
 ### 25. Standard IA téléphone / WhatsApp
 
@@ -1231,12 +1273,27 @@ périodique des nouveautés. Suppose un déclenchement planifié (proche de la
 purge `pg_cron` de l'item 20) plutôt qu'une réponse à une question posée —
 mode "push" inédit dans le produit actuel, entièrement request/response.
 
-### 27. Réponse automatique aux avis clients
+### 27. Réponse automatique aux avis clients : déprioritisé (2026-11-12)
 
 **Idée neuve, née de la session de repositionnement** (pas dans le
 catalogue initial). Un brouillon de réponse à chaque avis Google ou
-Trustpilot, dans le ton de la marque, conforme à la politique interne —
+Trustpilot, dans le ton de la marque, conforme à la politique interne :
 même logique que l'item 22 (brouillon email) appliqué à un canal différent.
+
+**Déprioritisé avant implémentation**, pour deux raisons. (1) Blocage
+externe sur l'entrée des avis : l'API Google Business Profile exige une
+demande d'accès manuelle (validation Google, quelques jours à quelques
+semaines, parfois refusée), et l'API Trustpilot nécessite un compte
+Trustpilot Business payant — aucune des deux n'est accessible immédiatement
+avec une simple clé comme Resend/Stripe. (2) Sans cette intégration,
+l'outil se limite à coller un avis à la main et recopier le brouillon à la
+main : une réponse à un avis client est généralement courte et générique,
+contrairement à l'item 22 où un email client peut poser une vraie question
+factuelle qui justifie d'aller chercher dans la base documentaire. La
+valeur ajoutée réelle par rapport à coller l'avis directement dans un
+assistant généraliste est jugée trop faible pour justifier le
+développement en l'état. Pas supprimé du catalogue produit : à reconsidérer
+si l'accès API est obtenu ou si une raison plus solide émerge.
 
 ### 28. Coach de simulation
 
@@ -2036,38 +2093,70 @@ Testé : `tsc --noEmit` propre, 86 tests au vert (pas de nouveau test —
 `getDocumentChunks` est une requête ES simple, symétrique de fonctions
 déjà non testées unitairement comme `deleteDocumentChunks`).
 
-### 46. Chatbot vocal intégrable via iframe
+### 46. Transcription de réunions (reformulé, ex-"Chatbot vocal intégrable via iframe") : ✅ Fait (MVP)
 
-**Idée (2026-10-12)**, née de la session de repositionnement
-produit/marché (séparation Corpus.ia / brique technique RAG++, voir le
-plan d'action discuté en conversation). Le widget actuel
-(`components/EmbedBubbleWidget.tsx` + `public/widget.js`) est texte
-uniquement ; l'idée est une variante vocale du même chat — parler au lieu
+**Idée d'origine (2026-10-12)**, née de la session de repositionnement
+produit/marché : une variante vocale du widget existant, parler au lieu
 d'écrire, réponse en voix de synthèse.
 
-**Distinct de l'item 25** (Standard IA téléphone/WhatsApp) : l'item 25
-suppose une intégration téléphonie/WhatsApp Business API (canal hors
-web) ; celui-ci reste dans le widget web existant (iframe), juste une
-modalité d'entrée/sortie différente — pas de nouveau canal de
-distribution, "seulement" de l'audio en plus du texte.
+**Repensé (2026-11-12)**, avant de coder quoi que ce soit sur cette
+première idée : la voix en entrée/sortie sur un widget web a une valeur
+réelle mais étroite (parler à voix haute devant son écran est rarement
+plus pratique que taper, contrairement à un vrai canal vocal comme le
+téléphone, item 25), et n'ouvre aucun nouveau segment de client. Gardée
+en note ci-dessous, non retenue pour ce chantier. À la place : enregistrer
+une réunion depuis le dashboard, la transcrire et l'indexer automatiquement
+dans le RAG, pour l'interroger ensuite en chat écrit normal, comme n'importe
+quel autre document. Colle à la thèse du produit ("tes documents → un
+chatbot utile") au lieu d'y être orthogonal, zéro blocage externe
+(contrairement à l'item 27/Trustpilot ou au canal WhatsApp de l'item 25 :
+seulement l'API OpenAI, déjà utilisée partout dans le produit), et marché
+déjà validé ailleurs (Otter.ai, Fireflies, Fathom).
 
-**Piste technique notée (2026-10-30)** : même piste Whisper que l'item 25
-pour le speech-to-text (gratuit, open-source, auto-hébergeable — pattern
-service VPS déjà prouvé avec l'OCR). Reste à regarder côté synthèse
-vocale (text-to-speech) une option équivalente gratuite/auto-hébergeable
-le moment venu. Note seulement, pas de décision avant reprise explicite
-de ce chantier.
+**Implémenté** : un enregistrement devient un document comme un autre.
+`lib/extract.ts` : nouveau type `'audio'` (`detectFileType` reconnaît
+.webm/.mp4/.m4a/.mp3/.wav/.mpga/.mpeg), transcrit via `lib/openai.ts`
+`transcribeAudio` (API Whisper, `toFile` + `audio.transcriptions.create`,
+français forcé) plutôt que mammoth/pdf-parse/OCR, puis la même suite
+chunk/embed/index que tout document. Rejeté avec un message clair
+au-delà de 24 Mo (marge sous la limite de 25 Mo de l'API, environ 90
+minutes au débit fixé par l'enregistreur) plutôt que de laisser échouer
+l'appel à l'API. `components/AudioRecorder.tsx` (nouveau, à côté de
+`DocumentUploader`/`UrlUploader` sur la page d'un chatbot) : enregistre
+via `MediaRecorder` (débit fixé à 32 kbit/s, arrêt automatique à 90 min),
+envoie le résultat à la route d'upload générique comme un fichier normal.
+Logique d'upload/polling partagée avec `DocumentUploader` extraite dans
+`lib/clientDocumentUpload.ts`. Palier PME/Métier (`AUDIO_TRANSCRIPTION_
+ALLOWED_PLANS`, `lib/plans.ts`), vérifié côté serveur dans la route
+d'upload (pas seulement dans l'UI) pour qu'un appel direct à l'API ne
+contourne pas le palier requis.
 
-**Pas chiffré, gros morceau pas détaillé encore** : speech-to-text côté
-visiteur (micro navigateur, streaming), text-to-speech côté réponse
-(latence à maîtriser pour rester conversationnel), et la question de
-l'API à utiliser (OpenAI propose des modèles voix temps réel — à vérifier
-au moment de s'y mettre plutôt que de figer un choix maintenant, l'offre
-bouge vite sur ce point). Nouvelle modalité jamais touchée dans le
-produit actuel — à dimensionner sérieusement avant de s'engager, comme
-l'item 33.
+**Limites connues du MVP** : enregistrement direct depuis le dashboard
+seulement, pas d'intégration Zoom/Teams/Meet (voir note ci-dessous) ;
+limite dure de 90 minutes ; aucune diarisation (qui a dit quoi) ; pas de
+récupération automatique si l'enregistrement est interrompu en cours de
+réunion (reprendre depuis le début).
 
-**Effort** : élevé. Idée backlog, aucun code à ce stade.
+**Piste explorée mais non retenue : voix en entrée/sortie sur le widget**
+(l'idée d'origine). Techniquement faisable sans blocage externe (Whisper
+pour l'entrée, un modèle de synthèse vocale pour la sortie, comme noté le
+2026-10-30), mais écartée faute de valeur business claire pour un widget
+web. À reconsidérer seulement si une vraie demande se manifeste.
+
+**Note pour une v2 éventuelle : intégration directe Zoom/Teams/Meet**,
+pour éviter l'étape manuelle d'enregistrement. Probablement du même ordre
+de complexité que les blocages rencontrés sur les items 25/27 (validation
+d'accès par une plateforme tierce, pas juste une clé API) : Zoom et
+Microsoft Teams exposent des apps marketplace avec leur propre processus
+de revue/publication, et l'accès aux enregistrements Google Meet passe
+par l'API Google Workspace (comptes Google Workspace, pas les comptes
+Gmail personnels). Non chiffré, non commencé : à cadrer explicitement si
+ce chantier est repris.
+
+**Testé** : `tsc --noEmit` propre, `npx vitest run` au vert (nouveaux tests
+pour `transcribeAudio` et la branche audio d'`extractText`), `npm run
+build` propre. Pas encore testé en conditions réelles (vrai enregistrement
+micro dans le navigateur).
 
 ### 47. Indicateur de chargement du chat trop statique — ✅ Fait
 

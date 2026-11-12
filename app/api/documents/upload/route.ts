@@ -7,6 +7,8 @@ import { detectFileType } from '@/lib/extract';
 import { processDocument } from '@/lib/ingest';
 import { logWarn, logError } from '@/lib/logger';
 import { sanitizeFilenameForPath } from '@/lib/visitorFileRules';
+import { AUDIO_TRANSCRIPTION_ALLOWED_PLANS } from '@/lib/plans';
+import type { OrgPlan } from '@/types/database';
 
 // Ingestion (extraction/chunking/embeddings/indexing) runs in the background
 // after the response is sent — see the waitUntil call below — so this only
@@ -37,7 +39,7 @@ export async function POST(request: Request) {
     // from another tenant simply won't be found.
     const { data: chatbot, error: chatbotError } = await supabase
       .from('chatbots')
-      .select('id, organization_id, use_ai_indexing, use_case')
+      .select('id, organization_id, use_ai_indexing, use_case, document_format, organizations!inner(plan)')
       .eq('id', chatbotId)
       .single();
 
@@ -72,10 +74,27 @@ export async function POST(request: Request) {
       logWarn('upload.unsupported_format', { userId: user.id, chatbotId, filename: file.name, ext });
       return NextResponse.json(
         {
-          error: `Le format .${ext} n'est pas encore supporté (seuls .pdf, .docx, .txt, .md, .csv, .xlsx, .xls, .png, .jpg/.jpeg et .webp le sont pour l'instant).`,
+          error: `Le format .${ext} n'est pas encore supporté (seuls .pdf, .docx, .txt, .md, .csv, .xlsx, .xls, .png, .jpg/.jpeg, .webp et les formats audio (.webm, .mp4, .m4a, .mp3, .wav) le sont pour l'instant).`,
         },
         { status: 400 }
       );
+    }
+
+    // Transcription de réunions (docs/roadmap.md item 46), premium : gardée
+    // ici plutôt que côté UI seulement (components/AudioRecorder.tsx), pour
+    // qu'un appel direct à cette route ne contourne pas le palier requis.
+    if (fileType === 'audio') {
+      // postgrest-js's type inference for a joined column doesn't narrow to
+      // OrgPlan here (pre-existing gap, same pattern as app/api/chat/
+      // route.ts): annotate explicitly.
+      const org = Array.isArray(chatbot.organizations) ? chatbot.organizations[0] : chatbot.organizations;
+      const plan: OrgPlan | undefined = org?.plan;
+      if (!plan || !AUDIO_TRANSCRIPTION_ALLOWED_PLANS.includes(plan)) {
+        return NextResponse.json(
+          { error: 'La transcription de réunions nécessite le plan PME ou Métier.' },
+          { status: 403 }
+        );
+      }
     }
 
     // sanitizeFilenameForPath strips accents/spaces/apostrophes etc. —
@@ -144,6 +163,7 @@ export async function POST(request: Request) {
         filename: file.name,
         useAiIndexing: chatbot.use_ai_indexing,
         analyzeContract: chatbot.use_case === 'contract_analyzer',
+        documentFormat: chatbot.use_case === 'paperwork_digitizer' ? chatbot.document_format : null,
       }).catch((err) => {
         logError('upload.background_processing_uncaught', {
           documentId: document.id,

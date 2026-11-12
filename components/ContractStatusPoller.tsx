@@ -6,12 +6,15 @@ import { useRouter } from 'next/navigation';
 const POLL_INTERVAL_MS = 2000;
 const POLL_TIMEOUT_MS = 5 * 60 * 1000;
 
-// Renders nothing — mounted by app/dashboard/contrats/[id]/page.tsx only
-// while the one document is still 'pending'/'processing', polls its status
-// (same pattern as components/DocumentUploader.tsx) and refreshes the
-// server page once it's done, which picks up both the new status and
-// chatbots.contract_summary (set by lib/ingest.ts before the document
-// flips to 'indexed', see processDocument's Promise.all).
+// Renders nothing — mounted while a document is still 'pending'/
+// 'processing' by app/dashboard/contrats/[id]/page.tsx (one document) and
+// app/dashboard/paperasse/[id]/page.tsx (one instance per pending document,
+// docs/roadmap.md item 24), polls its status (same pattern as
+// components/DocumentUploader.tsx) and refreshes the server page once it's
+// done, which picks up both the new status and whatever structured
+// extraction was attempted alongside it (contract_summary or
+// extracted_fields, set by lib/ingest.ts before the document flips to
+// 'indexed', see processDocument's Promise.all).
 export default function ContractStatusPoller({ documentId }: { documentId: string }) {
   const router = useRouter();
   const startedRef = useRef(false);
