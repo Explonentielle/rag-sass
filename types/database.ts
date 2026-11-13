@@ -22,7 +22,14 @@ export type ContractSummaryJson = Record<string, string | null>;
 // Format choisi à la création d'un digitaliseur de paperasse (item 24),
 // oriente l'extraction (lib/openai.ts extractDocumentFields). Stocké sur
 // chatbots.document_format, null pour les autres use_cases.
-export type DocumentFormat = 'facture' | 'libre';
+export type DocumentFormat =
+  | 'facture'
+  | 'devis'
+  | 'bon_commande'
+  | 'bon_livraison'
+  | 'note_frais'
+  | 'fiche_paie'
+  | 'libre';
 
 // Paires label/valeur extraites d'un document (lib/openai.ts
 // ExtractedField), stockées telles quelles sur documents.extracted_fields —

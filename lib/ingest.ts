@@ -1,5 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
-import type { Database } from '@/types/database';
+import type { Database, DocumentFormat } from '@/types/database';
 import { extractText, extractFromUrl, UnsupportedDocumentError, type SupportedFileType } from '@/lib/extract';
 import { chunkText } from '@/lib/chunking';
 import { embedTexts, structureChunksWithAI, extractContractClauses, extractDocumentFields } from '@/lib/openai';
@@ -171,7 +171,7 @@ async function analyzeAndStoreDocumentFields(
   supabase: SupabaseClient<Database>,
   documentId: string,
   chatbotId: string,
-  format: 'facture' | 'libre',
+  format: DocumentFormat,
   text: string
 ): Promise<void> {
   try {
@@ -209,7 +209,7 @@ export interface ProcessDocumentParams {
   // extracted text and stores the result on documents.extracted_fields.
   // Caller resolves this from chatbots.document_format when
   // use_case === 'paperwork_digitizer'; undefined/null skips it.
-  documentFormat?: 'facture' | 'libre' | null;
+  documentFormat?: DocumentFormat | null;
 }
 
 /**

@@ -353,20 +353,30 @@ describe('extractDocumentFields', () => {
     expect(result).toBeNull();
   });
 
-  it('uses a different system prompt for facture vs libre', async () => {
+  it('uses a distinct, non-empty system prompt for every format', async () => {
+    const formats = ['facture', 'devis', 'bon_commande', 'bon_livraison', 'note_frais', 'fiche_paie', 'libre'] as const;
+    const prompts: string[] = [];
+
+    for (const format of formats) {
+      createMock.mockResolvedValueOnce(fakeStructuredResponse({ fields: validFields }));
+      await extractDocumentFields('Texte...', format);
+      const call = createMock.mock.calls[createMock.mock.calls.length - 1][0];
+      const systemPrompt = call.messages.find((m: { role: string }) => m.role === 'system').content;
+      expect(systemPrompt.length).toBeGreaterThan(0);
+      prompts.push(systemPrompt);
+    }
+
+    expect(new Set(prompts).size).toBe(formats.length);
+  });
+
+  it('restricts the fiche_paie prompt to the listed fields, given the sensitive data involved', async () => {
     createMock.mockResolvedValueOnce(fakeStructuredResponse({ fields: validFields }));
-    await extractDocumentFields('Texte...', 'facture');
-    const factureSystemPrompt = createMock.mock.calls[0][0].messages.find(
+    await extractDocumentFields('Texte...', 'fiche_paie');
+    const systemPrompt = createMock.mock.calls[createMock.mock.calls.length - 1][0].messages.find(
       (m: { role: string }) => m.role === 'system'
     ).content;
 
-    createMock.mockResolvedValueOnce(fakeStructuredResponse({ fields: validFields }));
-    await extractDocumentFields('Texte...', 'libre');
-    const libreSystemPrompt = createMock.mock.calls[1][0].messages.find(
-      (m: { role: string }) => m.role === 'system'
-    ).content;
-
-    expect(factureSystemPrompt).not.toBe(libreSystemPrompt);
+    expect(systemPrompt.toLowerCase()).toContain('données personnelles sensibles');
   });
 
   it('truncates very long documents before sending them to the model', async () => {

@@ -1259,6 +1259,28 @@ pour `extractDocumentFields`, même pattern que `extractContractClauses`),
 paperasse/[id]` générées). Pas encore testé en conditions réelles (upload
 d'un vrai document).
 
+**Formats étendus (2026-11-13)** : au-delà de "Facture"/"Libre", 5
+nouveaux formats avec leur propre schéma de champs attendus dans
+`lib/openai.ts` (`DOCUMENT_FIELDS_SYSTEM_PROMPTS`) : devis, bon de
+commande, bon de livraison, note de frais, fiche de paie. Migration
+`0032_digitizer_more_formats.sql` élargit la contrainte CHECK sur
+`chatbots.document_format`.
+
+**Fiche de paie, garde-fou RGPD** : seul format parmi les 7 à manipuler
+une donnée personnelle sensible (salaire). Deux précautions ajoutées,
+pas de blocage technique : (1) le prompt d'extraction liste explicitement
+les champs autorisés et interdit d'en extraire d'autres (ex. numéro de
+sécurité sociale, adresse, même présents sur le document) ; (2)
+`components/CreateDigitizerForm.tsx` affiche un avertissement à la
+sélection de ce format, invitant à vérifier les accès et la durée de
+conservation. Pas de contrôle d'accès ou de rétention différencié par
+format au niveau base de données : à reprendre si ce format est
+réellement utilisé pour de vraies fiches de paie de salariés.
+
+Testé : `tsc --noEmit` propre, 293 tests au vert (le test `extractDocumentFields`
+remplacé par une vérification sur les 7 formats plutôt que 2), `npm run
+build` propre.
+
 ### 25. Standard IA téléphone / WhatsApp
 
 **Idée** : le même assistant, sur un canal vocal ou messagerie plutôt que
@@ -3298,3 +3320,92 @@ l'entrée active se déplie en liste de sections cliquables.
   déjà enregistrés. La recherche, elle, n'est jamais court-circuitée : le classement ne
   sert qu'aux statistiques.
 - Libellé du lien de rendez-vous reformulé (« Lien de prise de rendez-vous »).
+
+### 68. Jeu de test d'évaluation de la qualité du RAG : ✅ Fait (MVP), limite découverte
+
+**Idée (2026-11-13)** : pas une feature produit, un outil de diagnostic pour
+mesurer la qualité du pipeline RAG (retrieval + génération) sur un corpus
+contrôlé, indépendamment de n'importe quel org/chatbot réel.
+
+**Implémenté** : `eval/rag-eval.mts` (`npm run rag-eval`) fait tourner le
+vrai pipeline (`rewriteQuery` → `embedText` → `hybridSearch` →
+`rerankChunks` → `buildSystemPrompt` → `streamAnswer`, identique à
+`/api/chat`) sur un jeu de données synthétique indexé puis nettoyé à
+chaque exécution, sous un `chatbot_id` factice dédié (jamais un vrai
+chatbot, même en pointant l'Elasticsearch de prod). Deux jeux sous
+`eval/fixtures/` :
+- `nordia-systems` (16 questions) : politique RH/IT d'une entreprise
+  fictive, documents courts (un chunk chacun).
+- `volcanic-cloud` (20 questions, par défaut) : politique commerciale d'un
+  éditeur SaaS fictif, dense en logique métier conditionnelle (seuils,
+  tranches, paliers qui se ressemblent), complétée par 5 extraits Wikipedia
+  entiers comme contenu distracteur (licence CC BY-SA, attribution en tête
+  de fichier) pour porter le corpus à ~100 chunks et tester le retrieval à
+  une échelle plus réaliste qu'un corpus trié sur le volet.
+
+Chaque question a un `category` (fait direct, reformulation, synthèse
+multi-documents, question sans réponse dans le corpus, question dont le
+document pertinent est retrouvé mais ne répond pas vraiment), les
+documents source attendus et les faits attendus dans la réponse. Détail
+dans `eval/README.md`.
+
+**Résultat sur le petit corpus (8 chunks)** : 100% retrieval et réponses
+correctes, y compris sur les questions pièges (le modèle refuse
+correctement de répondre plutôt que d'inventer, avec nuance même sur le
+cas le plus difficile : un document pertinent retrouvé qui ne couvre pas
+le point précis demandé).
+
+**Limite découverte sur le gros corpus (100 chunks, 2026-11-13)** : une
+question pointue ("délai de traitement d'une demande de suppression
+RGPD") a retrouvé l'article Wikipedia générique sur le RGPD au lieu du
+document spécifique de l'entreprise qui contient la vraie réponse. Cause
+vérifiée dans `lib/chunking.ts` : `securite-et-conformite.md` (7 sections
+distinctes, résidence des données/chiffrement/certifications/rétention/
+RGPD/notification/sous-traitants) tient en un seul chunk de 2080
+caractères (sous le seuil `TARGET_TOKENS = 650`), donc son embedding est
+une moyenne diluée sur 7 sujets à la fois. En face, l'article Wikipedia
+(16 chunks) a des chunks entièrement dédiés au droit à l'effacement, sans
+dilution : il l'emporte sur une question qui ne porte que sur ce point
+précis. Aucune hallucination (le modèle a dit ne pas trouver l'info
+plutôt que d'inventer), mais un vrai échec de retrieval.
+
+**Pas de correctif appliqué, volontairement.** Le seul levier identifié
+(réduire `TARGET_TOKENS` pour forcer des chunks plus petits et plus
+topiquement purs) est une constante globale qui affecte tous les
+documents de tous les clients, pas un réglage local à ce test : la
+changer sur la foi d'un seul cas synthétique serait une sur-correction.
+À reprendre sérieusement si le même schéma (document interne court
+multi-sujets perdant face à une référence longue mono-sujet) se
+reproduit avec de vrais clients.
+
+**Troisième jeu ajouté (2026-11-13) : `cas-limites`**, 15 questions sur
+des angles différents du volume : contradiction entre documents (une
+grille tarifaire archivée et une FAQ interne non à jour contredisant la
+politique officielle), négation/exclusion, dénombrement, questions
+ambiguës (palier non précisé), confusion avec un chiffre concurrent
+proche mais différent.
+
+**Confirmation positive obtenue avec ce jeu** : sur deux questions où un
+document contredisait frontalement la politique officielle (SSO sur
+Starter, couverture support le week-end), le modèle a spontanément
+comparé les deux sources et signalé l'écart ("la FAQ support interne
+affirme... mais le document officiel dit...") sans qu'on le lui demande
+explicitement dans la question. C'est exactement ce que demande
+l'instruction du template "second cerveau" ("si plusieurs documents se
+contredisent, signale-le"), et ça fonctionne même sous un corpus construit
+spécifiquement pour le piéger. Sur une question volontairement ambiguë
+(palier non précisé), le modèle a aussi donné les trois réponses possibles
+plutôt que d'en deviner une au hasard. 14/14 retrieval, 11/11 réponses
+correctes une fois corrigés deux faux négatifs du script lui-même (un
+nombre écrit en toutes lettres, "trois" au lieu de "3" ; même limite de
+principe que l'espace avant le symbole %, non corrigée pour ce cas précis
+— normaliser les nombres en lettres serait de la sur-ingénierie pour un
+script de diagnostic).
+
+**Testé** : `tsc --noEmit` propre, 292 tests du projet au vert. Deux bugs
+de comparaison corrigés en cours de route dans le script (sous-chaînes
+insensibles aux espaces, sinon "15 %" ne matchait pas "15%"), et la
+notation refactorée pour dépendre de ce que fournit chaque question
+(`expected_source_documents`/`expected_answer_contains` non vides) plutôt
+que du nom de sa catégorie, pour que de nouvelles catégories n'aient rien
+à changer côté script.

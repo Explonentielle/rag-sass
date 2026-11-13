@@ -1,5 +1,6 @@
 import OpenAI, { toFile } from 'openai';
 import { logWarn } from '@/lib/logger';
+import type { DocumentFormat } from '@/types/database';
 
 let client: OpenAI | null = null;
 
@@ -643,13 +644,53 @@ const FACTURE_FIELDS_SYSTEM_PROMPT = `Tu extrais les informations clés d'une fa
 Renvoie exactement ces champs, dans cet ordre, sous forme de paires label/valeur : "Numéro de facture", "Date d'émission", "Fournisseur", "Client", "Montant HT", "Montant TTC", "TVA", "Date d'échéance", "Mode de paiement".
 Si une information est absente du document, utilise la valeur "Non précisé" plutôt que d'inventer.`;
 
+const DEVIS_FIELDS_SYSTEM_PROMPT = `Tu extrais les informations clés d'un devis pour une liste structurée. Base-toi uniquement sur le texte fourni, n'invente rien.
+
+Renvoie exactement ces champs, dans cet ordre, sous forme de paires label/valeur : "Numéro de devis", "Date d'émission", "Client", "Montant HT", "Montant TTC", "Date de validité", "Prestations".
+Si une information est absente du document, utilise la valeur "Non précisé" plutôt que d'inventer.`;
+
+const BON_COMMANDE_FIELDS_SYSTEM_PROMPT = `Tu extrais les informations clés d'un bon de commande pour une liste structurée. Base-toi uniquement sur le texte fourni, n'invente rien.
+
+Renvoie exactement ces champs, dans cet ordre, sous forme de paires label/valeur : "Numéro de commande", "Date", "Fournisseur", "Articles commandés", "Quantités", "Montant total", "Date de livraison prévue".
+Si une information est absente du document, utilise la valeur "Non précisé" plutôt que d'inventer.`;
+
+const BON_LIVRAISON_FIELDS_SYSTEM_PROMPT = `Tu extrais les informations clés d'un bon de livraison pour une liste structurée. Base-toi uniquement sur le texte fourni, n'invente rien.
+
+Renvoie exactement ces champs, dans cet ordre, sous forme de paires label/valeur : "Numéro de livraison", "Date de livraison", "Articles livrés", "Quantités", "Destinataire".
+Si une information est absente du document, utilise la valeur "Non précisé" plutôt que d'inventer.`;
+
+const NOTE_FRAIS_FIELDS_SYSTEM_PROMPT = `Tu extrais les informations clés d'une note de frais pour une liste structurée. Base-toi uniquement sur le texte fourni, n'invente rien.
+
+Renvoie exactement ces champs, dans cet ordre, sous forme de paires label/valeur : "Date de la dépense", "Montant", "Catégorie de dépense", "Justificatif joint".
+Si une information est absente du document, utilise la valeur "Non précisé" plutôt que d'inventer.`;
+
+// Donnée personnelle sensible (RGPD) : l'instruction limite explicitement
+// l'extraction aux champs listés, pour ne pas que le modèle remonte par
+// exemple un numéro de sécurité sociale ou une adresse présents sur le
+// même document mais non demandés.
+const FICHE_PAIE_FIELDS_SYSTEM_PROMPT = `Tu extrais les informations clés d'une fiche de paie pour une liste structurée. Base-toi uniquement sur le texte fourni, n'invente rien. Ce document contient des données personnelles sensibles : n'extrais que les champs listés ci-dessous, rien de plus (pas de numéro de sécurité sociale, pas d'adresse personnelle, même s'ils figurent sur le document).
+
+Renvoie exactement ces champs, dans cet ordre, sous forme de paires label/valeur : "Nom de l'employé", "Période", "Salaire brut", "Salaire net", "Cotisations sociales".
+Si une information est absente du document, utilise la valeur "Non précisé" plutôt que d'inventer.`;
+
 const LIBRE_FIELDS_SYSTEM_PROMPT = `Tu extrais les informations clés d'un document administratif pour une liste structurée. Base-toi uniquement sur le texte fourni, n'invente rien.
 
 Identifie toi-même les paires label/valeur les plus pertinentes du document (par exemple des références, dates, montants, noms de parties...), au maximum 15. Les labels doivent être courts et en français. N'invente pas de champ dont la valeur serait absente du document.`;
 
+const DOCUMENT_FIELDS_SYSTEM_PROMPTS: Record<DocumentFormat, string> = {
+  facture: FACTURE_FIELDS_SYSTEM_PROMPT,
+  devis: DEVIS_FIELDS_SYSTEM_PROMPT,
+  bon_commande: BON_COMMANDE_FIELDS_SYSTEM_PROMPT,
+  bon_livraison: BON_LIVRAISON_FIELDS_SYSTEM_PROMPT,
+  note_frais: NOTE_FRAIS_FIELDS_SYSTEM_PROMPT,
+  fiche_paie: FICHE_PAIE_FIELDS_SYSTEM_PROMPT,
+  libre: LIBRE_FIELDS_SYSTEM_PROMPT,
+};
+
 /**
  * Extracts a structured list of label/value fields from a document's full
- * text, oriented by `format`: 'facture' uses a fixed set of expected fields,
+ * text, oriented by `format`: every format except 'libre' uses its own
+ * fixed set of expected fields (see DOCUMENT_FIELDS_SYSTEM_PROMPTS above);
  * 'libre' lets the model identify its own relevant fields. Returns null on
  * any failure (API error, unusable output) — lib/ingest.ts leaves
  * documents.extracted_fields null in that case rather than failing the
@@ -657,11 +698,11 @@ Identifie toi-même les paires label/valeur les plus pertinentes du document (pa
  */
 export async function extractDocumentFields(
   rawText: string,
-  format: 'facture' | 'libre'
+  format: DocumentFormat
 ): Promise<ExtractedField[] | null> {
   const text =
     rawText.length > DOCUMENT_FIELDS_MAX_CHARS ? rawText.slice(0, DOCUMENT_FIELDS_MAX_CHARS) : rawText;
-  const systemPrompt = format === 'facture' ? FACTURE_FIELDS_SYSTEM_PROMPT : LIBRE_FIELDS_SYSTEM_PROMPT;
+  const systemPrompt = DOCUMENT_FIELDS_SYSTEM_PROMPTS[format];
 
   try {
     const openai = getOpenAiClient();

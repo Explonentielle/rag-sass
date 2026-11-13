@@ -1,0 +1,122 @@
+[
+  {
+    "id": "q01",
+    "category": "contradiction",
+    "question": "Quel est le tarif actuel du palier Pro ?",
+    "expected_source_documents": ["tarification-et-paliers.md"],
+    "expected_answer_contains": ["199"],
+    "notes": "Le document archivé (tarification-archive-2025.md) mentionne 149€, une ancienne valeur explicitement marquée obsolète : ne doit pas être citée comme le tarif actuel."
+  },
+  {
+    "id": "q02",
+    "category": "contradiction",
+    "question": "Quelle est la remise actuelle sur un engagement annuel ?",
+    "expected_source_documents": ["tarification-et-paliers.md"],
+    "expected_answer_contains": ["15"],
+    "notes": "L'archive mentionne 10%, une ancienne valeur."
+  },
+  {
+    "id": "q03",
+    "category": "contradiction",
+    "question": "Dans quel délai puis-je être remboursé après mon premier paiement ?",
+    "expected_source_documents": ["politique-remboursement.md"],
+    "expected_answer_contains": ["14 jours"],
+    "notes": "La FAQ support interne (document non fiable, signalé comme tel) affirme à tort 30 jours."
+  },
+  {
+    "id": "q04",
+    "category": "contradiction",
+    "question": "Le SSO est-il disponible sur le palier Starter ?",
+    "expected_source_documents": ["gestion-comptes-et-acces.md"],
+    "expected_answer_contains": [],
+    "notes": "La FAQ interne dit à tort que oui moyennant supplément. La bonne réponse dit que ce n'est pas disponible du tout sur Starter (le SSO payant en option existe seulement à partir de Pro). Pas de vérification automatique (réponse négative), à relire à la main."
+  },
+  {
+    "id": "q05",
+    "category": "contradiction",
+    "question": "Après combien de jours de retard de paiement mon compte est-il suspendu ?",
+    "expected_source_documents": ["gestion-comptes-et-acces.md"],
+    "expected_answer_contains": ["14 jours"],
+    "notes": "La FAQ dit à tort 7 jours. Le document officiel distingue lecture seule (3 jours) et suspension complète (14 jours) : 'suspendu' correspond au second seuil."
+  },
+  {
+    "id": "q06",
+    "category": "contradiction",
+    "question": "Le support est-il disponible 24h/24 et 7j/7 le week-end sur le palier Pro ?",
+    "expected_source_documents": ["escalade-support.md"],
+    "expected_answer_contains": [],
+    "notes": "La FAQ dit à tort oui pour tous les paliers payants. En réalité seul le traitement des P1 est garanti le week-end pour Starter/Pro ; la couverture 24/7 complète (P1 et P2) est réservée à Enterprise. Réponse nuancée, à relire à la main."
+  },
+  {
+    "id": "q07",
+    "category": "negation",
+    "question": "Quels paliers n'incluent pas le SSO gratuitement ?",
+    "expected_source_documents": ["gestion-comptes-et-acces.md"],
+    "expected_answer_contains": ["starter", "pro"],
+    "notes": "Question par exclusion : Starter ne l'a pas du tout, Pro l'a en option payante, seul Enterprise l'inclut sans frais. Teste si le modèle raisonne correctement sur l'absence plutôt que de citer juste un palier au hasard."
+  },
+  {
+    "id": "q08",
+    "category": "negation",
+    "question": "Sur quel palier n'y a-t-il aucun crédit SLA automatique en cas de panne ?",
+    "expected_source_documents": ["sla-et-credits.md"],
+    "expected_answer_contains": ["starter"],
+    "notes": "Question par exclusion, un seul palier concerné."
+  },
+  {
+    "id": "q09",
+    "category": "counting",
+    "question": "Combien de niveaux de sévérité de ticket de support existe-t-il chez Volcanic Cloud ?",
+    "expected_source_documents": ["escalade-support.md"],
+    "expected_answer_contains": ["4"],
+    "notes": "Nécessite de compter (P1 à P4) plutôt que de citer un fait isolé."
+  },
+  {
+    "id": "q10",
+    "category": "counting",
+    "question": "Combien de niveaux existe-t-il dans le programme partenaires ?",
+    "expected_source_documents": ["programme-partenaires.md"],
+    "expected_answer_contains": ["3"],
+    "notes": "Nécessite de compter (Silver, Gold, Platinum)."
+  },
+  {
+    "id": "q11",
+    "category": "ambiguous",
+    "question": "Quel est le délai de remboursement ?",
+    "expected_source_documents": ["politique-remboursement.md"],
+    "expected_answer_contains": ["14 jours"],
+    "notes": "Palier non précisé dans la question. Le chiffre 14 jours (Starter/Pro) doit apparaître, mais idéalement la réponse signale aussi que le palier Enterprise suit des règles définies au contrat, pas la règle générale. Cette nuance n'est pas vérifiée automatiquement."
+  },
+  {
+    "id": "q12",
+    "category": "near_miss_competitor",
+    "question": "Quel crédit Volcanic Cloud applique-t-il en cas de disponibilité en dessous de l'engagement contractuel ?",
+    "expected_source_documents": ["sla-et-credits.md"],
+    "expected_answer_contains": ["10"],
+    "notes": "comparatif-marche.md mentionne un concurrent (DataForge) avec un taux fixe de 20%, différent du modèle par paliers de Volcanic Cloud (10/25/50% selon la gravité). Teste que la réponse ne mélange pas les deux modèles."
+  },
+  {
+    "id": "q13",
+    "category": "contradiction",
+    "question": "Quel est le tarif d'entrée de gamme chez Volcanic Cloud aujourd'hui ?",
+    "expected_source_documents": ["tarification-et-paliers.md"],
+    "expected_answer_contains": ["49"],
+    "notes": "Triple piège numérique : l'archive mentionne 39€ (ancien tarif Starter), comparatif-marche.md mentionne 59€ (l'entrée de gamme d'un concurrent, CloudNova) : trois chiffres proches, pour trois choses différentes, dans trois documents différents."
+  },
+  {
+    "id": "q14",
+    "category": "unanswerable",
+    "question": "Quel est le tarif de CloudNova pour son offre équivalente à notre palier Enterprise ?",
+    "expected_source_documents": [],
+    "expected_answer_contains": [],
+    "notes": "comparatif-marche.md ne mentionne que l'équivalent Pro (199€) et l'entrée de gamme (59€) de CloudNova, jamais d'équivalent Enterprise : sujet absent du corpus."
+  },
+  {
+    "id": "q15",
+    "category": "ambiguous",
+    "question": "Quel est le temps de première réponse garanti pour un incident critique ?",
+    "expected_source_documents": ["escalade-support.md"],
+    "expected_answer_contains": [],
+    "notes": "Palier non précisé : trois réponses possibles (4h Starter, 1h Pro, 15 minutes Enterprise). Idéalement le modèle distingue les trois plutôt que d'en choisir une seule au hasard. Pas de vérification automatique, à relire à la main."
+  }
+]

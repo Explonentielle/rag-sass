@@ -76,11 +76,23 @@ export default function CreateDigitizerForm({ organizationId }: { organizationId
               className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-900 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
             >
               <option value="facture">Facture</option>
+              <option value="devis">Devis</option>
+              <option value="bon_commande">Bon de commande</option>
+              <option value="bon_livraison">Bon de livraison</option>
+              <option value="note_frais">Note de frais</option>
+              <option value="fiche_paie">Fiche de paie</option>
               <option value="libre">Libre (le modèle identifie les champs lui-même)</option>
             </select>
             <p className="text-xs text-slate-400">
               Fixé à la création : détermine les champs extraits de chaque document ajouté ensuite.
             </p>
+            {format === 'fiche_paie' && (
+              <p className="text-xs text-amber-600">
+                Les fiches de paie contiennent des données personnelles sensibles (salaire). Vérifiez
+                qui a accès à ce digitaliseur et la durée pendant laquelle ces documents doivent être
+                conservés.
+              </p>
+            )}
           </div>
 
           {error && <p className="text-sm text-red-600">{error}</p>}

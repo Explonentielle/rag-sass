@@ -11,7 +11,15 @@ import {
 import type { ChatbotUseCase, DocumentFormat, OrgPlan } from '@/types/database';
 
 const USE_CASES: ChatbotUseCase[] = ['site_widget', 'second_cerveau', 'contract_analyzer', 'paperwork_digitizer'];
-const DOCUMENT_FORMATS: DocumentFormat[] = ['facture', 'libre'];
+const DOCUMENT_FORMATS: DocumentFormat[] = [
+  'facture',
+  'devis',
+  'bon_commande',
+  'bon_livraison',
+  'note_frais',
+  'fiche_paie',
+  'libre',
+];
 
 export async function POST(request: Request) {
   const supabase = createClient();

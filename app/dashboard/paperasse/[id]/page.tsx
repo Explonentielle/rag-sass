@@ -13,7 +13,15 @@ import { logQueryError } from '@/lib/supabaseResult';
 import type { DocumentFormat } from '@/types/database';
 import PageSections from '@/components/PageSections';
 
-const FORMAT_LABELS = { facture: 'Facture', libre: 'Libre' } as const;
+const FORMAT_LABELS: Record<DocumentFormat, string> = {
+  facture: 'Facture',
+  devis: 'Devis',
+  bon_commande: 'Bon de commande',
+  bon_livraison: 'Bon de livraison',
+  note_frais: 'Note de frais',
+  fiche_paie: 'Fiche de paie',
+  libre: 'Libre',
+};
 
 export default async function DigitizerPage({ params }: { params: { id: string } }) {
   const supabase = createClient();
