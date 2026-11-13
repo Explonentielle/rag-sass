@@ -10,7 +10,8 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
-    "smoke-test": "tsx scripts/smoke-test.mts"
+    "smoke-test": "tsx scripts/smoke-test.mts",
+    "rag-eval": "tsx eval/rag-eval.mts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.123.0",

@@ -1,0 +1,130 @@
+[
+  {
+    "id": "q01",
+    "category": "direct",
+    "question": "Combien de jours de congés payés ai-je par an ?",
+    "expected_source_documents": ["conges-payes.md"],
+    "expected_answer_contains": ["25 jours"],
+    "notes": "Fait direct, un seul document, formulation proche du texte source."
+  },
+  {
+    "id": "q02",
+    "category": "direct",
+    "question": "Quels jours de la semaine dois-je être présent au bureau si je suis en télétravail ?",
+    "expected_source_documents": ["teletravail.md"],
+    "expected_answer_contains": ["mardi", "jeudi"],
+    "notes": "Deux faits attendus dans la même réponse."
+  },
+  {
+    "id": "q03",
+    "category": "paraphrase",
+    "question": "Est-ce que je peux garder mes congés non pris pour l'année suivante ?",
+    "expected_source_documents": ["conges-payes.md"],
+    "expected_answer_contains": ["31 mars", "5 jours"],
+    "notes": "Question reformulée (ne reprend pas le mot 'report') : teste la recherche sémantique au-delà du mot-clé exact."
+  },
+  {
+    "id": "q04",
+    "category": "direct",
+    "question": "Quel est le plafond de remboursement pour un repas en déplacement professionnel ?",
+    "expected_source_documents": ["notes-de-frais.md"],
+    "expected_answer_contains": ["25"],
+    "notes": "Précision numérique simple."
+  },
+  {
+    "id": "q05",
+    "category": "paraphrase",
+    "question": "À partir de quel montant dois-je garder une facture pour une dépense professionnelle ?",
+    "expected_source_documents": ["notes-de-frais.md"],
+    "expected_answer_contains": ["10"],
+    "notes": "Reformulation de 'justificatif obligatoire au-delà de 10€'."
+  },
+  {
+    "id": "q06",
+    "category": "direct",
+    "question": "La double authentification est-elle obligatoire sur mes comptes professionnels ?",
+    "expected_source_documents": ["securite-informatique.md"],
+    "expected_answer_contains": ["deux facteurs", "obligatoire"],
+    "notes": "Question fermée (oui/non) avec justification attendue."
+  },
+  {
+    "id": "q07",
+    "category": "direct",
+    "question": "Puis-je brancher une clé USB personnelle sur mon ordinateur de travail ?",
+    "expected_source_documents": ["securite-informatique.md"],
+    "expected_answer_contains": ["interdit"],
+    "notes": "Question fermée, réponse négative attendue."
+  },
+  {
+    "id": "q08",
+    "category": "direct",
+    "question": "Qui m'accompagne pendant mes premières semaines dans l'entreprise ?",
+    "expected_source_documents": ["onboarding.md"],
+    "expected_answer_contains": ["parrain"],
+    "notes": "Fait direct sur l'onboarding."
+  },
+  {
+    "id": "q09",
+    "category": "direct",
+    "question": "Combien de temps dure la période d'essai chez Nordia Systems ?",
+    "expected_source_documents": ["onboarding.md"],
+    "expected_answer_contains": ["3 mois"],
+    "notes": "Attention au piège : le document mentionne aussi '6 mois maximum' (renouvellement), la bonne réponse de base est 3 mois."
+  },
+  {
+    "id": "q10",
+    "category": "direct",
+    "question": "Quel pourcentage de ma mutuelle est pris en charge par l'entreprise ?",
+    "expected_source_documents": ["avantages-sociaux.md"],
+    "expected_answer_contains": ["70"],
+    "notes": "Précision numérique simple."
+  },
+  {
+    "id": "q11",
+    "category": "direct",
+    "question": "Quelle est la durée du préavis si je démissionne et que je suis cadre ?",
+    "expected_source_documents": ["procedure-depart.md"],
+    "expected_answer_contains": ["3 mois"],
+    "notes": "Attention au piège : le document donne aussi '1 mois' pour les non-cadres, la question précise 'cadre'."
+  },
+  {
+    "id": "q12",
+    "category": "multi_doc",
+    "question": "Qu'est-ce qui m'est remboursé financièrement entre le télétravail et les déplacements professionnels ?",
+    "expected_source_documents": ["teletravail.md", "notes-de-frais.md"],
+    "expected_answer_contains": ["15", "25"],
+    "notes": "Nécessite de combiner deux documents distincts (indemnité télétravail + plafond repas) pour une réponse complète."
+  },
+  {
+    "id": "q13",
+    "category": "multi_doc",
+    "question": "Si je quitte l'entreprise, que dois-je restituer et quelle somme vais-je recevoir ?",
+    "expected_source_documents": ["procedure-depart.md", "equipement-informatique.md"],
+    "expected_answer_contains": ["matériel", "solde de tout compte"],
+    "notes": "Nécessite de combiner la procédure de départ (argent) et l'équipement informatique (restitution matérielle)."
+  },
+  {
+    "id": "q14",
+    "category": "unanswerable",
+    "question": "Quelle est la politique de congé parental chez Nordia Systems ?",
+    "expected_source_documents": [],
+    "expected_answer_contains": [],
+    "notes": "Sujet absent du corpus. La bonne réponse dit explicitement qu'elle n'a pas cette information, plutôt que d'inventer une politique plausible."
+  },
+  {
+    "id": "q15",
+    "category": "unanswerable",
+    "question": "Quel est le salaire moyen d'un développeur chez Nordia Systems ?",
+    "expected_source_documents": [],
+    "expected_answer_contains": [],
+    "notes": "Sujet absent du corpus (aucun document ne parle de grille de salaires)."
+  },
+  {
+    "id": "q16",
+    "category": "unanswerable_distractor",
+    "question": "Est-ce que je peux faire mon télétravail depuis l'étranger ?",
+    "expected_source_documents": ["teletravail.md"],
+    "expected_answer_contains": [],
+    "notes": "Piège : le document le plus pertinent (teletravail.md) sera probablement retrouvé car il parle bien de télétravail, mais il ne traite jamais du cas 'depuis l'étranger'. La bonne réponse doit le signaler plutôt que d'extrapoler une règle non écrite à partir d'un document retrouvé mais incomplet sur ce point précis."
+  }
+]
