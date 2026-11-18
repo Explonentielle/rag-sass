@@ -100,13 +100,13 @@ function Hero({ isLoggedIn }: { isLoggedIn: boolean }) {
             Pilote gratuit et sans engagement
           </span>
           <h1 className={styles.heroTitle}>
-            Votre back-office, pris en charge par l&apos;
-            <span className={styles.accent}>IA</span>
+            Vos documents travaillent,
+            <span className={styles.accent}> pas vous</span>
           </h1>
           <p className={styles.heroLede}>
-            Corpus.ai extrait vos factures et contrats, qualifie vos leads et transcrit vos
-            réunions, directement depuis vos documents. Plus qu&apos;un chatbot qui répond aux
-            questions : un assistant qui fait le travail administratif à votre place.
+            Corpus.ai analyse vos contrats, factures et devis, qualifie vos leads avant même le
+            premier appel, et répond à vos questions depuis vos documents internes. Trois outils,
+            un seul corpus de documents.
           </p>
           <div className={styles.heroCtas}>
             <Link
@@ -134,7 +134,7 @@ function Hero({ isLoggedIn }: { isLoggedIn: boolean }) {
 
         <div className={styles.heroVisual} aria-hidden="true">
           <div className={styles.heroChart}>
-            <div className={styles.heroChartTitle}>Retrouver une information dans vos contrats et procédures</div>
+            <div className={styles.heroChartTitle}>Retrouver une information dans vos contrats, factures et procédures</div>
             <div className={styles.heroChartSub}>Temps moyen, à titre d&apos;illustration</div>
             <div className={styles.heroBars}>
               <div className={styles.heroBar}>
@@ -271,10 +271,10 @@ function Features() {
   const groups = [
     {
       icon: FEATURE_ICONS.doc,
-      title: 'Paperasse traitée automatiquement',
+      title: 'Analyseur de documents',
       points: [
-        'Factures, devis, contrats, bons de commande, fiches de paie : les champs clés sont extraits et structurés automatiquement, au fil de vos uploads.',
-        'Vos contrats résumés clause par clause (durée, résiliation, pénalités), interrogeables en langage naturel.',
+        'Factures, devis, contrats, bons de commande, bons de livraison, notes de frais, fiches de paie : les champs clés sont extraits et listés automatiquement, au fil de vos uploads.',
+        'Sur vos contrats : clauses résumées (durée, résiliation, pénalités) et interrogeables en langage naturel, directement depuis le document.',
       ],
     },
     {
@@ -308,7 +308,7 @@ function Features() {
         <div className={styles.featuresHead}>
           <span className={styles.sectionLabel}>Ce que nous proposons</span>
           <h2>Plus qu&apos;un chatbot</h2>
-          <p>Un assistant qui traite votre paperasse et vos leads, pas juste vos questions.</p>
+          <p>Un assistant qui analyse vos documents et qualifie vos leads, pas juste vos questions.</p>
         </div>
         <div className={styles.featureGrid}>
           {groups.map((g, i) => (
@@ -357,18 +357,17 @@ function Catalogue() {
   // industrie (santé, immobilier, vente, conformité...) ira sur une page
   // dédiée plus tard, pas ici.
   const available: CatalogueEntry[] = [
-    { title: 'Digitaliseur de paperasse', body: 'Uploadez vos factures, devis, contrats ou fiches de paie au fil du temps, les champs clés sont extraits automatiquement.', who: 'PME, comptabilité, administratif' },
-    { title: 'Analyseur de contrats', body: "Dépose un contrat, obtiens l'extraction des clauses clés et pose tes questions dessus.", who: 'PME sans juriste interne' },
+    { title: 'Analyseur de documents', body: 'Factures, devis, contrats, bons de commande ou fiches de paie : les champs clés sont extraits automatiquement au fil de vos uploads. Sur un contrat, posez aussi vos questions directement sur le document.', who: 'PME, comptabilité, administratif' },
     { title: 'Agent de qualification', body: 'Engage un visiteur, pose les bonnes questions, score et route le contact vers votre équipe ou votre CRM.', who: 'B2B à cycle de vente long' },
+    { title: 'Chatbot documentaire & support client', body: 'Répond aux questions à partir de vos documents (PDF natifs ou scannés, images) ou de vos FAQ et procédures, sources citées à chaque réponse.', who: 'Sites publics, SaaS, équipes support' },
     { title: 'Transcription de réunions', body: 'Enregistrez une réunion depuis le dashboard, elle est transcrite et indexée automatiquement : posez vos questions dessus ensuite.', who: 'Équipes, assistant interne' },
-    { title: 'Chatbot documentaire', body: 'Répond aux questions à partir de vos documents (PDF natifs ou scannés, images), sources citées à chaque réponse.', who: 'Tout le monde' },
-    { title: 'Second cerveau', body: 'Déposez vos notes et supports, retrouvez-les en langage naturel, pour vous seul.', who: 'Indépendants, coachs, consultants' },
+    { title: 'Assistant interne / second cerveau', body: 'Déposez vos notes, procédures ou documents internes au fil du temps, retrouvez-les en langage naturel : pour vous seul ou pour toute votre équipe.', who: 'Indépendants, consultants, équipes' },
     { title: 'Assistant sans documents', body: 'Le savoir tient dans quelques consignes : zéro upload, zéro indexation, en ligne en minutes.', who: 'Indépendants, artisans' },
-    { title: 'Support client', body: 'Réponses immédiates à partir de vos FAQ, procédures et guides, sourcées comme le reste.', who: 'Infopreneurs, SaaS, équipes support' },
     { title: 'Indexation assistée par IA', body: 'Déposez un document brut, sans rien préparer : une IA nettoie et structure le contenu avant indexation.', who: 'Tout document mal formaté' },
   ];
 
   const roadmap: CatalogueEntry[] = [
+    { title: 'Export CSV et chat sur tous les documents', body: "Exporter les champs extraits en CSV, et poser des questions en chat sur n'importe quel type de document, pas seulement les contrats.", who: 'Comptabilité, gestion' },
     { title: 'Brouillon de réponse email', body: 'Rédige une réponse client à partir de la base de connaissance, à valider avant envoi.', who: 'Support à fort volume' },
     { title: 'Standard IA téléphone / WhatsApp', body: 'Le même assistant, sur un canal vocal ou messagerie.', who: 'Commerces de proximité' },
     { title: 'Veille & synthèse', body: 'Surveille un corpus interne ou externe, pousse un résumé périodique des nouveautés.', who: 'Veille concurrentielle, R&D' },
@@ -381,7 +380,7 @@ function Catalogue() {
           <span className={styles.sectionLabel}>Catalogue</span>
           <h2>Ce que Corpus.ai peut faire pour votre activité</h2>
           <p className={styles.dek}>
-            De la paperasse traitée automatiquement au second cerveau personnel, certains cas
+            De l&apos;analyse de documents automatisée au second cerveau personnel, certains cas
             d&apos;usage tournent déjà, d&apos;autres sont notre feuille de route.
           </p>
         </div>
@@ -458,8 +457,7 @@ function Pricing({ isLoggedIn }: { isLoggedIn: boolean }) {
         'Assistants illimités',
         'Formats étendus : CSV, Excel, multi-documents',
         "Membres d'équipe multiples",
-        'Analyseur de contrats (IA)',
-        'Digitaliseur de paperasse (IA)',
+        'Analyseur de documents (IA)',
         'Transcription de réunions (IA)',
       ],
       cta: 'Commencer gratuitement',
@@ -676,7 +674,7 @@ function Footer() {
               <LogoMark />
               Corpus.ai
             </span>
-            <p>L&apos;IA qui traite votre paperasse, qualifie vos leads et répond à vos questions, depuis vos documents.</p>
+            <p>L&apos;IA qui analyse vos documents, qualifie vos leads et répond à vos questions, depuis votre corpus.</p>
           </div>
           <div className={styles.footerCol}>
             <span className={styles.footerColTitle}>Navigation</span>

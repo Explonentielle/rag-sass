@@ -3409,3 +3409,44 @@ notation refactorée pour dépendre de ce que fournit chaque question
 (`expected_source_documents`/`expected_answer_contains` non vides) plutôt
 que du nom de sa catégorie, pour que de nouvelles catégories n'aient rien
 à changer côté script.
+
+---
+
+### 69. Refonte de la landing : positionnement, offre et catalogue (2026-11-18)
+
+**Besoin** : le wording de la landing ne convainquait plus (retour direct),
+et deux entrées séparées ("Digitaliseur de paperasse" et "Analyseur de
+contrats") donnaient l'impression de deux outils redondants plutôt qu'un
+seul, alors qu'ils partagent la même logique (extraction de champs depuis
+un document).
+
+**Fait (landing uniquement, `app/page.tsx` + `app/layout.tsx`)** :
+- Nouveau positionnement : "Vos documents travaillent, pas vous" (hero),
+  structuré explicitement autour de trois piliers (analyse de documents,
+  qualification de leads, réponses sourcées) plutôt qu'un slogan
+  "back-office IA" trop vague.
+- Les deux entrées sont fusionnées sous un seul nom, **"Analyseur de
+  documents"**, dans la section Fonctionnalités, le Catalogue et les
+  Tarifs (plan PME). Le texte reste honnête sur la portée réelle :
+  l'extraction de champs est décrite pour tous les types de documents
+  (factures, devis, contrats, bons de commande/livraison, notes de frais,
+  fiches de paie), mais le chat question/réponse n'est mentionné que pour
+  les contrats, seul cas où il existe vraiment aujourd'hui.
+- Catalogue réduit de 9 à 7 entrées "Disponible aujourd'hui" : en plus de
+  la fusion ci-dessus, "Chatbot documentaire" et "Support client"
+  fusionnés (même capacité, deux personas), "Second cerveau" renommé
+  "Assistant interne / second cerveau" pour couvrir aussi la
+  digitalisation libre de documents internes (pas de différence réelle
+  entre les deux côté produit).
+- Nouvelle entrée en feuille de route : "Export CSV et chat sur tous les
+  documents" — rend explicite, au lieu de le sous-entendre, que l'export
+  CSV et le chat sur les documents non-contractuels (factures, devis...)
+  ne sont pas encore construits.
+
+**Explicitement pas fait (chantier séparé, plus lourd)** : la fusion
+réelle, côté produit, des `use_case` `paperwork_digitizer` et
+`contract_analyzer` (pages dashboard, formulaire de création, pipeline
+d'extraction) reste à faire. Le nom public "Analyseur de documents"
+désigne aujourd'hui deux outils distincts en interne ; les unifier pour
+de vrai demande : ajouter l'export CSV, ajouter le chat sur les documents
+du digitaliseur, puis fusionner les deux `use_case`/UI en un seul.

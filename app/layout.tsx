@@ -27,9 +27,9 @@ const label = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
-  title: 'Corpus.ai : votre back-office, pris en charge par l\'IA',
+  title: 'Corpus.ai : vos documents travaillent, pas vous',
   description:
-    "Corpus.ai extrait vos factures et contrats, qualifie vos leads et répond à vos questions, directement depuis vos documents. Plus qu'un chatbot : un assistant qui agit pour votre PME.",
+    "Corpus.ai analyse vos contrats, factures et devis, qualifie vos leads avant le premier appel, et répond à vos questions depuis vos documents internes. Trois outils, un seul corpus de documents.",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
