@@ -18,6 +18,20 @@ function CheckIcon() {
   );
 }
 
+// Deux rectangles arrondis décalés (motif "documents empilés"), plutôt
+// qu'une simple lettre "C" : évoque la paperasse traitée par le produit,
+// cohérent avec le repositionnement "back-office IA" de la landing.
+function LogoMark() {
+  return (
+    <span className={styles.mark}>
+      <svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true">
+        <rect x="9" y="3" width="12" height="12" rx="3" fill="var(--brass)" opacity="0.6" />
+        <rect x="3" y="9" width="12" height="12" rx="3" fill="currentColor" />
+      </svg>
+    </span>
+  );
+}
+
 export default async function LandingPage() {
   const supabase = createClient();
   const {
@@ -46,7 +60,7 @@ function Nav({ isLoggedIn }: { isLoggedIn: boolean }) {
     <header className={styles.nav}>
       <div className={`${styles.wrap} ${styles.navInner}`}>
         <Link href="/" className={styles.logo}>
-          <span className={styles.mark}>C</span>
+          <LogoMark />
           Corpus.ai
         </Link>
         <nav className={styles.navLinks}>
@@ -86,13 +100,13 @@ function Hero({ isLoggedIn }: { isLoggedIn: boolean }) {
             Pilote gratuit et sans engagement
           </span>
           <h1 className={styles.heroTitle}>
-            De vos documents à un assistant qui{' '}
-            <span className={styles.accent}>répond</span>
+            Votre back-office, pris en charge par l&apos;
+            <span className={styles.accent}>IA</span>
           </h1>
           <p className={styles.heroLede}>
-            Corpus.ai transforme vos documents, notes et procédures en un assistant qui vous
-            répond instantanément, seul ou en équipe, pour vous ou pour vos clients. Un forfait
-            simple, aucun jargon technique, sources citées à chaque réponse.
+            Corpus.ai extrait vos factures et contrats, qualifie vos leads et transcrit vos
+            réunions, directement depuis vos documents. Plus qu&apos;un chatbot qui répond aux
+            questions : un assistant qui fait le travail administratif à votre place.
           </p>
           <div className={styles.heroCtas}>
             <Link
@@ -120,7 +134,7 @@ function Hero({ isLoggedIn }: { isLoggedIn: boolean }) {
 
         <div className={styles.heroVisual} aria-hidden="true">
           <div className={styles.heroChart}>
-            <div className={styles.heroChartTitle}>Trouver une information dans vos documents</div>
+            <div className={styles.heroChartTitle}>Retrouver une information dans vos contrats et procédures</div>
             <div className={styles.heroChartSub}>Temps moyen, à titre d&apos;illustration</div>
             <div className={styles.heroBars}>
               <div className={styles.heroBar}>
@@ -197,8 +211,8 @@ function HowItWorks() {
     },
     {
       k: '03',
-      title: 'Votre équipe ou vos clients posent leurs questions',
-      body: 'En interne ou via le widget public sur votre site, avec des réponses instantanées et sourcées, strictement fondées sur vos documents.',
+      title: 'Vos documents travaillent pour vous',
+      body: 'Réponses sourcées à vos questions, factures et contrats extraits automatiquement, leads qualifiés et routés : en interne ou via le widget public sur votre site.',
     },
   ];
   return (
@@ -256,35 +270,35 @@ const FEATURE_ICONS = {
 function Features() {
   const groups = [
     {
+      icon: FEATURE_ICONS.doc,
+      title: 'Paperasse traitée automatiquement',
+      points: [
+        'Factures, devis, contrats, bons de commande, fiches de paie : les champs clés sont extraits et structurés automatiquement, au fil de vos uploads.',
+        'Vos contrats résumés clause par clause (durée, résiliation, pénalités), interrogeables en langage naturel.',
+      ],
+    },
+    {
       icon: FEATURE_ICONS.check,
-      title: 'Réponses fiables',
+      title: 'Leads qualifiés, pas juste des conversations',
+      points: [
+        'Le chatbot pose les bonnes questions à vos visiteurs, note le lead et prévient votre équipe automatiquement.',
+        "Lead chaud : partage direct d'un lien de rendez-vous, ou notification vers votre CRM par webhook.",
+      ],
+    },
+    {
+      icon: FEATURE_ICONS.search,
+      title: 'Réponses fiables, toujours sourcées',
       points: [
         'Chaque réponse cite les documents utilisés, vérifiable en un clic.',
         "Si l'information ne figure pas dans vos documents, l'assistant le signale au lieu de deviner.",
       ],
     },
     {
-      icon: FEATURE_ICONS.search,
-      title: 'Recherche puissante',
-      points: [
-        'Recherche hybride : mots-clés et sens combinés, pour ne rien manquer.',
-        'Répond dans la langue du visiteur, à partir de la même base documentaire.',
-      ],
-    },
-    {
       icon: FEATURE_ICONS.shield,
-      title: 'Données isolées',
+      title: 'Données isolées et sécurisées',
       points: [
         'Chaque organisation est cloisonnée au niveau base de données (Row Level Security).',
         "Domaines d'intégration restreints : vous choisissez où le widget peut tourner.",
-      ],
-    },
-    {
-      icon: FEATURE_ICONS.doc,
-      title: "Prêt à l'emploi",
-      points: [
-        'Templates par secteur : vente, support, immobilier, santé, ou gardez vos propres notes pour vous seul.',
-        'Widget intégrable sur votre site en quelques minutes.',
       ],
     },
   ];
@@ -293,8 +307,8 @@ function Features() {
       <div className={styles.wrap}>
         <div className={styles.featuresHead}>
           <span className={styles.sectionLabel}>Ce que nous proposons</span>
-          <h2>Nos fonctionnalités</h2>
-          <p>Pour des réponses fiables, rapides et en sécurité.</p>
+          <h2>Plus qu&apos;un chatbot</h2>
+          <p>Un assistant qui traite votre paperasse et vos leads, pas juste vos questions.</p>
         </div>
         <div className={styles.featureGrid}>
           {groups.map((g, i) => (
@@ -343,15 +357,15 @@ function Catalogue() {
   // industrie (santé, immobilier, vente, conformité...) ira sur une page
   // dédiée plus tard, pas ici.
   const available: CatalogueEntry[] = [
+    { title: 'Digitaliseur de paperasse', body: 'Uploadez vos factures, devis, contrats ou fiches de paie au fil du temps, les champs clés sont extraits automatiquement.', who: 'PME, comptabilité, administratif' },
+    { title: 'Analyseur de contrats', body: "Dépose un contrat, obtiens l'extraction des clauses clés et pose tes questions dessus.", who: 'PME sans juriste interne' },
+    { title: 'Agent de qualification', body: 'Engage un visiteur, pose les bonnes questions, score et route le contact vers votre équipe ou votre CRM.', who: 'B2B à cycle de vente long' },
+    { title: 'Transcription de réunions', body: 'Enregistrez une réunion depuis le dashboard, elle est transcrite et indexée automatiquement : posez vos questions dessus ensuite.', who: 'Équipes, assistant interne' },
     { title: 'Chatbot documentaire', body: 'Répond aux questions à partir de vos documents (PDF natifs ou scannés, images), sources citées à chaque réponse.', who: 'Tout le monde' },
     { title: 'Second cerveau', body: 'Déposez vos notes et supports, retrouvez-les en langage naturel, pour vous seul.', who: 'Indépendants, coachs, consultants' },
     { title: 'Assistant sans documents', body: 'Le savoir tient dans quelques consignes : zéro upload, zéro indexation, en ligne en minutes.', who: 'Indépendants, artisans' },
     { title: 'Support client', body: 'Réponses immédiates à partir de vos FAQ, procédures et guides, sourcées comme le reste.', who: 'Infopreneurs, SaaS, équipes support' },
     { title: 'Indexation assistée par IA', body: 'Déposez un document brut, sans rien préparer : une IA nettoie et structure le contenu avant indexation.', who: 'Tout document mal formaté' },
-    { title: 'Agent de qualification', body: 'Engage un visiteur, pose les bonnes questions, score et route le contact.', who: 'B2B à cycle de vente long' },
-    { title: 'Analyseur de contrats', body: "Dépose un contrat, obtiens l'extraction des clauses clés et pose tes questions dessus.", who: 'PME sans juriste interne' },
-    { title: 'Digitaliseur de paperasse', body: 'Uploadez vos factures ou documents administratifs au fil du temps, les champs clés sont extraits automatiquement.', who: 'PME, comptabilité, administratif' },
-    { title: 'Transcription de réunions', body: 'Enregistrez une réunion depuis le dashboard, elle est transcrite et indexée automatiquement : posez vos questions dessus ensuite.', who: 'Équipes, assistant interne' },
   ];
 
   const roadmap: CatalogueEntry[] = [
@@ -367,7 +381,7 @@ function Catalogue() {
           <span className={styles.sectionLabel}>Catalogue</span>
           <h2>Ce que Corpus.ai peut faire pour votre activité</h2>
           <p className={styles.dek}>
-            Du second cerveau personnel à l&apos;assistant partagé en équipe, certains cas
+            De la paperasse traitée automatiquement au second cerveau personnel, certains cas
             d&apos;usage tournent déjà, d&apos;autres sont notre feuille de route.
           </p>
         </div>
@@ -510,12 +524,12 @@ function Pricing({ isLoggedIn }: { isLoggedIn: boolean }) {
 }
 
 function Testimonials() {
-  // TEMPORARY: entries below are invented placeholders (fake names/quotes),
-  // added only to visualize the section with several cards while the
-  // product isn't commercialized yet (no domain, pas de vrais clients
-  // pilotes pour l'instant). Willy's entry is the one real person so far
-  // (quote still pending his own wording). Replace the placeholders with
-  // real testimonials before any public launch.
+  // Les trois personnes sont réelles (Willy Duong, Laurent Martin, Véronique),
+  // ont réellement utilisé le produit, et les citations sont des retours
+  // oraux reformulés par le fondateur, pas des placeholders inventés de
+  // toutes pièces. Willy est le seul dont la citation reste encore à
+  // valider avec lui avant publication ; Laurent et Véronique ont déjà
+  // donné leur retour sous cette forme.
   const quotes = [
     {
       quote:
@@ -659,10 +673,10 @@ function Footer() {
         <div className={styles.footerGrid}>
           <div className={styles.footerBrand}>
             <span className={styles.logo}>
-              <span className={styles.mark}>C</span>
+              <LogoMark />
               Corpus.ai
             </span>
-            <p>Transformez vos documents et process en un assistant IA qui répond.</p>
+            <p>L&apos;IA qui traite votre paperasse, qualifie vos leads et répond à vos questions, depuis vos documents.</p>
           </div>
           <div className={styles.footerCol}>
             <span className={styles.footerColTitle}>Navigation</span>

@@ -27,9 +27,9 @@ const label = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
-  title: 'Corpus.ai : de vos documents à un assistant qui répond',
+  title: 'Corpus.ai : votre back-office, pris en charge par l\'IA',
   description:
-    "Corpus.ai transforme vos documents et notes en un assistant qui répond instantanément, seul ou en équipe. Un forfait simple, sources citées à chaque réponse.",
+    "Corpus.ai extrait vos factures et contrats, qualifie vos leads et répond à vos questions, directement depuis vos documents. Plus qu'un chatbot : un assistant qui agit pour votre PME.",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
