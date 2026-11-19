@@ -8,7 +8,7 @@ import FloatingChatWidget from '@/components/FloatingChatWidget';
 // just inherits these CSS variables like everything else.
 const display = Newsreader({
   subsets: ['latin'],
-  weight: ['400', '500', '600'],
+  weight: ['400', '500', '600', '700'],
   style: ['normal', 'italic'],
   variable: '--font-display',
   display: 'swap',

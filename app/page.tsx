@@ -93,6 +93,13 @@ function Nav({ isLoggedIn }: { isLoggedIn: boolean }) {
 function Hero({ isLoggedIn }: { isLoggedIn: boolean }) {
   return (
     <header className={styles.hero}>
+      <svg
+        className={`${styles.watermark} ${styles.heroWatermark}`}
+        viewBox="0 0 24 24"
+        aria-hidden="true"
+      >
+        <path d="M7 2 H15 L20 7 V19 Q20 22 17 22 H7 Q4 22 4 19 V5 Q4 2 7 2 Z" fill="currentColor" />
+      </svg>
       <div className={`${styles.wrap} ${styles.heroGrid}`}>
         <div>
           <span className={styles.heroBadge}>
@@ -119,17 +126,6 @@ function Hero({ isLoggedIn }: { isLoggedIn: boolean }) {
               Voir comment ça marche
             </a>
           </div>
-          <ul className={styles.heroChecks}>
-            <li>
-              <CheckIcon /> 100% gratuit pour démarrer
-            </li>
-            <li>
-              <CheckIcon /> Sans engagement
-            </li>
-            <li>
-              <CheckIcon /> En ligne en quelques minutes
-            </li>
-          </ul>
         </div>
 
         <div className={styles.heroVisual} aria-hidden="true">
@@ -631,20 +627,29 @@ function FinalCta({ isLoggedIn }: { isLoggedIn: boolean }) {
   return (
     <section className={styles.closing}>
       <div className={styles.closingInner}>
-        <h3>
-          Prêt à essayer Corpus.ai sur <span className={styles.accent}>vos documents</span> ?
-        </h3>
-        <p>Pilote gratuit, sans engagement, pour les premières entreprises.</p>
-        <div className={styles.closingCtas}>
-          <Link
-            href={isLoggedIn ? '/dashboard' : '/signup'}
-            className={`${styles.btn} ${styles.btnPrimary}`}
-          >
-            {isLoggedIn ? 'Aller au dashboard' : 'Commencer gratuitement'}
-          </Link>
-          <a href="#tarifs" className={`${styles.btn} ${styles.btnOutlineLight}`}>
-            Voir les tarifs
-          </a>
+        <svg
+          className={`${styles.watermark} ${styles.closingWatermark}`}
+          viewBox="0 0 24 24"
+          aria-hidden="true"
+        >
+          <path d="M7 2 H15 L20 7 V19 Q20 22 17 22 H7 Q4 22 4 19 V5 Q4 2 7 2 Z" fill="currentColor" />
+        </svg>
+        <div className={styles.closingContent}>
+          <h3>
+            Prêt à essayer Corpus.ai sur <span className={styles.accent}>vos documents</span> ?
+          </h3>
+          <p>Pilote gratuit, sans engagement, pour les premières entreprises.</p>
+          <div className={styles.closingCtas}>
+            <Link
+              href={isLoggedIn ? '/dashboard' : '/signup'}
+              className={`${styles.btn} ${styles.btnPrimary}`}
+            >
+              {isLoggedIn ? 'Aller au dashboard' : 'Commencer gratuitement'}
+            </Link>
+            <a href="#tarifs" className={`${styles.btn} ${styles.btnOutlineLight}`}>
+              Voir les tarifs
+            </a>
+          </div>
         </div>
       </div>
     </section>
