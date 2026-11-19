@@ -18,15 +18,15 @@ function CheckIcon() {
   );
 }
 
-// Deux rectangles arrondis décalés (motif "documents empilés"), plutôt
-// qu'une simple lettre "C" : évoque la paperasse traitée par le produit,
-// cohérent avec le repositionnement "back-office IA" de la landing.
+// Document à coin plié ("dog-ear") plutôt que deux rectangles abstraits :
+// un repère visuel directement lisible comme "document", cohérent avec
+// "Corpus" (un ensemble de documents) et avec l'Analyseur de documents.
 function LogoMark() {
   return (
     <span className={styles.mark}>
       <svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true">
-        <rect x="9" y="3" width="12" height="12" rx="3" fill="var(--brass)" opacity="0.6" />
-        <rect x="3" y="9" width="12" height="12" rx="3" fill="currentColor" />
+        <path d="M7 2 H15 L20 7 V19 Q20 22 17 22 H7 Q4 22 4 19 V5 Q4 2 7 2 Z" fill="currentColor" />
+        <path d="M15 2 L20 7 H15 Z" fill="var(--brass)" />
       </svg>
     </span>
   );
@@ -134,29 +134,16 @@ function Hero({ isLoggedIn }: { isLoggedIn: boolean }) {
 
         <div className={styles.heroVisual} aria-hidden="true">
           <div className={styles.heroChart}>
-            <div className={styles.heroChartTitle}>Retrouver une information dans vos contrats, factures et procédures</div>
-            <div className={styles.heroChartSub}>Temps moyen, à titre d&apos;illustration</div>
-            <div className={styles.heroBars}>
-              <div className={styles.heroBar}>
-                <div className={styles.heroBarTrack}>
-                  <div
-                    className={`${styles.heroBarFill} ${styles.heroBarFillBefore}`}
-                    style={{ height: '88%' }}
-                  />
-                </div>
-                <strong>~8 min</strong>
-                <span>Sans assistant</span>
-              </div>
-              <div className={styles.heroBar}>
-                <div className={styles.heroBarTrack}>
-                  <div
-                    className={`${styles.heroBarFill} ${styles.heroBarFillAfter}`}
-                    style={{ height: '12%' }}
-                  />
-                </div>
-                <strong>~10 sec</strong>
-                <span>Avec Corpus.ai</span>
-              </div>
+            <div className={styles.heroChatHead}>
+              <span className={styles.heroChatDot} />
+              Corpus.ai · Assistant
+            </div>
+            <div className={styles.heroChatBubbleUser}>
+              Quelle est la durée de préavis sur le contrat Dupont ?
+            </div>
+            <div className={styles.heroChatBubbleBot}>
+              <span>3 mois, résiliable à la date anniversaire du contrat.</span>
+              <span className={styles.heroChatCite}>contrat-dupont.pdf · clause 4.2</span>
             </div>
           </div>
           <div className={styles.heroChartBadge}>
