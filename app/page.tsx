@@ -122,7 +122,7 @@ function Hero({ isLoggedIn }: { isLoggedIn: boolean }) {
             >
               {isLoggedIn ? 'Aller au dashboard' : 'Commencer gratuitement'}
             </Link>
-            <a href="#comment-ca-marche" className={`${styles.btn} ${styles.btnOutlineLight}`}>
+            <a href="#comment-ca-marche" className={`${styles.btn} ${styles.btnGhost}`}>
               Voir comment ça marche
             </a>
           </div>
@@ -646,7 +646,7 @@ function FinalCta({ isLoggedIn }: { isLoggedIn: boolean }) {
             >
               {isLoggedIn ? 'Aller au dashboard' : 'Commencer gratuitement'}
             </Link>
-            <a href="#tarifs" className={`${styles.btn} ${styles.btnOutlineLight}`}>
+            <a href="#tarifs" className={`${styles.btn} ${styles.btnGhost}`}>
               Voir les tarifs
             </a>
           </div>

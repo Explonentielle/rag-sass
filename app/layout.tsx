@@ -3,7 +3,7 @@ import { Newsreader, Work_Sans, JetBrains_Mono } from 'next/font/google';
 import './globals.css';
 import FloatingChatWidget from '@/components/FloatingChatWidget';
 
-// Forest/brass identity from the landing redesign, loaded once here instead
+// Kraft/stamp identity from the landing redesign, loaded once here instead
 // of per-page — app/page.tsx no longer needs its own font instances, it
 // just inherits these CSS variables like everything else.
 const display = Newsreader({
