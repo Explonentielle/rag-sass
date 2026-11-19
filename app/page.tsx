@@ -41,6 +41,12 @@ export default async function LandingPage() {
   return (
     <div className={styles.page}>
       <Nav isLoggedIn={!!user} />
+      <span className={`${styles.marginRail} ${styles.marginRailLeft}`} aria-hidden="true">
+        Corpus.ai · Dossier N° 001 · Corpus.ai · Dossier N° 001
+      </span>
+      <span className={`${styles.marginRail} ${styles.marginRailRight}`} aria-hidden="true">
+        Pilote gratuit · sans engagement · Pilote gratuit · sans engagement
+      </span>
       <Hero isLoggedIn={!!user} />
       <TrustBar />
       <HowItWorks />
@@ -58,32 +64,34 @@ export default async function LandingPage() {
 function Nav({ isLoggedIn }: { isLoggedIn: boolean }) {
   return (
     <header className={styles.nav}>
-      <div className={`${styles.wrap} ${styles.navInner}`}>
-        <Link href="/" className={styles.logo}>
+      <div className={`${styles.wrap} ${styles.navBar}`}>
+        <Link href="/" className={`${styles.logo} ${styles.navTab}`}>
           <LogoMark />
           Corpus.ai
         </Link>
-        <nav className={styles.navLinks}>
-          <a href="#comment-ca-marche">Comment ça marche</a>
-          <a href="#fonctionnalites">Fonctionnalités</a>
-          <a href="#catalogue">Catalogue</a>
-          <a href="#tarifs">Tarifs</a>
-        </nav>
-        <div className={styles.navActions}>
-          {isLoggedIn ? (
-            <Link href="/dashboard" className={`${styles.btn} ${styles.btnSm} ${styles.btnPrimary}`}>
-              Aller au dashboard
-            </Link>
-          ) : (
-            <>
-              <Link href="/login" className={styles.navLogin}>
-                Connexion
+        <div className={styles.navRight}>
+          <nav className={styles.navLinks}>
+            <a href="#comment-ca-marche">Comment ça marche</a>
+            <a href="#fonctionnalites">Fonctionnalités</a>
+            <a href="#catalogue">Catalogue</a>
+            <a href="#tarifs">Tarifs</a>
+          </nav>
+          <div className={styles.navActions}>
+            {isLoggedIn ? (
+              <Link href="/dashboard" className={`${styles.btn} ${styles.btnSm} ${styles.btnPrimary}`}>
+                Aller au dashboard
               </Link>
-              <Link href="/signup" className={`${styles.btn} ${styles.btnSm} ${styles.btnPrimary}`}>
-                Essayer gratuitement
-              </Link>
-            </>
-          )}
+            ) : (
+              <>
+                <Link href="/login" className={styles.navLogin}>
+                  Connexion
+                </Link>
+                <Link href="/signup" className={`${styles.btn} ${styles.btnSm} ${styles.btnPrimary}`}>
+                  Essayer gratuitement
+                </Link>
+              </>
+            )}
+          </div>
         </div>
       </div>
     </header>
@@ -100,55 +108,44 @@ function Hero({ isLoggedIn }: { isLoggedIn: boolean }) {
       >
         <path d="M7 2 H15 L20 7 V19 Q20 22 17 22 H7 Q4 22 4 19 V5 Q4 2 7 2 Z" fill="currentColor" />
       </svg>
-      <div className={`${styles.wrap} ${styles.heroGrid}`}>
-        <div>
-          <span className={styles.heroBadge}>
-            <CheckIcon />
-            Pilote gratuit et sans engagement
-          </span>
-          <h1 className={styles.heroTitle}>
-            Vos documents travaillent,
-            <span className={styles.accent}> pas vous</span>
-          </h1>
-          <p className={styles.heroLede}>
-            Corpus.ai analyse vos contrats, factures et devis, qualifie vos leads avant même le
-            premier appel, et répond à vos questions depuis vos documents internes. Trois outils,
-            un seul corpus de documents.
-          </p>
-          <div className={styles.heroCtas}>
-            <Link
-              href={isLoggedIn ? '/dashboard' : '/signup'}
-              className={`${styles.btn} ${styles.btnPrimary}`}
-            >
-              {isLoggedIn ? 'Aller au dashboard' : 'Commencer gratuitement'}
-            </Link>
-            <a href="#comment-ca-marche" className={`${styles.btn} ${styles.btnGhost}`}>
-              Voir comment ça marche
-            </a>
-          </div>
+      <div className={styles.wrap}>
+        <span className={styles.stampBadge}>
+          <CheckIcon />
+          Pilote gratuit et sans engagement
+        </span>
+        <h1 className={styles.heroTitle}>
+          Vos documents travaillent,
+          <br />
+          <span className={styles.accent}>pas vous</span>
+        </h1>
+        <p className={styles.heroLede}>
+          Corpus.ai analyse vos contrats, factures et devis, qualifie vos leads avant même le
+          premier appel, et répond à vos questions depuis vos documents internes. Trois outils,
+          un seul corpus de documents.
+        </p>
+        <div className={styles.heroCtas}>
+          <Link
+            href={isLoggedIn ? '/dashboard' : '/signup'}
+            className={`${styles.btn} ${styles.btnPrimary}`}
+          >
+            {isLoggedIn ? 'Aller au dashboard' : 'Commencer gratuitement'}
+          </Link>
+          <a href="#comment-ca-marche" className={`${styles.btn} ${styles.btnGhost}`}>
+            Voir comment ça marche
+          </a>
         </div>
 
-        <div className={styles.heroVisual} aria-hidden="true">
-          <div className={styles.heroChart}>
-            <div className={styles.heroChatHead}>
-              <span className={styles.heroChatDot} />
-              Corpus.ai · Assistant
-            </div>
+        <div className={styles.caseFile}>
+          <div className={styles.paperclip} aria-hidden="true" />
+          <div className={styles.fileCard}>
+            <span className={styles.ribbon}>Sourcé</span>
+            <div className={styles.fileCardLabel}>Dossier · contrat-dupont.pdf</div>
             <div className={styles.heroChatBubbleUser}>
               Quelle est la durée de préavis sur le contrat Dupont ?
             </div>
             <div className={styles.heroChatBubbleBot}>
               <span>3 mois, résiliable à la date anniversaire du contrat.</span>
               <span className={styles.heroChatCite}>contrat-dupont.pdf · clause 4.2</span>
-            </div>
-          </div>
-          <div className={styles.heroChartBadge}>
-            <span className={styles.ico}>
-              <CheckIcon />
-            </span>
-            <div>
-              <strong>Réponse immédiate</strong>
-              <span>Sourcée, en quelques secondes</span>
             </div>
           </div>
         </div>
@@ -209,8 +206,10 @@ function HowItWorks() {
           {steps.map((s) => (
             <div key={s.k} className={styles.step}>
               <div className={styles.stepK}>{s.k}</div>
-              <h4>{s.title}</h4>
-              <p>{s.body}</p>
+              <div className={styles.stepBody}>
+                <h4>{s.title}</h4>
+                <p>{s.body}</p>
+              </div>
             </div>
           ))}
         </div>
@@ -219,41 +218,9 @@ function HowItWorks() {
   );
 }
 
-const FEATURE_ICONS = {
-  check: (
-    <path
-      fillRule="evenodd"
-      d="M16.704 4.153a.75.75 0 01.143 1.052l-8 10.5a.75.75 0 01-1.127.075l-4.5-4.5a.75.75 0 011.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 011.05-.143z"
-      clipRule="evenodd"
-    />
-  ),
-  search: (
-    <path
-      fillRule="evenodd"
-      d="M9 3.5a5.5 5.5 0 100 11 5.5 5.5 0 000-11zM2 9a7 7 0 1112.452 4.391l3.328 3.329a.75.75 0 11-1.06 1.06l-3.329-3.328A7 7 0 012 9z"
-      clipRule="evenodd"
-    />
-  ),
-  shield: (
-    <path
-      fillRule="evenodd"
-      d="M10 1.75a.75.75 0 01.37.097l6.25 3.5a.75.75 0 01.38.653v4.5c0 4.21-2.72 7.627-6.657 9.253a.75.75 0 01-.586 0C5.82 18.127 3.1 14.71 3.1 10.5V6a.75.75 0 01.38-.653l6.25-3.5A.75.75 0 0110 1.75z"
-      clipRule="evenodd"
-    />
-  ),
-  doc: (
-    <path
-      fillRule="evenodd"
-      d="M5.5 2A1.5 1.5 0 004 3.5v13A1.5 1.5 0 005.5 18h9a1.5 1.5 0 001.5-1.5V7.621a1.5 1.5 0 00-.44-1.06l-4.12-4.122A1.5 1.5 0 0010.378 2H5.5zm4.75 1.5V6a1 1 0 001 1h2.5l-3.5-3.5z"
-      clipRule="evenodd"
-    />
-  ),
-};
-
 function Features() {
   const groups = [
     {
-      icon: FEATURE_ICONS.doc,
       title: 'Analyseur de documents',
       points: [
         'Factures, devis, contrats, bons de commande, bons de livraison, notes de frais, fiches de paie : les champs clés sont extraits et listés automatiquement, au fil de vos uploads.',
@@ -261,7 +228,6 @@ function Features() {
       ],
     },
     {
-      icon: FEATURE_ICONS.check,
       title: 'Leads qualifiés, pas juste des conversations',
       points: [
         'Le chatbot pose les bonnes questions à vos visiteurs, note le lead et prévient votre équipe automatiquement.',
@@ -269,19 +235,10 @@ function Features() {
       ],
     },
     {
-      icon: FEATURE_ICONS.search,
       title: 'Réponses fiables, toujours sourcées',
       points: [
         'Chaque réponse cite les documents utilisés, vérifiable en un clic.',
         "Si l'information ne figure pas dans vos documents, l'assistant le signale au lieu de deviner.",
-      ],
-    },
-    {
-      icon: FEATURE_ICONS.shield,
-      title: 'Données isolées et sécurisées',
-      points: [
-        'Chaque organisation est cloisonnée au niveau base de données (Row Level Security).',
-        "Domaines d'intégration restreints : vous choisissez où le widget peut tourner.",
       ],
     },
   ];
@@ -294,23 +251,16 @@ function Features() {
           <p>Un assistant qui analyse vos documents et qualifie vos leads, pas juste vos questions.</p>
         </div>
         <div className={styles.featureGrid}>
-          {groups.map((g, i) => (
-            <div key={g.title} className={styles.featureCard}>
-              <span className={styles.featureNum}>{String(i + 1).padStart(2, '0')}</span>
-              <span className={styles.featureIcon}>
-                <svg viewBox="0 0 20 20" fill="currentColor">
-                  {g.icon}
-                </svg>
-              </span>
-              <h4>{g.title}</h4>
-              <ul className={styles.featurePoints}>
-                {g.points.map((p) => (
-                  <li key={p}>
-                    <CheckIcon />
-                    <span>{p}</span>
-                  </li>
-                ))}
-              </ul>
+          {groups.map((g) => (
+            <div key={g.title} className={styles.folder}>
+              <span className={styles.fTab}>{g.title}</span>
+              <div className={styles.fBody}>
+                <ul className={styles.featurePoints}>
+                  {g.points.map((p) => (
+                    <li key={p}>{p}</li>
+                  ))}
+                </ul>
+              </div>
             </div>
           ))}
         </div>
@@ -368,23 +318,17 @@ function Catalogue() {
           </p>
         </div>
 
-        <div className={styles.registerNote}>
-          <span className={styles.registerKey}>
-            <span className={`${styles.swatch} ${styles.swatchNow}`} /> Disponible aujourd&apos;hui
-          </span>
-          <span className={styles.registerKey}>
-            <span className={`${styles.swatch} ${styles.swatchNext}`} /> Feuille de route (à venir)
-          </span>
-        </div>
-
         <div className={styles.catGroup}>
           <div className={styles.catGroupHead}>Disponible aujourd&apos;hui</div>
-          <div className={styles.catGrid}>
+          <div className={styles.catRows}>
             {available.map((c) => (
-              <div key={c.title} className={styles.catCard}>
-                <h4>{c.title}</h4>
-                <p>{c.body}</p>
-                <span className={styles.catFor}>Pour → {c.who}</span>
+              <div key={c.title} className={styles.catRow}>
+                <span className={styles.catStamp}>Dispo</span>
+                <div>
+                  <strong>{c.title}</strong>
+                  <p>{c.body}</p>
+                  <span className={styles.catFor}>Pour → {c.who}</span>
+                </div>
               </div>
             ))}
           </div>
@@ -392,13 +336,15 @@ function Catalogue() {
 
         <div className={styles.catGroup}>
           <div className={styles.catGroupHead}>Feuille de route</div>
-          <div className={styles.catGrid}>
+          <div className={styles.catRows}>
             {roadmap.map((c) => (
-              <div key={c.title} className={`${styles.catCard} ${styles.catCardRoadmap}`}>
-                <span className={styles.catBadgeSoon}>Bientôt</span>
-                <h4>{c.title}</h4>
-                <p>{c.body}</p>
-                <span className={styles.catFor}>Pour → {c.who}</span>
+              <div key={c.title} className={`${styles.catRow} ${styles.catRowRoadmap}`}>
+                <span className={styles.catStamp}>Bientôt</span>
+                <div>
+                  <strong>{c.title}</strong>
+                  <p>{c.body}</p>
+                  <span className={styles.catFor}>Pour → {c.who}</span>
+                </div>
               </div>
             ))}
           </div>
@@ -635,6 +581,7 @@ function FinalCta({ isLoggedIn }: { isLoggedIn: boolean }) {
           <path d="M7 2 H15 L20 7 V19 Q20 22 17 22 H7 Q4 22 4 19 V5 Q4 2 7 2 Z" fill="currentColor" />
         </svg>
         <div className={styles.closingContent}>
+          <div className={styles.approved}>Approuvé</div>
           <h3>
             Prêt à essayer Corpus.ai sur <span className={styles.accent}>vos documents</span> ?
           </h3>

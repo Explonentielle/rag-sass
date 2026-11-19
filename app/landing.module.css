@@ -4,6 +4,7 @@
    would fight rather than complement. Revisit as a real design pass if
    dark mode becomes a real ask, not by bolting a media query onto this. */
 .page {
+  position: relative;
   color-scheme: light;
   --paper: #F3ECD9;
   --paperDeep: #EBDFC0;
@@ -18,10 +19,12 @@
   --brass: #8B6B3D;
   --brassInk: #60492A;
   --brassSoft: #F0E0B8;
-  --shadow: 0 1px 2px rgba(36,27,18,0.08), 0 14px 32px -16px rgba(36,27,18,0.22);
+  --shadow: 0 2px 4px rgba(36,27,18,0.1), 0 16px 36px -16px rgba(36,27,18,0.28);
   --shadowStamp: 0 10px 24px -10px rgba(168,52,31,0.45);
 
   background: var(--paper);
+  background-image: radial-gradient(var(--brass) 1.3px, transparent 1.3px);
+  background-size: 20px 20px;
   color: var(--ink);
   font-family: var(--font-body), -apple-system, "Segoe UI", sans-serif;
   line-height: 1.6;
@@ -41,19 +44,33 @@
 
 .mono { font-family: var(--font-label), ui-monospace, monospace; }
 
-.wrap { max-width: 1120px; margin: 0 auto; padding: 0 24px; }
+.wrap { max-width: 1240px; margin: 0 auto; padding: 0 24px; }
 
-/* ---------- nav: a thin brass hairline under the border, like a bound
-   ledger's stitched edge, instead of a plain flat line ---------- */
+/* Fixed margin rails — on wide screens, a centered column leaves a lot of
+   bare gutter on each side; a ledger-style ruled margin with a running
+   label fills it on purpose instead of leaving it looking unfinished. */
+.marginRail {
+  display: none; position: fixed; top: 74px; bottom: 0; width: 30px; z-index: 1; pointer-events: none;
+  align-items: center; justify-content: center;
+  writing-mode: vertical-rl; text-orientation: mixed;
+  font-family: var(--font-label), monospace; font-size: 11px; letter-spacing: 0.18em; text-transform: uppercase;
+  color: var(--inkFaint); opacity: 0.5;
+}
+.marginRailLeft { left: 28px; border-right: 1px solid var(--line); }
+.marginRailRight { right: 28px; border-left: 1px solid var(--line); transform: rotate(180deg); }
+@media (min-width: 1480px) { .marginRail { display: flex; } }
+
+/* ---------- nav: the logo sits in a folder tab whose flat bottom edge
+   merges with the bar's border — a single flex row, so nothing can
+   overlap or get clipped. ---------- */
 .nav {
   position: sticky; top: 0; z-index: 20;
-  background: rgba(243,236,217,0.92);
-  backdrop-filter: blur(8px);
-  border-bottom: 1px solid var(--line);
-  box-shadow: 0 1px 0 var(--brassSoft);
+  background: var(--paperDeep);
+  border-bottom: 2px solid var(--ink);
 }
-.navInner { display: flex; align-items: center; justify-content: space-between; height: 68px; }
-.navLinks { display: none; align-items: center; gap: 32px; font-size: 14px; font-weight: 500; color: var(--inkSoft); }
+.navBar { display: flex; align-items: flex-end; justify-content: space-between; }
+.navRight { display: flex; align-items: center; gap: 22px; padding: 14px 0; }
+.navLinks { display: none; align-items: center; gap: 22px; font-size: 13.5px; font-weight: 600; color: var(--inkSoft); }
 @media (min-width: 860px) { .navLinks { display: flex; } }
 .navLinks a:hover { color: var(--stampInk); }
 .navActions { display: flex; align-items: center; gap: 14px; }
@@ -63,15 +80,20 @@
 
 .logo { display: flex; align-items: center; gap: 8px; font-family: var(--font-body), sans-serif; font-weight: 700; font-size: 18px; color: var(--ink); text-decoration: none; }
 .logo .mark { width: 26px; height: 26px; border-radius: 6px; background: var(--stamp); color: var(--paper); display: inline-flex; align-items: center; justify-content: center; font-family: var(--font-label), monospace; font-size: 12px; }
+.navTab {
+  background: var(--card); border: 2px solid var(--ink); border-bottom: none; border-radius: 10px 10px 0 0;
+  padding: 10px 18px; margin-top: 14px; transform: translateY(2px); font-size: 16px;
+}
+.navTab .mark { width: 22px; height: 22px; }
 
 /* ---------- buttons ---------- */
 .btn {
   font-family: var(--font-body), sans-serif;
   font-size: 14.5px;
-  font-weight: 600;
+  font-weight: 700;
   padding: 12px 22px;
-  border-radius: 8px;
-  border: 1px solid transparent;
+  border-radius: 6px;
+  border: 2px solid var(--ink);
   display: inline-flex;
   align-items: center;
   gap: 8px;
@@ -79,79 +101,68 @@
   text-decoration: none;
 }
 .btnSm { padding: 8px 16px; font-size: 13.5px; }
-.btnPrimary { background: var(--stamp); color: var(--paper); box-shadow: var(--shadowStamp); }
+.btnPrimary { background: var(--stamp); color: var(--paper); border-color: var(--stamp); box-shadow: var(--shadowStamp); }
 .btnPrimary:hover { transform: translateY(-1px); box-shadow: 0 12px 28px -8px var(--stamp); }
-.btnGhost { border-color: var(--line); color: var(--ink); background: var(--card); }
-.btnGhost:hover { border-color: var(--stamp); }
-.btnBrass { background: var(--brass); color: var(--paper); }
+.btnGhost { border-color: var(--ink); color: var(--ink); background: var(--card); }
+.btnGhost:hover { border-color: var(--stamp); color: var(--stampInk); }
+.btnBrass { background: var(--brass); color: var(--paper); border-color: var(--brass); }
 .btnBrass:hover { transform: translateY(-1px); box-shadow: 0 6px 18px -8px var(--brass); }
 
-/* ---------- hero: no gradient band — a plain kraft-paper section. The
-   badge reads as an actual rubber stamp (dashed border, rotated, mono
-   caps) instead of a generic SaaS pill, and a large pale outline of the
-   logo mark sits behind the copy like a watermark pressed into paper. ---------- */
-.hero {
-  position: relative; padding: 72px 0 96px; overflow: hidden;
-  background: var(--paper);
-}
-.heroGrid { position: relative; z-index: 1; display: grid; grid-template-columns: 1.05fr 0.95fr; gap: 56px; align-items: center; }
-@media (max-width: 900px) { .heroGrid { grid-template-columns: 1fr; } }
+/* ---------- hero: centered statement, then a stamped case-file below
+   instead of a side-by-side card — a document pulled from the pile, not a
+   generic floating UI screenshot. ---------- */
+.hero { position: relative; padding: 48px 0 72px; text-align: center; overflow: hidden; }
 
-.heroBadge {
+.stampBadge {
   display: inline-flex; align-items: center; gap: 8px;
-  background: transparent; border: 1.5px dashed var(--stamp);
-  border-radius: 6px; padding: 7px 14px;
-  font-family: var(--font-label), monospace; font-size: 11.5px; letter-spacing: 0.04em; text-transform: uppercase;
-  font-weight: 600; color: var(--stampInk); margin-bottom: 30px;
-  transform: rotate(-2deg);
+  background: transparent; border: 2px dashed var(--stamp); color: var(--stampInk);
+  font-family: var(--font-label), monospace; font-size: 11.5px; letter-spacing: 0.05em; text-transform: uppercase;
+  font-weight: 700; padding: 8px 16px; border-radius: 6px; transform: rotate(-2deg); margin-bottom: 26px;
 }
-.heroBadge svg { width: 14px; height: 14px; color: var(--stamp); flex-shrink: 0; }
+.stampBadge svg { width: 14px; height: 14px; color: var(--stamp); flex-shrink: 0; }
 
 .heroTitle {
   font-family: var(--font-display), Georgia, serif;
-  font-size: clamp(38px, 5.6vw, 64px); line-height: 1.08; font-weight: 500;
-  letter-spacing: -0.01em; color: var(--ink);
+  font-size: clamp(36px, 5.6vw, 58px); line-height: 1.1; font-weight: 500;
+  letter-spacing: -0.01em; color: var(--ink); max-width: 760px; margin: 0 auto;
 }
 .heroTitle .accent { color: var(--stampInk); font-style: italic; }
-.heroLede { margin-top: 22px; font-size: 16.5px; line-height: 1.6; color: var(--inkSoft); max-width: 460px; }
-.heroCtas { display: flex; gap: 12px; margin-top: 32px; flex-wrap: wrap; }
+.heroLede { margin: 20px auto 0; font-size: 16.5px; line-height: 1.6; color: var(--inkSoft); max-width: 540px; }
+.heroCtas { display: flex; gap: 12px; justify-content: center; margin-top: 28px; flex-wrap: wrap; }
 
-/* Large ghost outline of the logo mark, bleeding off the section's edge —
-   reads as a watermark pressed into the paper, not a generic blob shape. */
 .watermark { position: absolute; pointer-events: none; z-index: 0; color: var(--line); opacity: 0.55; }
-.heroWatermark { width: 420px; height: 420px; right: -110px; top: -70px; }
+.heroWatermark { width: 380px; height: 380px; right: -100px; bottom: -40px; }
 .closingWatermark { width: 360px; height: 360px; left: -90px; bottom: -90px; }
 
-/* ---------- hero visual: a chat mockup sitting on a small stack of paper —
-   two rotated sheets peeking out behind the real card, instead of a flat
-   drop shadow, to read as actual paperwork rather than a generic UI card. ---------- */
-.heroVisual { position: relative; padding-bottom: 28px; z-index: 1; }
-.heroVisual::before, .heroVisual::after {
-  content: ""; position: absolute; inset: 0 12px 28px;
-  border: 1px solid var(--line); border-radius: 22px; z-index: -1;
+/* Case-file: a document pulled slightly askew from the pile, paperclipped,
+   stamped "Sourcé" — the real differentiator (a sourced answer) shown as
+   an actual artifact instead of an abstract stat card. */
+.caseFile { position: relative; z-index: 1; max-width: 760px; margin: 40px auto 0; }
+.paperclip {
+  position: absolute; left: 44px; top: -26px; width: 34px; height: 70px;
+  border: 5px solid var(--brass); border-radius: 16px; border-bottom-color: transparent;
+  transform: rotate(-8deg); z-index: 3;
 }
-.heroVisual::before { background: var(--card); transform: rotate(-3deg) translateY(6px); }
-.heroVisual::after { background: var(--paperDeep); transform: rotate(2deg) translateY(3px); }
-.heroChart {
-  position: relative;
-  background: var(--card); border: 1px solid var(--line); border-radius: 22px; padding: 24px 24px 32px;
-  box-shadow: var(--shadow);
-  animation: settle 0.8s cubic-bezier(.2,.7,.3,1) both;
+.fileCard {
+  position: relative; background: var(--card); border: 2px solid var(--ink); border-radius: 8px;
+  padding: 28px 30px; transform: rotate(-1.2deg); box-shadow: var(--shadow); text-align: left;
 }
-@keyframes settle { from { transform: translateY(18px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
-
-.heroChatHead { display: flex; align-items: center; gap: 8px; font-size: 12px; font-weight: 600; color: var(--inkFaint); margin-bottom: 16px; }
-.heroChatDot { width: 8px; height: 8px; border-radius: 50%; background: var(--stamp); box-shadow: 0 0 0 3px var(--stampSoft); }
+.ribbon {
+  position: absolute; top: 18px; right: -34px; background: var(--stamp); color: var(--paper);
+  font-family: var(--font-label), monospace; font-size: 11px; font-weight: 700; letter-spacing: 0.06em;
+  padding: 5px 42px; transform: rotate(35deg); box-shadow: 0 2px 6px rgba(0,0,0,0.25);
+}
+.fileCardLabel { color: var(--inkFaint); font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; font-family: var(--font-label), monospace; }
 .heroChatBubbleUser {
-  margin-left: auto; max-width: 82%;
+  margin-top: 12px; margin-left: auto; max-width: 82%;
   background: var(--paperDeep); color: var(--ink);
-  border-radius: 14px 14px 4px 14px; padding: 10px 14px;
-  font-size: 13.5px; line-height: 1.5; margin-bottom: 12px;
+  border-radius: 12px 12px 4px 12px; padding: 10px 14px;
+  font-size: 13.5px; line-height: 1.5;
 }
 .heroChatBubbleBot {
-  max-width: 88%; display: flex; flex-direction: column; gap: 8px;
+  margin-top: 12px; max-width: 88%; display: flex; flex-direction: column; gap: 8px;
   background: var(--stampSoft); color: var(--stampInk);
-  border-radius: 14px 14px 14px 4px; padding: 12px 14px;
+  border-radius: 12px 12px 12px 4px; padding: 12px 14px;
   font-size: 13.5px; line-height: 1.5;
 }
 .heroChatCite {
@@ -161,33 +172,19 @@
   padding: 4px 9px; border-radius: 9999px;
 }
 
-.heroChartBadge {
-  position: absolute; left: 20px; bottom: 0;
-  display: flex; align-items: center; gap: 10px;
-  background: var(--card); border: 1px solid var(--line); border-radius: 16px;
-  padding: 12px 16px; box-shadow: var(--shadow); font-size: 12px;
-  animation: rise 0.8s 0.3s cubic-bezier(.2,.7,.3,1) both;
+/* ---------- trust strip: a small fan of index cards, not a flat grid ---------- */
+.trust { padding: 56px 0 16px; }
+.trustGrid { display: flex; justify-content: center; flex-wrap: wrap; gap: 0; }
+.trustItem {
+  position: relative; background: var(--card); border: 1.5px solid var(--line); border-radius: 6px;
+  width: 210px; padding: 22px; text-align: center; margin: 0 -6px; box-shadow: var(--shadow);
 }
-@keyframes rise { from { transform: translateY(14px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
-.heroChartBadge .ico {
-  display: flex; align-items: center; justify-content: center; flex-shrink: 0;
-  width: 30px; height: 30px; border-radius: 50%; background: var(--stampSoft); color: var(--stamp);
-}
-.heroChartBadge strong { display: block; font-size: 12.5px; color: var(--ink); }
-.heroChartBadge span { font-size: 11px; color: var(--inkFaint); }
-
-@media (prefers-reduced-motion: reduce) {
-  .heroChart, .heroChartBadge { animation: none; }
-}
-
-/* ---------- trust strip: big stat numbers, flat band under the hero ---------- */
-.trust { padding: 56px 0 8px; border-bottom: 1px solid var(--line); }
-.trustGrid { display: grid; gap: 1px; background: var(--line); border: 1px solid var(--line); border-radius: 14px; overflow: hidden; }
-@media (min-width: 640px) { .trustGrid { grid-template-columns: repeat(3, 1fr); } }
-.trustItem { background: var(--paperDeep); padding: 26px 24px; text-align: center; }
+.trustItem:nth-child(1) { transform: rotate(-4deg); }
+.trustItem:nth-child(2) { transform: rotate(0deg); z-index: 2; }
+.trustItem:nth-child(3) { transform: rotate(4deg); }
 .trustStat {
   font-family: var(--font-label), monospace; font-weight: 700;
-  font-size: clamp(26px, 2.8vw, 32px); color: var(--stamp); line-height: 1;
+  font-size: clamp(22px, 2.4vw, 28px); color: var(--stamp); line-height: 1;
 }
 .trustItem strong { display: block; margin-top: 10px; font-size: 14px; font-weight: 600; color: var(--ink); }
 .trustItem span { display: block; margin-top: 2px; font-size: 12.5px; color: var(--inkSoft); }
@@ -199,118 +196,87 @@
 .sectionHead h2 { font-size: 30px; font-weight: 700; letter-spacing: -0.015em; }
 .dek { margin-top: 10px; color: var(--inkSoft); font-size: 15px; }
 
-/* ---------- how it works: connected timeline, not separate cards ----------
-   A line runs through the step numbers, left to right — the steps are one
-   continuous process, not three unrelated boxes. Collapses to a vertical
-   line on mobile. */
+/* ---------- how it works: three tabs in a row, each with a dark numbered
+   header strip, instead of circles on a connecting line ---------- */
 .how { padding: 72px 0; border-bottom: 1px solid var(--line); }
-.steps { display: flex; justify-content: space-between; gap: 8px; }
-@media (max-width: 780px) { .steps { flex-direction: column; gap: 0; } }
-
-.step { flex: 1; position: relative; text-align: center; padding: 0 18px; }
-.step:not(:last-child)::after {
-  content: ""; position: absolute; top: 19px; left: 50%; width: 100%; height: 2px;
-  background: var(--line); z-index: 1;
-}
-@media (max-width: 780px) {
-  .step { text-align: left; padding: 0 0 36px 58px; min-height: 0; }
-  .step:not(:last-child)::after { top: 0; left: 19px; width: 2px; height: 100%; }
-}
-
+.steps { display: flex; gap: 18px; flex-wrap: wrap; }
+.step { flex: 1; min-width: 220px; background: var(--card); border: 1.5px solid var(--line); border-radius: 6px; overflow: hidden; }
 .stepK {
-  position: relative; z-index: 2;
-  display: flex; align-items: center; justify-content: center;
-  width: 38px; height: 38px; border-radius: 50%;
-  background: var(--stamp); color: var(--paper);
-  font-family: var(--font-label), monospace; font-size: 14px; font-weight: 700;
-  margin: 0 auto 20px; box-shadow: var(--shadowStamp);
+  background: var(--ink); color: var(--paper);
+  font-family: var(--font-label), monospace; font-size: 13px; font-weight: 700;
+  padding: 9px 16px;
 }
-@media (max-width: 780px) { .stepK { position: absolute; top: 0; left: 0; margin: 0; } }
-
+.stepBody { padding: 18px 18px 22px; }
 .step h4 { font-family: var(--font-body), sans-serif; font-size: 15.5px; font-weight: 700; margin-bottom: 8px; color: var(--ink); }
 .step p { margin: 0; font-size: 13.5px; color: var(--inkSoft); line-height: 1.55; }
 
-/* ---------- features: icon badge + big decorative number ----------
-   Each card carries two distinct visual marks (small stamp-colored icon
-   badge, big pale number) plus a checkmark list. Closes with a mini-CTA
-   banner embedded right in the section. */
+/* ---------- features: three manila folders, one per pillar — the tab
+   label replaces an icon badge as the identifying mark ---------- */
 .features { padding: 72px 0; border-bottom: 1px solid var(--line); background: var(--paperDeep); }
 .featuresHead { max-width: 560px; margin: 0 auto 36px; text-align: center; }
 .featuresHead .sectionLabel { color: var(--stampInk); }
 .featuresHead h2 { font-size: 30px; font-weight: 700; letter-spacing: -0.015em; }
 .featuresHead p { margin-top: 14px; color: var(--inkSoft); font-size: 14.5px; line-height: 1.6; }
 
-.featureGrid { display: grid; gap: 18px; margin-bottom: 18px; }
-@media (min-width: 720px) { .featureGrid { grid-template-columns: repeat(2, 1fr); } }
-.featureCard {
-  position: relative; overflow: hidden;
-  background: var(--card); border: 1px solid var(--line);
-  border-radius: 16px; padding: 26px 24px; box-shadow: var(--shadow);
+.featureGrid { display: grid; gap: 22px; margin-bottom: 20px; }
+@media (min-width: 780px) { .featureGrid { grid-template-columns: repeat(3, 1fr); } }
+.folder { background: var(--card); border: 1.5px solid var(--line); border-radius: 0 10px 10px 10px; }
+.fTab {
+  display: inline-block; background: var(--stamp); color: var(--paper);
+  padding: 7px 18px; border-radius: 8px 8px 0 0; margin-left: -1.5px;
+  font-family: var(--font-body), sans-serif; font-weight: 700; font-size: 14px;
 }
-.featureNum {
-  position: absolute; top: 10px; right: 18px;
-  font-family: var(--font-label), monospace; font-weight: 700;
-  font-size: 40px; color: var(--brassSoft); line-height: 1; z-index: 0;
-}
-.featureIcon {
-  position: relative; z-index: 1;
-  display: flex; align-items: center; justify-content: center;
-  width: 40px; height: 40px; border-radius: 10px;
-  background: var(--stamp); color: var(--paper); box-shadow: var(--shadowStamp);
-  margin-bottom: 18px;
-}
-.featureIcon svg { width: 20px; height: 20px; }
-.featureCard h4 { position: relative; z-index: 1; font-size: 15.5px; font-weight: 700; color: var(--ink); margin-bottom: 14px; }
-.featurePoints { position: relative; z-index: 1; list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 9px; }
-.featurePoints li { display: flex; align-items: flex-start; gap: 8px; font-size: 13.5px; color: var(--inkSoft); line-height: 1.5; }
-.featurePoints svg { width: 15px; height: 15px; color: var(--stamp); flex-shrink: 0; margin-top: 2px; }
+.fBody { padding: 22px 22px 24px; }
+.featurePoints { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+.featurePoints li { padding-left: 16px; position: relative; font-size: 13.5px; color: var(--inkSoft); line-height: 1.55; }
+.featurePoints li::before { content: ""; position: absolute; left: 0; top: 7px; width: 6px; height: 6px; background: var(--stamp); border-radius: 2px; }
 
 .featureCta {
   display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 16px;
-  background: var(--card); border: 1px solid var(--line); border-radius: 16px;
+  background: var(--card); border: 1.5px solid var(--line); border-radius: 10px;
   padding: 22px 26px; box-shadow: var(--shadow);
 }
 .featureCta p { margin: 0; max-width: 480px; }
 .featureCta strong { display: block; font-size: 14.5px; color: var(--ink); margin-bottom: 4px; }
 .featureCta span { font-size: 13px; color: var(--inkSoft); }
 
-/* ---------- catalogue: flat index cards, deliberately calmer than the
-   Features cards above (no shadow at rest) — a reference list, not a
-   showcase ---------- */
+/* ---------- catalogue: a stamped index list, grouped by "available" vs
+   "roadmap" — each row carries its own Dispo/Bientôt stamp, so a separate
+   legend would only repeat what the row already says ---------- */
 .catalogue { padding: 64px 0; border-bottom: 1px solid var(--line); }
-.registerNote { display: flex; gap: 22px; flex-wrap: wrap; margin-bottom: 30px; font-size: 13px; color: var(--inkSoft); }
-.registerKey { display: flex; align-items: center; gap: 8px; }
-.swatch { width: 14px; height: 14px; border-radius: 4px; flex-shrink: 0; }
-.swatchNow { background: var(--stamp); }
-.swatchNext { background: var(--card); border: 1.5px dashed var(--brass); }
-
 .catGroup { margin-bottom: 12px; }
 .catGroupHead {
   font-family: var(--font-label), monospace; font-size: 13px; letter-spacing: 0.04em; text-transform: uppercase; font-weight: 600;
   color: var(--ink); margin-bottom: 16px; padding-bottom: 10px; border-bottom: 1px solid var(--line);
-  display: flex; align-items: center; gap: 10px;
 }
-.catGrid { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 14px; margin-bottom: 48px; }
-.catCard { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 18px 20px; box-shadow: none; display: flex; flex-direction: column; gap: 8px; transition: transform 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease; }
-.catCard:hover { transform: translateY(-2px); border-color: var(--stamp); box-shadow: var(--shadow); }
-.catCardRoadmap { background: var(--paperDeep); border: 1px solid var(--line); box-shadow: none; }
-.catCardRoadmap:hover { border-color: var(--brass); box-shadow: none; transform: none; }
-.catBadgeSoon {
-  align-self: flex-start;
-  font-family: var(--font-label), monospace; font-size: 10.5px; letter-spacing: 0.05em; text-transform: uppercase;
-  color: var(--brassInk); background: var(--brassSoft); padding: 4px 10px; border-radius: 9999px;
+.catRows { display: flex; flex-direction: column; gap: 10px; margin-bottom: 40px; }
+.catRow { display: flex; align-items: flex-start; gap: 16px; padding: 14px 18px; border: 1.5px solid var(--line); border-radius: 6px; background: var(--card); }
+.catStamp {
+  flex-shrink: 0; margin-top: 2px;
+  font-family: var(--font-label), monospace; font-size: 10px; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase;
+  border: 2px solid var(--stamp); color: var(--stampInk); padding: 4px 9px; border-radius: 4px; transform: rotate(-3deg);
 }
-.catCard h4 { font-family: var(--font-body), sans-serif; font-size: 14.5px; font-weight: 600; color: var(--ink); }
-.catCard p { margin: 0; font-size: 12.8px; color: var(--inkSoft); line-height: 1.55; }
-.catFor { font-size: 11.5px; color: var(--inkFaint); font-family: var(--font-label), monospace; margin-top: auto; padding-top: 4px; }
+.catRowRoadmap { background: var(--paperDeep); }
+.catRowRoadmap .catStamp { border-color: var(--brass); color: var(--brassInk); }
+.catRow strong { display: block; font-size: 14.5px; color: var(--ink); }
+.catRow p { margin: 2px 0 0; font-size: 12.8px; color: var(--inkSoft); line-height: 1.55; }
+.catFor { display: block; margin-top: 4px; font-size: 11px; color: var(--inkFaint); font-family: var(--font-label), monospace; }
 
-/* ---------- pricing ---------- */
+/* ---------- pricing: torn perforated tickets, slightly askew ---------- */
 .pricing { padding: 64px 0; border-bottom: 1px solid var(--line); }
-.priceGrid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; }
+.priceGrid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px; }
 @media (max-width: 1080px) { .priceGrid { grid-template-columns: repeat(2, 1fr); } }
 @media (max-width: 560px) { .priceGrid { grid-template-columns: 1fr; } }
-.priceCard { background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 26px 24px; display: flex; flex-direction: column; box-shadow: var(--shadow); }
-.priceCardFeatured { border: 1.5px solid var(--stamp); box-shadow: var(--shadowStamp); position: relative; }
+.priceCard {
+  position: relative; background: var(--card); border: 1.5px solid var(--line); border-radius: 6px;
+  padding: 28px 22px 24px; display: flex; flex-direction: column; transform: rotate(-1deg);
+}
+.priceCard:nth-child(even) { transform: rotate(1deg); }
+.priceCard::before {
+  content: ""; position: absolute; top: -2px; left: 16px; right: 16px; height: 2px;
+  background: repeating-linear-gradient(90deg, var(--ink) 0 6px, transparent 6px 12px);
+}
+.priceCardFeatured { border: 1.5px solid var(--stamp); box-shadow: var(--shadowStamp); transform: rotate(0deg); }
 .priceBadge { position: absolute; top: -12px; left: 22px; background: var(--stamp); color: var(--paper); font-family: var(--font-label), monospace; font-size: 10.5px; letter-spacing: 0.05em; text-transform: uppercase; padding: 4px 10px; border-radius: 9999px; }
 .priceCard h3 { font-family: var(--font-body), sans-serif; font-size: 17px; font-weight: 600; margin-bottom: 4px; color: var(--ink); }
 .priceWho { font-size: 13px; color: var(--inkFaint); margin-bottom: 16px; }
@@ -322,13 +288,22 @@
 .priceList li::before { content: ""; position: absolute; left: 0; top: 7px; width: 6px; height: 6px; background: var(--brass); border-radius: 50%; }
 .priceNote { margin-top: 22px; font-size: 12.5px; color: var(--inkFaint); max-width: 640px; }
 
-/* ---------- testimonials ---------- */
+/* ---------- testimonials: pinned notes, slightly askew ---------- */
 .testimonials { padding: 64px 0; border-bottom: 1px solid var(--line); }
-.testiGrid { display: grid; gap: 16px; }
+.testiGrid { display: grid; gap: 20px; }
 @media (min-width: 780px) { .testiGrid { grid-template-columns: repeat(3, 1fr); } }
 .testiGridSolo { grid-template-columns: 1fr !important; max-width: 520px; margin: 0 auto; }
-.testiCard { background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 22px; box-shadow: var(--shadow); display: flex; flex-direction: column; justify-content: space-between; }
-.testiGridSolo .testiCard { padding: 32px; }
+.testiCard {
+  position: relative; background: var(--card); border: 1.5px solid var(--line); border-radius: 6px;
+  padding: 24px 22px; display: flex; flex-direction: column; justify-content: space-between;
+}
+.testiCard::before {
+  content: ""; position: absolute; top: -9px; left: 50%; transform: translateX(-50%);
+  width: 16px; height: 16px; border-radius: 50%; background: var(--stamp); border: 1.5px solid var(--card);
+}
+.testiGrid .testiCard:nth-child(1) { transform: rotate(-2deg); }
+.testiGrid .testiCard:nth-child(3) { transform: rotate(2deg); }
+.testiGridSolo .testiCard { padding: 32px; transform: none; }
 .testiGridSolo .testiQuote { font-size: 16px; }
 .testiQuote { margin: 0; font-size: 14px; font-style: italic; color: var(--inkSoft); line-height: 1.6; }
 .testiMeta { margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--line); display: flex; align-items: center; gap: 10px; }
@@ -347,7 +322,7 @@
 @media (min-width: 820px) { .faqGrid { grid-template-columns: 0.8fr 1.2fr; align-items: start; } }
 .faqHead .sectionHead { text-align: left; margin: 0 0 24px; max-width: none; }
 .faqContact {
-  background: var(--ink); color: var(--paper); border-radius: 16px;
+  background: var(--ink); color: var(--paper); border-radius: 10px;
   padding: 22px 24px;
 }
 .faqContact strong { display: block; font-size: 14.5px; margin-bottom: 4px; }
@@ -356,7 +331,7 @@
 .faqContactLink:hover { color: var(--paper); }
 
 .faqList { display: flex; flex-direction: column; gap: 10px; }
-.faqItem { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 16px 20px; }
+.faqItem { background: var(--card); border: 1.5px solid var(--line); border-radius: 6px; padding: 16px 20px; }
 .faqItem summary { display: flex; cursor: pointer; list-style: none; align-items: center; justify-content: space-between; gap: 16px; font-size: 14.5px; font-weight: 600; color: var(--ink); }
 .faqItem summary::-webkit-details-marker { display: none; }
 .faqPlus {
@@ -368,8 +343,9 @@
 .faqItem[open] .faqPlus { transform: rotate(45deg); }
 .faqItem p { margin: 12px 0 2px; font-size: 13.8px; color: var(--inkSoft); line-height: 1.6; }
 
-/* ---------- closing: deeper kraft band, centered — no dark gradient, the
-   page keeps its one dark anchor for the footer only ---------- */
+/* ---------- closing: deeper kraft band, a big "Approuvé" stamp above the
+   headline — no dark gradient, the page keeps its one dark anchor for the
+   footer only ---------- */
 .closing { padding: 0; }
 .closingInner {
   position: relative; overflow: hidden;
@@ -378,13 +354,18 @@
   color: var(--ink); padding: 72px 24px; text-align: center;
 }
 .closingContent { position: relative; z-index: 1; display: flex; flex-direction: column; align-items: center; }
+.approved {
+  display: inline-block; border: 4px solid var(--stamp); color: var(--stampInk);
+  font-family: var(--font-label), monospace; font-weight: 700; font-size: 18px; letter-spacing: 0.08em;
+  padding: 8px 24px; transform: rotate(-4deg); border-radius: 8px; margin-bottom: 20px;
+}
 .closingInner h3 { color: var(--ink); font-size: clamp(26px, 3.4vw, 38px); font-weight: 700; letter-spacing: -0.015em; max-width: 620px; }
 .closingInner h3 .accent { color: var(--stampInk); font-style: italic; }
 .closingInner p { margin: 16px 0 0; font-size: 15px; color: var(--inkSoft); max-width: 480px; }
 .closingCtas { display: flex; gap: 12px; margin-top: 30px; flex-wrap: wrap; justify-content: center; }
 
 /* ---------- footer: the one dark anchor on the page, like the back cover
-   of a dossier, not a gradient echo of the old hero ---------- */
+   of a dossier ---------- */
 .footer { background: var(--ink); color: #CDB98C; padding: 56px 0 28px; }
 .footerGrid { display: grid; gap: 36px; padding-bottom: 32px; }
 .footerDivider { border-bottom: 1px solid rgba(255,255,255,0.08); }
