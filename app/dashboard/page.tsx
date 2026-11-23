@@ -97,9 +97,9 @@ export default async function DashboardPage() {
 
   return (
     <div className="space-y-10">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight text-slate-900">{org.name}</h1>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="min-w-0">
+          <h1 className="truncate text-2xl font-semibold tracking-tight text-slate-900">{org.name}</h1>
           <p className="mt-1 text-sm text-slate-500">Vue d'ensemble de votre espace</p>
         </div>
         <CreateChatbotForm

@@ -132,14 +132,14 @@ export default async function ChatbotPage({ params }: { params: { id: string } }
   return (
     <div className="space-y-10">
       <PageSections sections={pageSections} />
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-4">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex min-w-0 items-center gap-4">
           <IconBadge spacing="">{ICONS.chat}</IconBadge>
-          <div>
+          <div className="min-w-0">
             <Link href={backHref} className="text-sm text-slate-500 hover:text-slate-700">
               {backLabel}
             </Link>
-            <h1 className="mt-1 text-2xl font-semibold tracking-tight text-slate-900">
+            <h1 className="mt-1 truncate text-2xl font-semibold tracking-tight text-slate-900">
               {chatbot.name}
             </h1>
           </div>
@@ -203,9 +203,9 @@ export default async function ChatbotPage({ params }: { params: { id: string } }
 
         <Card className="divide-y divide-slate-100">
           {(documents ?? []).map((doc) => (
-            <div key={doc.id} className="flex items-center justify-between px-5 py-4 text-sm">
-              <div>
-                <p className="font-medium text-slate-900">{doc.filename}</p>
+            <div key={doc.id} className="flex flex-wrap items-center justify-between gap-3 px-5 py-4 text-sm">
+              <div className="min-w-0 flex-1">
+                <p className="truncate font-medium text-slate-900">{doc.filename}</p>
                 {doc.status === 'error' && doc.error_message && (
                   <p className="mt-0.5 text-xs text-red-600">{doc.error_message}</p>
                 )}
@@ -218,7 +218,7 @@ export default async function ChatbotPage({ params }: { params: { id: string } }
                   </p>
                 )}
               </div>
-              <div className="flex items-center gap-3">
+              <div className="flex flex-wrap items-center gap-3">
                 {doc.file_type === 'url' && (doc.status === 'indexed' || doc.status === 'error') && (
                   <RefreshDocumentButton documentId={doc.id} />
                 )}

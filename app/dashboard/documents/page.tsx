@@ -16,7 +16,7 @@ export default async function DocumentsPage() {
   const { data: documentsData, error: documentsError } = await supabase
     .from('documents')
     .select(
-      'id, filename, status, error_message, chunk_count, uploaded_at, chatbot_id, chatbots!inner(id, name, organization_id)'
+      'id, filename, status, error_message, chunk_count, uploaded_at, chatbot_id, chatbots!inner(id, name, organization_id, use_case)'
     )
     .eq('chatbots.organization_id', org.id)
     .order('uploaded_at', { ascending: false });
@@ -41,11 +41,18 @@ export default async function DocumentsPage() {
       <Card className="divide-y divide-slate-100">
         {allDocuments.map((doc) => {
           const chatbot = Array.isArray(doc.chatbots) ? doc.chatbots[0] : doc.chatbots;
+          // 'paperwork_digitizer' has its own route tree (app/dashboard/
+          // paperasse/[id]): every other use_case is viewed at the shared
+          // chatbot detail route.
+          const href =
+            chatbot?.use_case === 'paperwork_digitizer'
+              ? `/dashboard/paperasse/${doc.chatbot_id}`
+              : `/dashboard/chatbots/${doc.chatbot_id}`;
           return (
             <Link
               key={doc.id}
-              href={`/dashboard/chatbots/${doc.chatbot_id}`}
-              className="flex items-center justify-between gap-4 px-5 py-4 text-sm hover:bg-slate-50"
+              href={href}
+              className="flex flex-wrap items-center justify-between gap-4 px-5 py-4 text-sm hover:bg-slate-50"
             >
               <div className="min-w-0">
                 <p className="truncate font-medium text-slate-900">{doc.filename}</p>

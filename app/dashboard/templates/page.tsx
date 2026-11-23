@@ -57,14 +57,14 @@ export default async function TemplatesPage() {
           <div className="grid gap-6 lg:grid-cols-2">
             {(customTemplates ?? []).map((t) => (
               <Card key={t.id} className="p-6">
-                <div className="flex items-start justify-between gap-3">
-                  <div className="flex items-center gap-3">
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div className="flex min-w-0 items-center gap-3">
                     <IconBadge size="sm" spacing="">
                       {ICONS.layers}
                     </IconBadge>
-                    <h3 className="font-semibold text-slate-900">{t.label}</h3>
+                    <h3 className="truncate font-semibold text-slate-900">{t.label}</h3>
                   </div>
-                  <div className="flex items-center gap-2">
+                  <div className="flex flex-shrink-0 items-center gap-2">
                     <EditTemplateButton
                       templateId={t.id}
                       initialLabel={t.label}

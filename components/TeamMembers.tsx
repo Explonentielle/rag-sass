@@ -144,13 +144,13 @@ export default function TeamMembers({
         const canChangeRole = canManage && !(m.role === 'owner' && currentUserRole !== 'owner');
 
         return (
-          <div key={m.userId} className="flex items-center justify-between gap-3 px-6 py-4 text-sm">
+          <div key={m.userId} className="flex flex-wrap items-center justify-between gap-3 px-6 py-4 text-sm">
             <div className="min-w-0">
               <p className="truncate text-slate-900">
                 {m.email} {isSelf && <span className="text-xs text-slate-400">(vous)</span>}
               </p>
             </div>
-            <div className="flex flex-shrink-0 items-center gap-2">
+            <div className="flex flex-shrink-0 flex-wrap items-center gap-2">
               {canChangeRole ? (
                 <select
                   value={m.role}

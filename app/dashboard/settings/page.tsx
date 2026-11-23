@@ -65,9 +65,9 @@ export default async function SettingsPage() {
           </Card>
         ) : (
           <Card className="divide-y divide-slate-100">
-            <div className="flex items-center justify-between px-6 py-4 text-sm">
-              <span className="text-slate-500">Nom</span>
-              <span className="font-medium text-slate-900">{org.name}</span>
+            <div className="flex items-center justify-between gap-3 px-6 py-4 text-sm">
+              <span className="flex-shrink-0 text-slate-500">Nom</span>
+              <span className="min-w-0 truncate font-medium text-slate-900">{org.name}</span>
             </div>
             <div className="flex items-center justify-between px-6 py-4 text-sm">
               <span className="text-slate-500">Plan</span>
@@ -90,9 +90,9 @@ export default async function SettingsPage() {
       <section id="compte" className="scroll-mt-6 space-y-3">
         <h2 className="font-semibold text-slate-900">Compte</h2>
         <Card className="divide-y divide-slate-100">
-          <div className="flex items-center justify-between px-6 py-4 text-sm">
-            <span className="text-slate-500">Email</span>
-            <span className="font-medium text-slate-900">{user?.email}</span>
+          <div className="flex items-center justify-between gap-3 px-6 py-4 text-sm">
+            <span className="flex-shrink-0 text-slate-500">Email</span>
+            <span className="min-w-0 truncate font-medium text-slate-900">{user?.email}</span>
           </div>
           <div className="flex items-center justify-between px-6 py-4 text-sm">
             <span className="text-slate-500">Rôle</span>
