@@ -49,13 +49,13 @@ export default function OrgSwitcher({ orgs, currentOrgId }: { orgs: Org[]; curre
         <span className="truncate text-sm font-medium text-white">
           {switching ? 'Changement...' : currentOrg?.name}
         </span>
-        <Icon className="h-4 w-4 flex-shrink-0 text-brand-300">
+        <Icon className="h-4 w-4 flex-shrink-0 text-brass-300">
           <polyline points="6,9 12,15 18,9" />
         </Icon>
       </button>
 
       {open && (
-        <div className="absolute left-3 right-3 top-full z-30 mt-1 rounded-md border border-white/10 bg-brand-900 py-1 shadow-xl">
+        <div className="absolute left-3 right-3 top-full z-30 mt-1 rounded-md border border-white/10 bg-slate-800 py-1 shadow-xl">
           {orgs.map((org) => (
             <button
               key={org.id}
@@ -63,7 +63,7 @@ export default function OrgSwitcher({ orgs, currentOrgId }: { orgs: Org[]; curre
               className={`flex w-full items-center justify-between px-3 py-2 text-left text-sm ${
                 org.id === currentOrgId
                   ? 'text-white'
-                  : 'text-brand-200 hover:bg-white/5 hover:text-white'
+                  : 'text-brass-200 hover:bg-white/5 hover:text-white'
               }`}
             >
               <span className="truncate">{org.name}</span>
@@ -78,7 +78,7 @@ export default function OrgSwitcher({ orgs, currentOrgId }: { orgs: Org[]; curre
               setOpen(false);
               setShowCreateModal(true);
             }}
-            className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-brand-200 hover:bg-white/5 hover:text-white"
+            className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-brass-200 hover:bg-white/5 hover:text-white"
           >
             + Nouvelle organisation
           </button>

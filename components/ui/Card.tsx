@@ -1,7 +1,7 @@
 export function Card({ className = '', ...props }: React.HTMLAttributes<HTMLDivElement>) {
   return (
     <div
-      className={`rounded-2xl border border-slate-200 bg-white shadow-card ${className}`}
+      className={`rounded-lg border border-slate-200 bg-white shadow-card ${className}`}
       {...props}
     />
   );
@@ -27,7 +27,7 @@ export function Badge({
   };
   return (
     <span
-      className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-medium ${tones[tone]} ${className}`}
+      className={`inline-flex items-center rounded-full px-2.5 py-1 font-mono text-xs font-semibold uppercase tracking-wider ${tones[tone]} ${className}`}
       {...props}
     />
   );

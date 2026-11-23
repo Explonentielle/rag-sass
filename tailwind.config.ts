@@ -5,46 +5,51 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
-        // Forest/brass identity from the landing redesign (app/landing.module.css)
-        // — reused here at the token level so the whole app picks it up through
-        // its existing brand-*/slate-* classes, instead of a per-file rewrite.
+        // Kraft-paper/stamp identity from the landing redesign
+        // (app/landing.module.css's --paper/--ink/--stamp/--brass variables)
+        // : reused here at the token level so the whole app picks it up
+        // through its existing brand-*/slate-*/brass-* classes, instead of a
+        // per-file rewrite. 500/700 match --stamp/--stampInk exactly; slate
+        // 50/200/500/600/900 match --paper/--line/--inkFaint/--inkSoft/--ink
+        // exactly; brass 100/500/700 match --brassSoft/--brass/--brassInk.
         brand: {
-          50: '#eaf1ec',
-          100: '#e1ebe3',
-          200: '#c3d9c9',
-          300: '#9ec2a8',
-          400: '#6fa47f',
-          500: '#468560',
-          600: '#2d6e50',
-          700: '#1f5c46', // forest — primary interactive color
-          800: '#163f31', // forestInk — hover/darker
-          900: '#102d24',
-          950: '#0a1e19',
+          50: '#fbefec',
+          100: '#f4dcd3',
+          200: '#e9c0af',
+          300: '#db9d84',
+          400: '#c97659',
+          500: '#a8341f', // stamp, primary interactive color
+          600: '#942d1b',
+          700: '#7b2817', // stampInk, hover/darker
+          800: '#601f12',
+          900: '#47170d',
+          950: '#2e0e08',
         },
         slate: {
-          50: '#f8f8f3',
-          100: '#eef0e8',
-          200: '#d8dcce',
-          300: '#c0c7b4',
-          400: '#9ba593',
-          500: '#838f82', // inkFaint
-          600: '#67715f',
-          700: '#4a564c', // inkSoft
-          800: '#303d34',
-          900: '#16231c', // ink
-          950: '#0d1511',
+          50: '#f3ecd9', // paper
+          100: '#ebdfc0', // paperDeep
+          200: '#d9cba0', // line
+          300: '#c7b98a',
+          400: '#a99979',
+          500: '#8a7c64', // inkFaint
+          600: '#5c4e3a', // inkSoft
+          700: '#4a3d2c',
+          800: '#332a1e',
+          900: '#241b12', // ink
+          950: '#16110b',
         },
         brass: {
-          50: '#f4e9d3',
-          100: '#ecdbb3',
-          200: '#dcc084',
-          300: '#c9a35c',
-          400: '#b78c40',
-          500: '#a9782e', // brass — secondary/CTA accent
-          600: '#8f6527',
-          700: '#7a5a22', // brassInk
-          800: '#5f451a',
-          900: '#473413',
+          50: '#fbf4e6',
+          100: '#f0e0b8', // brassSoft
+          200: '#e2c98c',
+          300: '#cdad68',
+          400: '#a68a4e',
+          500: '#8b6b3d', // brass
+          600: '#785c34',
+          700: '#60492a', // brassInk
+          800: '#4a3920',
+          900: '#352914',
+          950: '#211a0c',
         },
       },
       fontFamily: {
@@ -53,7 +58,9 @@ const config: Config = {
         mono: ['var(--font-label)', 'ui-monospace', 'monospace'],
       },
       boxShadow: {
-        card: '0 1px 2px 0 rgb(15 23 42 / 0.04), 0 1px 3px 0 rgb(15 23 42 / 0.06)',
+        // Ink-tinted (rgb(36 27 18) = --ink), not the previous neutral
+        // slate-900 tint, to match the landing's --shadow color.
+        card: '0 1px 2px 0 rgb(36 27 18 / 0.05), 0 2px 6px -1px rgb(36 27 18 / 0.08)',
       },
     },
   },

@@ -44,7 +44,7 @@ export function IconBadge({
   };
   return (
     <div
-      className={`flex flex-shrink-0 items-center justify-center rounded-xl ${sizes[size].box} ${tones[tone]} ${spacing}`}
+      className={`flex flex-shrink-0 items-center justify-center rounded-lg ${sizes[size].box} ${tones[tone]} ${spacing}`}
     >
       <Icon className={sizes[size].icon}>{children}</Icon>
     </div>

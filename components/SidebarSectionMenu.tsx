@@ -78,7 +78,7 @@ export default function SidebarSectionMenu({
               className={`block truncate rounded-md px-2.5 py-1.5 text-[13px] transition-colors ${
                 active
                   ? 'bg-white/10 font-medium text-white'
-                  : 'text-brand-300 hover:bg-white/5 hover:text-white'
+                  : 'text-brass-300 hover:bg-white/5 hover:text-white'
               }`}
             >
               {section.label}

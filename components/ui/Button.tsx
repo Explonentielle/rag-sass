@@ -2,13 +2,16 @@ import { forwardRef } from 'react';
 import Link from 'next/link';
 
 const base =
-  'inline-flex items-center justify-center gap-2 rounded-full text-sm font-medium transition-colors disabled:opacity-50 disabled:pointer-events-none';
+  'inline-flex items-center justify-center gap-2 rounded-md text-sm font-semibold transition-colors disabled:opacity-50 disabled:pointer-events-none';
 
+// border-2 on every variant (even transparent) keeps box sizing identical
+// across variants: the landing's buttons (app/landing.module.css .btn) are
+// all 2px-bordered, border-color matching the fill.
 const variants = {
-  primary: 'bg-brand-700 text-white shadow-lg shadow-brand-700/30 hover:bg-brand-800',
-  secondary: 'bg-white text-brand-900 border border-slate-300 shadow-sm hover:bg-slate-50',
-  ghost: 'text-slate-600 hover:text-slate-900 hover:bg-slate-100',
-  danger: 'bg-white text-red-600 border border-red-200 hover:bg-red-50',
+  primary: 'border-2 border-brand-500 bg-brand-500 text-white shadow-lg shadow-brand-500/30 hover:border-brand-700 hover:bg-brand-700',
+  secondary: 'border-2 border-slate-900 bg-white text-slate-900 shadow-sm hover:bg-slate-50',
+  ghost: 'border-2 border-transparent text-slate-600 hover:text-slate-900 hover:bg-slate-100',
+  danger: 'border-2 border-red-300 bg-white text-red-600 hover:bg-red-50',
 };
 
 const sizes = {

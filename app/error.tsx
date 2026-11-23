@@ -24,7 +24,7 @@ export default function RootError({
       {error.digest && <p className="font-mono text-xs text-slate-400">Référence : {error.digest}</p>}
       <button
         onClick={() => reset()}
-        className="rounded-md bg-brand-700 px-4 py-2 text-sm font-medium text-white hover:bg-brand-800"
+        className="rounded-md bg-brand-500 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700"
       >
         Réessayer
       </button>
