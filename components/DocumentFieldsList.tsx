@@ -1,9 +1,7 @@
 import type { ExtractedFieldsJson } from '@/types/database';
 
-// Paires label/valeur courtes (contrairement aux champs du résumé de
-// contrat, qui sont des phrases) : une grille à deux colonnes suffit, pas
-// besoin de l'accordéon de components/ContractSummaryAccordion.tsx
-// (docs/roadmap.md item 24).
+// Paires label/valeur courtes : une grille à deux colonnes suffit, pas
+// besoin d'un accordéon (docs/roadmap.md item 24).
 export default function DocumentFieldsList({ fields }: { fields: ExtractedFieldsJson }) {
   if (fields.length === 0) {
     return <p className="px-5 py-4 text-sm text-slate-400">Aucun champ extrait de ce document.</p>;

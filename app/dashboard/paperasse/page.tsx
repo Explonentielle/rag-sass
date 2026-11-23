@@ -34,12 +34,13 @@ export default async function PaperasseListPage() {
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <div className="flex items-center gap-2">
-            <h1 className="text-2xl font-semibold tracking-tight text-slate-900">Digitaliseur de paperasse</h1>
+            <h1 className="text-2xl font-semibold tracking-tight text-slate-900">Analyseur de documents</h1>
             <Badge tone="blue">Premium</Badge>
           </div>
           <p className="mt-1 text-sm text-slate-500">
-            Uploadez vos factures ou documents administratifs au fil du temps, obtenez les champs clés
-            extraits automatiquement de chacun.
+            Uploadez vos factures, devis, contrats ou autres documents administratifs, obtenez les
+            champs clés extraits automatiquement de chacun, exportables en CSV, et posez vos questions
+            directement en chat.
           </p>
         </div>
         {allowed && <CreateDigitizerForm organizationId={org.id} />}

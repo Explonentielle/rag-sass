@@ -2,7 +2,7 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import type { Database, DocumentFormat } from '@/types/database';
 import { extractText, extractFromUrl, UnsupportedDocumentError, type SupportedFileType } from '@/lib/extract';
 import { chunkText } from '@/lib/chunking';
-import { embedTexts, structureChunksWithAI, extractContractClauses, extractDocumentFields } from '@/lib/openai';
+import { embedTexts, structureChunksWithAI, extractDocumentFields } from '@/lib/openai';
 import {
   ensureChunksIndex,
   getEsClient,
@@ -133,40 +133,14 @@ async function resolveChunks(text: string, useAiIndexing: boolean | undefined): 
   };
 }
 
-// Contract clause extraction (docs/roadmap.md item 23) runs alongside
+// Document field extraction (docs/roadmap.md item 24; item 70 merged the old
+// contract analyzer into this same path, format 'contrat') runs alongside
 // chunking, not inside runIngestion's own try/catch: a failure here must
 // never flip the document's status to 'error' — the chat Q&A works off the
-// indexed chunks regardless of whether a summary was produced. Writes
-// straight to chatbots.contract_summary rather than returning a value,
+// indexed chunks regardless of whether fields were extracted. Writes
+// straight to documents.extracted_fields rather than returning a value,
 // since it's run via Promise.all alongside resolveChunks (see
 // processDocument below) and has nothing to contribute to that result.
-async function analyzeAndStoreContract(
-  supabase: SupabaseClient<Database>,
-  chatbotId: string,
-  documentId: string,
-  text: string
-): Promise<void> {
-  try {
-    const summary = await extractContractClauses(text);
-    if (summary) {
-      await supabase.from('chatbots').update({ contract_summary: summary }).eq('id', chatbotId);
-    }
-  } catch (err) {
-    logWarn('contract_analysis.failed', {
-      chatbotId,
-      documentId,
-      error: err instanceof Error ? err.message : String(err),
-    });
-  }
-}
-
-// Document field extraction (docs/roadmap.md item 24) runs alongside
-// chunking, same reasoning as analyzeAndStoreContract above: a failure must
-// never flip the document's status to 'error', and it writes straight to
-// documents.extracted_fields (per-document, unlike contract_summary which
-// is per-chatbot) rather than returning a value, since it's run via
-// Promise.all alongside resolveChunks and has nothing to contribute to that
-// result.
 async function analyzeAndStoreDocumentFields(
   supabase: SupabaseClient<Database>,
   documentId: string,
@@ -201,10 +175,6 @@ export interface ProcessDocumentParams {
   // off so every other call site (scripts/smoke-test.mts) keeps working
   // unchanged.
   useAiIndexing?: boolean;
-  // Premium (docs/roadmap.md item 23) — runs extractContractClauses on the
-  // extracted text and stores the result on chatbots.contract_summary.
-  // Caller resolves this from chatbots.use_case === 'contract_analyzer'.
-  analyzeContract?: boolean;
   // Premium (docs/roadmap.md item 24) — runs extractDocumentFields on the
   // extracted text and stores the result on documents.extracted_fields.
   // Caller resolves this from chatbots.document_format when
@@ -232,7 +202,6 @@ export async function processDocument(
     fileType,
     filename,
     useAiIndexing,
-    analyzeContract,
     documentFormat,
   } = params;
 
@@ -247,13 +216,11 @@ export async function processDocument(
     const text = await extractText(buffer, fileType, filename);
 
     // Run together: by the time the document's status flips to 'indexed'
-    // below, contract_summary/extracted_fields (if requested) has already
-    // been attempted — the pollers (components/ContractStatusPoller.tsx,
-    // reused as-is for the digitizer) refresh once on 'indexed' and expect
-    // the result to be ready.
+    // below, extracted_fields (if requested) has already been attempted:
+    // the poller (components/ContractStatusPoller.tsx) refreshes once on
+    // 'indexed' and expects the result to be ready.
     const [resolved] = await Promise.all([
       resolveChunks(text, useAiIndexing),
-      analyzeContract ? analyzeAndStoreContract(supabase, chatbotId, documentId, text) : Promise.resolve(),
       documentFormat
         ? analyzeAndStoreDocumentFields(supabase, documentId, chatbotId, documentFormat, text)
         : Promise.resolve(),

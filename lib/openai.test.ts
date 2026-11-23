@@ -1,7 +1,7 @@
 // Tests pour lib/openai.ts — rerankChunks (roadmap item 4),
 // structureChunksWithAI (item 18, indexation assistée par IA),
-// extractContractClauses (item 23, analyseur de contrats),
-// extractDocumentFields (item 24, digitaliseur de paperasse),
+// extractDocumentFields (item 24, analyseur de documents ; le format
+// 'contrat' couvre l'ancien analyseur de contrats depuis l'item 70),
 // transcribeAudio (item 46, transcription de réunions), et la boucle de
 // function calling de streamAnswer (item 33, agentique). rewriteQuery et
 // embedTexts ne sont pas testés ici : ce fichier se concentre sur la
@@ -37,7 +37,6 @@ vi.mock('@/lib/logger', () => ({ logWarn: vi.fn(), logInfo: vi.fn(), logError: v
 const {
   rerankChunks,
   structureChunksWithAI,
-  extractContractClauses,
   extractDocumentFields,
   transcribeAudio,
   streamAnswer,
@@ -238,73 +237,6 @@ describe('structureChunksWithAI', () => {
   });
 });
 
-describe('extractContractClauses', () => {
-  const validSummary = {
-    parties: 'Société Dupont SAS et Client Martin.',
-    objet: 'Prestation de maintenance informatique annuelle.',
-    dureeEtReconduction: '12 mois, reconduction tacite avec préavis de 3 mois.',
-    conditionsResiliation: 'Résiliation possible à tout moment avec préavis de 3 mois.',
-    penalites: 'Pénalité de 10% du montant restant dû en cas de rupture anticipée.',
-    modalitesPaiement: 'Paiement mensuel à 30 jours, par virement.',
-    clauseConfidentialite: 'Confidentialité réciproque sur toute la durée du contrat.',
-    clauseNonConcurrence: null,
-    pointsNotables: 'Aucun point particulier relevé.',
-  };
-
-  it('returns the structured summary on success', async () => {
-    createMock.mockResolvedValueOnce(fakeStructuredResponse(validSummary));
-
-    const result = await extractContractClauses('Texte du contrat...');
-
-    expect(result).toEqual(validSummary);
-  });
-
-  it('returns null when the API call fails, never throwing', async () => {
-    createMock.mockRejectedValueOnce(new Error('timeout'));
-
-    const result = await extractContractClauses('Texte du contrat...');
-
-    expect(result).toBeNull();
-  });
-
-  it('returns null when a required string field is missing', async () => {
-    const { parties, ...incomplete } = validSummary;
-    createMock.mockResolvedValueOnce(fakeStructuredResponse(incomplete));
-
-    const result = await extractContractClauses('Texte du contrat...');
-
-    expect(result).toBeNull();
-  });
-
-  it('returns null when an optional clause field is neither a string nor null', async () => {
-    createMock.mockResolvedValueOnce(
-      fakeStructuredResponse({ ...validSummary, clauseConfidentialite: 42 })
-    );
-
-    const result = await extractContractClauses('Texte du contrat...');
-
-    expect(result).toBeNull();
-  });
-
-  it('returns null on an unparseable response instead of throwing', async () => {
-    createMock.mockResolvedValueOnce({ choices: [{ message: { content: '{"parties": ' } }] });
-
-    const result = await extractContractClauses('Texte du contrat...');
-
-    expect(result).toBeNull();
-  });
-
-  it('truncates very long contracts before sending them to the model', async () => {
-    createMock.mockResolvedValueOnce(fakeStructuredResponse(validSummary));
-
-    await extractContractClauses('a'.repeat(100_000));
-
-    const sentMessages = createMock.mock.calls[0][0].messages;
-    const userMessage = sentMessages.find((m: { role: string }) => m.role === 'user');
-    expect(userMessage.content.length).toBe(60_000);
-  });
-});
-
 describe('extractDocumentFields', () => {
   const validFields = [
     { label: 'Numéro de facture', value: 'F-2026-042' },
@@ -354,7 +286,16 @@ describe('extractDocumentFields', () => {
   });
 
   it('uses a distinct, non-empty system prompt for every format', async () => {
-    const formats = ['facture', 'devis', 'bon_commande', 'bon_livraison', 'note_frais', 'fiche_paie', 'libre'] as const;
+    const formats = [
+      'facture',
+      'devis',
+      'bon_commande',
+      'bon_livraison',
+      'note_frais',
+      'fiche_paie',
+      'contrat',
+      'libre',
+    ] as const;
     const prompts: string[] = [];
 
     for (const format of formats) {

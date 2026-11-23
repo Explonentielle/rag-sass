@@ -124,6 +124,8 @@ Editor**, exécute-les dans l'ordre, une par une :
 | 29 | `0029_source_refresh.sql` | Sans effet si déjà appliquée (`add column if not exists`, `create index if not exists`) |
 | 30 | `0030_lead_webhook.sql` | Sans effet si déjà appliquée (`add column if not exists`) |
 | 31 | `0031_visitor_file_analysis.sql` | Sans effet si déjà appliquée (`add column if not exists`) |
+| 32 | `0032_digitizer_more_formats.sql` | Sans effet si déjà appliquée (`drop constraint if exists` avant recréation) |
+| 33 | `0033_merge_document_analyzer.sql` | Sans effet si déjà appliquée (plus aucune ligne `use_case = 'contract_analyzer'` après la première exécution, voir le commentaire en tête du fichier) |
 
 Pour les n° 1 à 4 : si l'exécution s'arrête sur une erreur
 `policy "..." already exists`, c'est le signal que cette migration (au

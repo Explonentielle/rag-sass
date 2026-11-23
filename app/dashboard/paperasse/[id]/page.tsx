@@ -4,6 +4,7 @@ import { createClient } from '@/lib/supabase/server';
 import DocumentUploader from '@/components/DocumentUploader';
 import ContractStatusPoller from '@/components/ContractStatusPoller';
 import DocumentFieldsList from '@/components/DocumentFieldsList';
+import ChatWidget from '@/components/ChatWidget';
 import { DocumentStatusBadge } from '@/components/DocumentStatusBadge';
 import DeleteDocumentButton from '@/components/DeleteDocumentButton';
 import DeleteChatbotSection from '@/components/DeleteChatbotSection';
@@ -20,6 +21,7 @@ const FORMAT_LABELS: Record<DocumentFormat, string> = {
   bon_livraison: 'Bon de livraison',
   note_frais: 'Note de frais',
   fiche_paie: 'Fiche de paie',
+  contrat: 'Contrat',
   libre: 'Libre',
 };
 
@@ -52,20 +54,27 @@ export default async function DigitizerPage({ params }: { params: { id: string }
     documentsError
   );
 
+  // Format 'contrat' (docs/roadmap.md item 70) : un seul document par
+  // analyse : l'uploader disparaît une fois celui-ci ajouté plutôt que de
+  // laisser l'utilisateur buter sur l'erreur 400 de l'API.
+  const atContractLimit = documentFormat === 'contrat' && (documents ?? []).length >= 1;
+  const hasIndexedDocument = (documents ?? []).some((doc) => doc.status === 'indexed');
+
   return (
     <div className="space-y-10">
       <PageSections
         sections={[
           { id: 'documents', label: 'Documents' },
+          ...(hasIndexedDocument ? [{ id: 'question', label: 'Poser une question' }] : []),
           { id: 'danger', label: 'Zone de danger' },
         ]}
       />
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-4">
           <IconBadge spacing="">{ICONS.layers}</IconBadge>
           <div>
             <Link href="/dashboard/paperasse" className="text-sm text-slate-500 hover:text-slate-700">
-              ← Digitaliseur de paperasse
+              ← Analyseur de documents
             </Link>
             <div className="mt-1 flex items-center gap-2">
               <h1 className="text-2xl font-semibold tracking-tight text-slate-900">{chatbot.name}</h1>
@@ -73,6 +82,14 @@ export default async function DigitizerPage({ params }: { params: { id: string }
             </div>
           </div>
         </div>
+        {(documents ?? []).length > 0 && (
+          <a
+            href={`/api/chatbots/${chatbot.id}/export`}
+            className="rounded-md border border-slate-300 px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50"
+          >
+            Exporter en CSV
+          </a>
+        )}
       </div>
 
       <section id="documents" className="scroll-mt-6 space-y-3">
@@ -81,7 +98,7 @@ export default async function DigitizerPage({ params }: { params: { id: string }
             <Icon className="h-4 w-4 text-brand-600">{ICONS.document}</Icon>
             Documents
           </h2>
-          <DocumentUploader chatbotId={chatbot.id} />
+          {!atContractLimit && <DocumentUploader chatbotId={chatbot.id} />}
         </div>
 
         {(documents ?? []).length === 0 ? (
@@ -94,9 +111,9 @@ export default async function DigitizerPage({ params }: { params: { id: string }
               const isProcessing = doc.status === 'pending' || doc.status === 'processing';
               return (
                 <Card key={doc.id} className="overflow-hidden">
-                  <div className="flex items-center justify-between px-5 py-4">
-                    <p className="font-medium text-slate-900">{doc.filename}</p>
-                    <div className="flex items-center gap-3">
+                  <div className="flex flex-wrap items-center justify-between gap-3 px-5 py-4">
+                    <p className="min-w-0 flex-1 truncate font-medium text-slate-900">{doc.filename}</p>
+                    <div className="flex flex-shrink-0 items-center gap-3">
                       <DocumentStatusBadge status={doc.status} />
                       <DeleteDocumentButton documentId={doc.id} />
                     </div>
@@ -126,6 +143,18 @@ export default async function DigitizerPage({ params }: { params: { id: string }
           </div>
         )}
       </section>
+
+      {hasIndexedDocument && (
+        <section id="question" className="scroll-mt-6 space-y-3">
+          <h2 className="flex items-center gap-2 font-semibold text-slate-900">
+            <Icon className="h-4 w-4 text-brand-600">{ICONS.chat}</Icon>
+            Poser une question sur ces documents
+          </h2>
+          <div className="flex h-[32rem] flex-col">
+            <ChatWidget chatbotId={chatbot.id} />
+          </div>
+        </section>
+      )}
 
       <section id="danger" className="scroll-mt-6 space-y-3">
         <h2 className="flex items-center gap-2 font-semibold text-slate-900">

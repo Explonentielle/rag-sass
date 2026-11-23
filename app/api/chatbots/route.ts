@@ -2,15 +2,10 @@ import { NextResponse } from 'next/server';
 import { reportDbError } from '@/lib/reportError';
 import { createClient } from '@/lib/supabase/server';
 import { PROMPT_TEMPLATES } from '@/lib/prompts';
-import {
-  PLAN_CHATBOT_LIMITS,
-  PLAN_LABELS,
-  CONTRACT_ANALYZER_ALLOWED_PLANS,
-  PAPERWORK_DIGITIZER_ALLOWED_PLANS,
-} from '@/lib/plans';
+import { PLAN_CHATBOT_LIMITS, PLAN_LABELS, PAPERWORK_DIGITIZER_ALLOWED_PLANS } from '@/lib/plans';
 import type { ChatbotUseCase, DocumentFormat, OrgPlan } from '@/types/database';
 
-const USE_CASES: ChatbotUseCase[] = ['site_widget', 'second_cerveau', 'contract_analyzer', 'paperwork_digitizer'];
+const USE_CASES: ChatbotUseCase[] = ['site_widget', 'second_cerveau', 'paperwork_digitizer'];
 const DOCUMENT_FORMATS: DocumentFormat[] = [
   'facture',
   'devis',
@@ -18,6 +13,7 @@ const DOCUMENT_FORMATS: DocumentFormat[] = [
   'bon_livraison',
   'note_frais',
   'fiche_paie',
+  'contrat',
   'libre',
 ];
 
@@ -78,19 +74,11 @@ export async function POST(request: Request) {
   // pattern in app/api/chatbots/[id]/route.ts): annotate explicitly.
   const plan: OrgPlan = org.plan;
 
-  // Premium entitlement (docs/roadmap.md item 23), checked at creation
+  // Premium entitlement (docs/roadmap.md item 24), checked at creation
   // since (unlike AI indexing) there's no later toggle to gate instead.
-  if (useCase === 'contract_analyzer' && !CONTRACT_ANALYZER_ALLOWED_PLANS.includes(plan)) {
-    return NextResponse.json(
-      { error: "L'analyseur de contrats nécessite le plan PME ou Métier." },
-      { status: 403 }
-    );
-  }
-
-  // Même logique de gating, docs/roadmap.md item 24.
   if (useCase === 'paperwork_digitizer' && !PAPERWORK_DIGITIZER_ALLOWED_PLANS.includes(plan)) {
     return NextResponse.json(
-      { error: 'Le digitaliseur de paperasse nécessite le plan PME ou Métier.' },
+      { error: "L'analyseur de documents nécessite le plan PME ou Métier." },
       { status: 403 }
     );
   }

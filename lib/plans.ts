@@ -75,8 +75,7 @@ export const PLAN_FEATURES: Record<OrgPlan, string[]> = {
     'Assistants illimités',
     'Formats étendus : CSV, Excel, multi-documents',
     "Membres d'équipe multiples",
-    'Analyseur de contrats (IA)',
-    'Digitaliseur de paperasse (IA)',
+    'Analyseur de documents (IA)',
     'Transcription de réunions (IA)',
   ],
   metier: ['Fonctionnalités de la feuille de route en priorité', 'Accompagnement à la mise en place', 'Facturation adaptée au volume réel'],
@@ -92,16 +91,10 @@ export const PLAN_FEATURES: Record<OrgPlan, string[]> = {
 export const AI_INDEXING_ALLOWED_PLANS: OrgPlan[] = ['pme', 'metier'];
 
 /**
- * Plans entitled to the contract analyzer (docs/roadmap.md item 23), a
- * premium feature for the same reason as AI indexing above (real per-document
- * LLM cost). Enforced at creation time in app/api/chatbots/route.ts.
- */
-export const CONTRACT_ANALYZER_ALLOWED_PLANS: OrgPlan[] = ['pme', 'metier'];
-
-/**
- * Plans entitled to the paperwork digitizer (docs/roadmap.md item 24), a
- * premium feature for the same reason as the contract analyzer above (real
- * per-document LLM cost). Enforced at creation time in
+ * Plans entitled to the document analyzer (docs/roadmap.md item 24; item 70
+ * merged the former contract analyzer into this same use_case, format
+ * 'contrat'), a premium feature for the same reason as AI indexing above
+ * (real per-document LLM cost). Enforced at creation time in
  * app/api/chatbots/route.ts.
  */
 export const PAPERWORK_DIGITIZER_ALLOWED_PLANS: OrgPlan[] = ['pme', 'metier'];

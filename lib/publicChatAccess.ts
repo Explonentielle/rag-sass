@@ -72,7 +72,7 @@ export async function getAccessibleChatbot(
   // Only a 'site_widget' chatbot is ever reachable anonymously — checked
   // here (the one chokepoint shared by every anonymous endpoint) rather
   // than relying on `is_public` alone: 'second_cerveau' and
-  // 'contract_analyzer' chatbots are meant to stay internal regardless of
+  // 'paperwork_digitizer' chatbots are meant to stay internal regardless of
   // what `is_public`/`allowed_origins` happen to hold (their dashboard UI
   // never exposes a way to change either), so this can't be bypassed by a
   // stale row, a future UI bug, or a direct API call.

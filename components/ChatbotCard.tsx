@@ -24,8 +24,8 @@ export default function ChatbotCard({
   name: string;
   createdAt: string;
   icon?: React.ReactNode;
-  // Defaults to the shared chatbot detail route — every use_case except
-  // 'contract_analyzer' (app/dashboard/contrats/page.tsx) is viewed there.
+  // Defaults to the shared chatbot detail route: 'paperwork_digitizer'
+  // (app/dashboard/paperasse/page.tsx) is the only use_case viewed elsewhere.
   href?: string;
 }) {
   const router = useRouter();

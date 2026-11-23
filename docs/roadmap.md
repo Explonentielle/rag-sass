@@ -3450,3 +3450,47 @@ d'extraction) reste à faire. Le nom public "Analyseur de documents"
 désigne aujourd'hui deux outils distincts en interne ; les unifier pour
 de vrai demande : ajouter l'export CSV, ajouter le chat sur les documents
 du digitaliseur, puis fusionner les deux `use_case`/UI en un seul.
+
+### 70. Fusion réelle de l'analyseur de contrats dans le digitaliseur, export CSV et chat universel : ✅ Fait (2026-11-23)
+
+**Fait**, complétant le chantier laissé ouvert par l'item 69 :
+
+- **Un seul `use_case`** : `contract_analyzer` est retiré (migration
+  `0033_merge_document_analyzer.sql`). Un contrat est maintenant un
+  `paperwork_digitizer` avec `document_format = 'contrat'`, toujours limité
+  à un seul document par analyse (`app/api/documents/upload/route.ts`),
+  mais ce n'est plus qu'une règle par format plutôt qu'un `use_case` à
+  part. La migration bascule les chatbots existants et convertit
+  `chatbots.contract_summary` (9 champs fixes) en paires label/valeur sur
+  `documents.extracted_fields`, avant de retirer la colonne.
+- **Une seule UI** : `app/dashboard/contrats/` et
+  `components/CreateContractForm.tsx`/`ContractSummaryAccordion.tsx`
+  supprimés. `app/dashboard/paperasse/` (renommé "Analyseur de documents"
+  dans la barre latérale et le titre de page) gère désormais tous les
+  formats, `contrat` compris (`CreateDigitizerForm.tsx`,
+  `lib/openai.ts` `DOCUMENT_FIELDS_SYSTEM_PROMPTS`).
+- **Chat sur tous les documents** : le chat (déjà générique côté serveur,
+  `app/api/chat/route.ts` n'a jamais filtré sur `use_case`) est maintenant
+  aussi affiché sur la page du digitaliseur, dès qu'au moins un document
+  est indexé, plus seulement sur la page contrat.
+- **Export CSV** (`app/api/chatbots/[id]/export/route.ts`, `lib/csv.ts`) :
+  une colonne par label rencontré parmi tous les documents du
+  digitaliseur (union, dans l'ordre d'apparition), une ligne par document,
+  cellule vide si ce document n'a pas ce champ. BOM UTF-8 pour un rendu
+  correct des accents dans Excel.
+- Landing (`app/page.tsx`) et tarifs (`lib/plans.ts` `PLAN_FEATURES.pme`,
+  qui avait pris du retard sur la landing après l'item 69) mis à jour pour
+  refléter que l'export CSV et le chat couvrent désormais tous les types
+  de documents, pas seulement les contrats ; l'entrée correspondante
+  retirée de la feuille de route du catalogue.
+- Corrigé en passant : `app/dashboard/documents/page.tsx` (liste globale
+  des documents) pointait tous les liens vers `/dashboard/chatbots/[id]`,
+  menant à un 404 pour un digitaliseur (route dédiée
+  `/dashboard/paperasse/[id]`) : bug préexistant, visible dès qu'on
+  touchait ce routage pour la fusion.
+
+**Pas testé en situation réelle** : la migration n'a pas été appliquée
+sur la base de production (à exécuter manuellement comme les précédentes,
+voir `docs/deployment.md`) ; le rendu du digitaliseur avec chat actif n'a
+pas été vérifié dans un vrai navigateur, seulement par relecture de code
+et `tsc`/tests unitaires.

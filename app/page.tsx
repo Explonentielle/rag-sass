@@ -223,8 +223,8 @@ function Features() {
     {
       title: 'Analyseur de documents',
       points: [
-        'Factures, devis, contrats, bons de commande, bons de livraison, notes de frais, fiches de paie : les champs clés sont extraits et listés automatiquement, au fil de vos uploads.',
-        'Sur vos contrats : clauses résumées (durée, résiliation, pénalités) et interrogeables en langage naturel, directement depuis le document.',
+        'Factures, devis, contrats, bons de commande, bons de livraison, notes de frais, fiches de paie : les champs clés sont extraits et listés automatiquement, au fil de vos uploads, exportables en CSV.',
+        "Posez vos questions en langage naturel directement sur vos documents, réponses sourcées. Sur un contrat : clauses résumées en plus (durée, résiliation, pénalités).",
       ],
     },
     {
@@ -290,7 +290,7 @@ function Catalogue() {
   // industrie (santé, immobilier, vente, conformité...) ira sur une page
   // dédiée plus tard, pas ici.
   const available: CatalogueEntry[] = [
-    { title: 'Analyseur de documents', body: 'Factures, devis, contrats, bons de commande ou fiches de paie : les champs clés sont extraits automatiquement au fil de vos uploads. Sur un contrat, posez aussi vos questions directement sur le document.', who: 'PME, comptabilité, administratif' },
+    { title: 'Analyseur de documents', body: 'Factures, devis, contrats, bons de commande ou fiches de paie : les champs clés sont extraits automatiquement au fil de vos uploads, exportables en CSV, et interrogeables en chat.', who: 'PME, comptabilité, administratif' },
     { title: 'Agent de qualification', body: 'Engage un visiteur, pose les bonnes questions, score et route le contact vers votre équipe ou votre CRM.', who: 'B2B à cycle de vente long' },
     { title: 'Chatbot documentaire & support client', body: 'Répond aux questions à partir de vos documents (PDF natifs ou scannés, images) ou de vos FAQ et procédures, sources citées à chaque réponse.', who: 'Sites publics, SaaS, équipes support' },
     { title: 'Transcription de réunions', body: 'Enregistrez une réunion depuis le dashboard, elle est transcrite et indexée automatiquement : posez vos questions dessus ensuite.', who: 'Équipes, assistant interne' },
@@ -300,7 +300,6 @@ function Catalogue() {
   ];
 
   const roadmap: CatalogueEntry[] = [
-    { title: 'Export CSV et chat sur tous les documents', body: "Exporter les champs extraits en CSV, et poser des questions en chat sur n'importe quel type de document, pas seulement les contrats.", who: 'Comptabilité, gestion' },
     { title: 'Brouillon de réponse email', body: 'Rédige une réponse client à partir de la base de connaissance, à valider avant envoi.', who: 'Support à fort volume' },
     { title: 'Standard IA téléphone / WhatsApp', body: 'Le même assistant, sur un canal vocal ou messagerie.', who: 'Commerces de proximité' },
     { title: 'Veille & synthèse', body: 'Surveille un corpus interne ou externe, pousse un résumé périodique des nouveautés.', who: 'Veille concurrentielle, R&D' },

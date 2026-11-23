@@ -49,11 +49,12 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Chatbot introuvable.' }, { status: 404 });
     }
 
-    // Contract analyzer (docs/roadmap.md item 23): one contract per
-    // analysis by design (isolated, not mixed into a shared knowledge
-    // base) — the dedicated creation flow (components/CreateContractForm.tsx)
-    // never sends a second file, this guards direct API use.
-    if (chatbot.use_case === 'contract_analyzer') {
+    // Format contrat (docs/roadmap.md item 70, ex-use_case contract_analyzer):
+    // un seul document par analyse, par design (isolé, pas mélangé dans une
+    // base de connaissance partagée). Le formulaire de création n'envoie
+    // jamais de second fichier pour ce format, ce garde-fou couvre un appel
+    // direct à l'API.
+    if (chatbot.document_format === 'contrat') {
       const { count, error: countError } = await supabase
         .from('documents')
         .select('id', { count: 'exact', head: true })
@@ -164,7 +165,6 @@ export async function POST(request: Request) {
         fileType,
         filename: file.name,
         useAiIndexing: chatbot.use_ai_indexing,
-        analyzeContract: chatbot.use_case === 'contract_analyzer',
         documentFormat: chatbot.use_case === 'paperwork_digitizer' ? chatbot.document_format : null,
       }).catch((err) => {
         logError('upload.background_processing_uncaught', {

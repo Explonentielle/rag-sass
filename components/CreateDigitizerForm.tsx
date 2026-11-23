@@ -6,13 +6,14 @@ import { Button } from '@/components/ui/Button';
 import { Card, Input, Label } from '@/components/ui/Card';
 import type { DocumentFormat } from '@/types/database';
 
-// Contrairement à components/CreateContractForm.tsx (un clic, un fichier,
-// pas de champ nom : un contrat = une analyse isolée), un digitaliseur
-// accumule plusieurs documents au fil du temps (docs/roadmap.md item 24) :
-// il lui faut un nom propre, et le format est fixé une fois pour toutes à
-// la création puisqu'il oriente l'extraction de chaque document ajouté
-// ensuite. Pas d'upload de fichier ici : il se fait après coup sur la page
-// du digitaliseur, via components/DocumentUploader.tsx.
+// Un digitaliseur accumule plusieurs documents au fil du temps (docs/
+// roadmap.md item 24) : il lui faut un nom propre, et le format est fixé
+// une fois pour toutes à la création puisqu'il oriente l'extraction de
+// chaque document ajouté ensuite. Format 'contrat' excepté : une analyse de
+// contrat reste limitée à un seul document (app/api/documents/upload/
+// route.ts), fusionné ici depuis l'ancien use_case contract_analyzer
+// (item 70). Pas d'upload de fichier ici : il se fait après coup sur la
+// page du digitaliseur, via components/DocumentUploader.tsx.
 export default function CreateDigitizerForm({ organizationId }: { organizationId: string }) {
   const router = useRouter();
   const [name, setName] = useState('');
@@ -81,6 +82,7 @@ export default function CreateDigitizerForm({ organizationId }: { organizationId
               <option value="bon_livraison">Bon de livraison</option>
               <option value="note_frais">Note de frais</option>
               <option value="fiche_paie">Fiche de paie</option>
+              <option value="contrat">Contrat</option>
               <option value="libre">Libre (le modèle identifie les champs lui-même)</option>
             </select>
             <p className="text-xs text-slate-400">
@@ -91,6 +93,12 @@ export default function CreateDigitizerForm({ organizationId }: { organizationId
                 Les fiches de paie contiennent des données personnelles sensibles (salaire). Vérifiez
                 qui a accès à ce digitaliseur et la durée pendant laquelle ces documents doivent être
                 conservés.
+              </p>
+            )}
+            {format === 'contrat' && (
+              <p className="text-xs text-slate-500">
+                Format pensé pour un seul document : une fois un contrat ajouté, créez un nouveau
+                digitaliseur pour en analyser un autre.
               </p>
             )}
           </div>

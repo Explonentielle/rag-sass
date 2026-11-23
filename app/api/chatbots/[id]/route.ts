@@ -279,7 +279,7 @@ export async function PATCH(request: Request, { params }: { params: { id: string
     }
   }
 
-  // A 'second_cerveau' or 'contract_analyzer' chatbot can never be made
+  // A 'second_cerveau' or 'paperwork_digitizer' chatbot can never be made
   // public from here — their dashboard UI has no "Widget" section to
   // reach this in the first place (a defense-in-depth check: the real
   // gate anonymous requests go through is lib/publicChatAccess.ts

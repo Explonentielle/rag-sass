@@ -1,6 +1,6 @@
 // Tests pour lib/publicChatAccess.ts getAccessibleChatbot — en particulier
 // le filtre sur use_case ajouté suite à un signalement (une organisation
-// 'second_cerveau'/'contract_analyzer' pouvait rester joignable via
+// 'second_cerveau'/'paperwork_digitizer' pouvait rester joignable via
 // l'endpoint anonyme /api/public-chat si is_public valait true, par défaut
 // au niveau colonne). Le reste de la logique (is_public, allowed_origins)
 // était déjà en prod, retesté ici en passant pour ne pas le casser.
@@ -61,9 +61,9 @@ describe('getAccessibleChatbot', () => {
     expect(result).toEqual({ ok: false, reason: 'private' });
   });
 
-  it('rejects a contract_analyzer chatbot even when is_public is true', async () => {
+  it('rejects a paperwork_digitizer chatbot even when is_public is true', async () => {
     const result = await getAccessibleChatbot(
-      fakeAdmin({ ...baseRow, use_case: 'contract_analyzer' }),
+      fakeAdmin({ ...baseRow, use_case: 'paperwork_digitizer' }),
       'bot-1',
       request
     );

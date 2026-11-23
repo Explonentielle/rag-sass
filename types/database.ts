@@ -11,17 +11,14 @@ export type OrgOverageMode = 'block' | 'auto_bill';
 export type SourceRefreshFrequency = 'off' | 'daily' | 'weekly';
 export type FileExtractionStatus = 'ok' | 'empty' | 'failed';
 export type OverageChargeStatus = 'succeeded' | 'failed';
-export type ChatbotUseCase = 'site_widget' | 'second_cerveau' | 'contract_analyzer' | 'paperwork_digitizer';
-
-// Structured clause extraction (lib/openai.ts ContractSummary), stored as
-// jsonb on chatbots.contract_summary — kept loose here (not importing
-// lib/openai.ts's richer ContractSummary type into this file) since this
-// module only describes the DB shape, not the app-level contract.
-export type ContractSummaryJson = Record<string, string | null>;
+export type ChatbotUseCase = 'site_widget' | 'second_cerveau' | 'paperwork_digitizer';
 
 // Format choisi à la création d'un digitaliseur de paperasse (item 24),
 // oriente l'extraction (lib/openai.ts extractDocumentFields). Stocké sur
-// chatbots.document_format, null pour les autres use_cases.
+// chatbots.document_format, null pour les autres use_cases. 'contrat' (item
+// 70) remplace l'ancien use_case contract_analyzer : un contrat est
+// désormais un digitaliseur comme un autre, juste limité à un seul document
+// par analyse (app/api/documents/upload/route.ts).
 export type DocumentFormat =
   | 'facture'
   | 'devis'
@@ -29,6 +26,7 @@ export type DocumentFormat =
   | 'bon_livraison'
   | 'note_frais'
   | 'fiche_paie'
+  | 'contrat'
   | 'libre';
 
 // Paires label/valeur extraites d'un document (lib/openai.ts
@@ -108,7 +106,6 @@ export interface Database {
           show_loading_steps: boolean;
           loading_messages: string[] | null;
           use_case: ChatbotUseCase;
-          contract_summary: ContractSummaryJson | null;
           document_format: DocumentFormat | null;
           allow_lead_qualification: boolean;
           lead_qualification_criteria: string | null;
@@ -138,7 +135,6 @@ export interface Database {
           show_loading_steps?: boolean;
           loading_messages?: string[] | null;
           use_case?: ChatbotUseCase;
-          contract_summary?: ContractSummaryJson | null;
           document_format?: DocumentFormat | null;
           allow_lead_qualification?: boolean;
           lead_qualification_criteria?: string | null;
@@ -168,7 +164,6 @@ export interface Database {
           show_loading_steps?: boolean;
           loading_messages?: string[] | null;
           use_case?: ChatbotUseCase;
-          contract_summary?: ContractSummaryJson | null;
           document_format?: DocumentFormat | null;
           allow_lead_qualification?: boolean;
           lead_qualification_criteria?: string | null;
