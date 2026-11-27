@@ -13,6 +13,11 @@ export type FileExtractionStatus = 'ok' | 'empty' | 'failed';
 export type OverageChargeStatus = 'succeeded' | 'failed';
 export type ChatbotUseCase = 'site_widget' | 'second_cerveau' | 'paperwork_digitizer';
 
+// Tâche extraite d'un enregistrement audio pour un assistant interne (item
+// 72). 'done' se fait cocher à la main, 'pending' est ce que le cron de
+// rappel (item 73) surveille.
+export type TaskStatus = 'pending' | 'done';
+
 // Format choisi à la création d'un digitaliseur de paperasse (item 24),
 // oriente l'extraction (lib/openai.ts extractDocumentFields). Stocké sur
 // chatbots.document_format, null pour les autres use_cases. 'contrat' (item
@@ -380,6 +385,35 @@ export interface Database {
           amount_cents?: number;
           stripe_payment_intent_id?: string | null;
           status?: OverageChargeStatus;
+          created_at?: string;
+        };
+      };
+      tasks: {
+        Row: {
+          id: string;
+          chatbot_id: string;
+          document_id: string | null;
+          title: string;
+          due_date: string | null;
+          status: TaskStatus;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          chatbot_id: string;
+          document_id?: string | null;
+          title: string;
+          due_date?: string | null;
+          status?: TaskStatus;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          chatbot_id?: string;
+          document_id?: string | null;
+          title?: string;
+          due_date?: string | null;
+          status?: TaskStatus;
           created_at?: string;
         };
       };

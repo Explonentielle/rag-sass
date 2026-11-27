@@ -15,6 +15,7 @@ const NAV_ITEMS = [
   { href: '/dashboard/second-cerveau', label: 'Assistant interne', icon: ICONS.index },
   { href: '/dashboard/paperasse', label: 'Analyseur de documents', icon: ICONS.layers },
   { href: '/dashboard/documents', label: 'Documents', icon: ICONS.document },
+  { href: '/dashboard/tasks', label: 'Tâches', icon: ICONS.checkCircle },
   { href: '/dashboard/templates', label: 'Templates', icon: ICONS.layers },
   { href: '/dashboard/docs', label: 'Documentation', icon: ICONS.book },
   { href: '/dashboard/settings', label: 'Paramètres', icon: ICONS.settings },

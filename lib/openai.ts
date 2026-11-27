@@ -656,3 +656,102 @@ export async function extractDocumentFields(
     return null;
   }
 }
+
+// ---------------------------------------------------------------------------
+// Task extraction from an audio transcript (docs/roadmap.md item 72),
+// premium (chatbots.use_case === 'second_cerveau', same
+// AUDIO_TRANSCRIPTION_ALLOWED_PLANS gate as the transcription itself, item
+// 46: no separate entitlement needed since this only runs on an already-
+// gated audio document). Same best-effort philosophy as the rest of this
+// module: a failure or "no task found" leaves the tasks table untouched,
+// never blocks the document's indexing.
+// ---------------------------------------------------------------------------
+const TASK_EXTRACTION_MAX_CHARS = 60_000;
+
+export interface ExtractedTask {
+  title: string;
+  /** ISO 8601 (YYYY-MM-DD), ou null si aucune échéance n'est mentionnée. */
+  dueDate: string | null;
+}
+
+const TASK_EXTRACTION_SYSTEM_PROMPT = `Tu identifies les tâches concrètes (actions à faire par quelqu'un) mentionnées dans la transcription d'une réunion ou d'une note vocale. Base-toi uniquement sur le texte fourni, n'invente rien.
+
+Ne retiens que les actions explicites ("il faut que X fasse Y", "on doit...", "à faire avant..."), jamais une simple information ou un sujet discuté sans action associée. Si une échéance précise est mentionnée (date, "avant vendredi", "la semaine prochaine"...), convertis-la en date au format YYYY-MM-DD en te basant sur la date de référence donnée ; sinon laisse dueDate à null plutôt que d'inventer une date. S'il n'y a aucune tâche, renvoie une liste vide.`;
+
+/**
+ * Extracts actionable to-do items (title + optional due date) from a
+ * transcript, oriented by `referenceDate` (the recording's own date) to
+ * resolve relative dates ("vendredi prochain"). Returns null on failure, an
+ * empty array when the transcript has no actionable item: the caller
+ * (lib/ingest.ts) treats both as "nothing to insert", not an error state.
+ */
+export async function extractTasksFromText(
+  rawText: string,
+  referenceDate: string
+): Promise<ExtractedTask[] | null> {
+  const text =
+    rawText.length > TASK_EXTRACTION_MAX_CHARS ? rawText.slice(0, TASK_EXTRACTION_MAX_CHARS) : rawText;
+
+  try {
+    const openai = getOpenAiClient();
+    const response = await openai.chat.completions.create({
+      model: DEFAULT_CHAT_MODEL,
+      max_completion_tokens: 1200,
+      response_format: {
+        type: 'json_schema',
+        json_schema: {
+          name: 'extracted_tasks',
+          strict: true,
+          schema: {
+            type: 'object',
+            properties: {
+              tasks: {
+                type: 'array',
+                items: {
+                  type: 'object',
+                  properties: {
+                    title: { type: 'string' },
+                    dueDate: { type: ['string', 'null'] },
+                  },
+                  required: ['title', 'dueDate'],
+                  additionalProperties: false,
+                },
+              },
+            },
+            required: ['tasks'],
+            additionalProperties: false,
+          },
+        },
+      },
+      messages: [
+        { role: 'system', content: TASK_EXTRACTION_SYSTEM_PROMPT },
+        { role: 'user', content: `Date de référence : ${referenceDate}\n\nTranscription :\n${text}` },
+      ],
+    });
+
+    const raw = response.choices[0]?.message?.content;
+    if (!raw) throw new Error('Réponse vide');
+
+    const parsed = JSON.parse(raw);
+    if (
+      !Array.isArray(parsed.tasks) ||
+      !parsed.tasks.every(
+        (t: unknown) =>
+          typeof t === 'object' &&
+          t !== null &&
+          typeof (t as { title: unknown }).title === 'string' &&
+          ((t as { dueDate: unknown }).dueDate === null || typeof (t as { dueDate: unknown }).dueDate === 'string')
+      )
+    ) {
+      throw new Error('Champ tasks manquant ou invalide');
+    }
+
+    return parsed.tasks as ExtractedTask[];
+  } catch (err) {
+    logWarn('task_extraction.failed', {
+      textLength: text.length,
+      error: err instanceof Error ? err.message : String(err),
+    });
+    return null;
+  }
+}

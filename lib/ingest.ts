@@ -2,7 +2,7 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import type { Database, DocumentFormat } from '@/types/database';
 import { extractText, extractFromUrl, UnsupportedDocumentError, type SupportedFileType } from '@/lib/extract';
 import { chunkText } from '@/lib/chunking';
-import { embedTexts, structureChunksWithAI, extractDocumentFields } from '@/lib/openai';
+import { embedTexts, structureChunksWithAI, extractDocumentFields, extractTasksFromText } from '@/lib/openai';
 import {
   ensureChunksIndex,
   getEsClient,
@@ -162,6 +162,41 @@ async function analyzeAndStoreDocumentFields(
   }
 }
 
+// Tâches extraites d'un enregistrement audio (docs/roadmap.md item 72), à
+// côté de resolveChunks/analyzeAndStoreDocumentFields : même philosophie
+// best-effort, une tâche manquée ou un échec d'extraction ne bloque jamais
+// l'indexation du document. Écrit directement dans la table `tasks` plutôt
+// que de renvoyer une valeur, pour la même raison que
+// analyzeAndStoreDocumentFields (lancé via Promise.all, rien à contribuer
+// au résultat de resolveChunks).
+async function extractAndStoreTasks(
+  supabase: SupabaseClient<Database>,
+  documentId: string,
+  chatbotId: string,
+  referenceDate: string,
+  text: string
+): Promise<void> {
+  try {
+    const tasks = await extractTasksFromText(text, referenceDate);
+    if (tasks && tasks.length > 0) {
+      await supabase.from('tasks').insert(
+        tasks.map((t) => ({
+          chatbot_id: chatbotId,
+          document_id: documentId,
+          title: t.title,
+          due_date: t.dueDate,
+        }))
+      );
+    }
+  } catch (err) {
+    logWarn('task_extraction_storage.failed', {
+      chatbotId,
+      documentId,
+      error: err instanceof Error ? err.message : String(err),
+    });
+  }
+}
+
 export interface ProcessDocumentParams {
   documentId: string;
   chatbotId: string;
@@ -180,6 +215,10 @@ export interface ProcessDocumentParams {
   // Caller resolves this from chatbots.document_format when
   // use_case === 'paperwork_digitizer'; undefined/null skips it.
   documentFormat?: DocumentFormat | null;
+  // Premium (docs/roadmap.md item 72): runs extractTasksFromText on the
+  // transcript and inserts any found task into the `tasks` table. Caller
+  // resolves this from fileType === 'audio' && use_case === 'second_cerveau'.
+  extractTasks?: boolean;
 }
 
 /**
@@ -203,6 +242,7 @@ export async function processDocument(
     filename,
     useAiIndexing,
     documentFormat,
+    extractTasks,
   } = params;
 
   return runIngestion(supabase, { documentId, chatbotId, organizationId, filename }, async () => {
@@ -216,13 +256,16 @@ export async function processDocument(
     const text = await extractText(buffer, fileType, filename);
 
     // Run together: by the time the document's status flips to 'indexed'
-    // below, extracted_fields (if requested) has already been attempted:
-    // the poller (components/ContractStatusPoller.tsx) refreshes once on
-    // 'indexed' and expects the result to be ready.
+    // below, extracted_fields/tasks (if requested) have already been
+    // attempted: the poller (components/ContractStatusPoller.tsx) refreshes
+    // once on 'indexed' and expects the result to be ready.
     const [resolved] = await Promise.all([
       resolveChunks(text, useAiIndexing),
       documentFormat
         ? analyzeAndStoreDocumentFields(supabase, documentId, chatbotId, documentFormat, text)
+        : Promise.resolve(),
+      extractTasks
+        ? extractAndStoreTasks(supabase, documentId, chatbotId, new Date().toISOString().slice(0, 10), text)
         : Promise.resolve(),
     ]);
     return resolved;

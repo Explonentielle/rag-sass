@@ -73,6 +73,9 @@ fixe — sert de mémoire centralisée plutôt que de planning strict.
 | 64 | Qualité | Gestion d'erreur côté utilisateur : plus aucun texte technique brut dans le front | Moyen | ✅ Fait (2026-11-12) |
 | 65 | Chat | Réponse vocale du chatbot (bouton « Écouter » sur chaque réponse, pour ne pas avoir à lire) | Faible (voix du navigateur) à moyen (voix de qualité) | Noté, pas implémenté (2026-11-12) |
 | 66 | Dashboard | Sous-menu des étapes de configuration dans la barre latérale (chatbot, assistant interne, paramètres...) | Faible-moyen | ✅ Fait (2026-11-12) |
+| 71 | Chat | Dicter un message au chatbot par la voix (dashboard, reprend Whisper de l'item 46) | Faible-moyen | ✅ Fait (2026-11-27) |
+| 72 | Catalogue | Extraire une todolist structurée (titre, échéance) depuis une demande vocale ou un enregistrement de réunion | Moyen | ✅ Fait (2026-11-27), migration 0034 à appliquer |
+| 73 | Catalogue | Rappel par email si une tâche de la todolist est en retard | Faible-moyen | ✅ Fait (2026-11-27) |
 
 ---
 
@@ -3494,3 +3497,110 @@ sur la base de production (à exécuter manuellement comme les précédentes,
 voir `docs/deployment.md`) ; le rendu du digitaliseur avec chat actif n'a
 pas été vérifié dans un vrai navigateur, seulement par relecture de code
 et `tsc`/tests unitaires.
+
+---
+
+### 71. Dicter un message au chatbot par la voix (dashboard) : ✅ Fait (2026-11-27)
+
+**Besoin** : pouvoir parler directement au chatbot (chat de test ou
+assistant interne "second cerveau", pas le widget public) au lieu de
+taper au clavier, pour aller plus vite sur un message long.
+
+**Distinct de l'idée déjà écartée à l'item 46** : la voix en
+entrée/sortie *sur le widget public* (visiteur d'un site client) avait
+été explicitement abandonnée le 2026-11-12, faute de valeur business
+claire. Ici le contexte est différent (l'utilisateur de son propre
+dashboard, pas un visiteur anonyme), donc ce raisonnement ne s'applique
+pas : implémenté uniquement côté dashboard (`ChatWidget.tsx`, `!isPublic`),
+le widget public n'a pas de bouton micro.
+
+**Implémenté** : `app/api/transcribe/route.ts` (nouveau, authentifié,
+10 Mo max) appelle `transcribeAudio` (`lib/openai.ts`, déjà en place
+depuis l'item 46) sur un court enregistrement, sans créer de document.
+`components/ChatWidget.tsx` : bouton micro (`MediaRecorder`, pattern
+repris de `AudioRecorder.tsx`) à côté du champ de saisie, visible
+seulement hors widget public ; le texte transcrit vient compléter
+`input` plutôt que l'envoyer automatiquement, l'utilisateur garde la
+main pour relire/corriger avant d'envoyer. Pas de palier requis (coût
+marginal négligeable face à une transcription de réunion entière).
+
+**Pas testé en conditions réelles** : `tsc --noEmit` et `npm test`
+passent, mais pas de vrai micro essayé dans un navigateur.
+
+**Effort réel** : faible-moyen, confirmé (surtout UI, la brique de
+transcription était déjà en place).
+
+### 72. Extraire une todolist structurée depuis une demande vocale ou un enregistrement de réunion : ✅ Fait (2026-11-27, migration à appliquer)
+
+**Besoin** : pour l'assistant interne (second cerveau), que
+l'enregistrement d'une réunion (ou une demande vocale courte) alimente
+directement une todolist (titre + échéance), pas seulement un document
+indexé pour le RAG.
+
+**Implémenté, automatique** : s'appuie sur l'item 46 (réutilise
+`transcribeAudio`, ne refait rien côté enregistrement). Pour un chatbot
+`use_case = 'second_cerveau'`, chaque enregistrement audio déclenche en
+plus, dans `lib/ingest.ts` (`extractAndStoreTasks`, lancé via le même
+`Promise.all` que `analyzeAndStoreDocumentFields`), un appel
+`extractTasksFromText` (`lib/openai.ts`, sortie structurée, même pattern
+que `extractDocumentFields`) : n'extrait que des actions explicites, pas
+un simple sujet discuté, et résout les échéances relatives ("vendredi
+prochain") à partir de la date de l'enregistrement. Liste vide ou échec
+= rien d'inséré, jamais un document en échec pour autant (même
+philosophie best-effort que le reste du module).
+
+**Stockage** : `supabase/migrations/0034_tasks.sql`, table `tasks`
+(`chatbot_id`, `document_id`, `title`, `due_date`, `status`), RLS scopée
+transitivement via `chatbot_id` comme `documents`, pas de colonne
+`organization_id` dédiée (cohérence avec le reste du schéma).
+
+**UI** : nouvelle page `/dashboard/tasks` (entrée "Tâches" dans la barre
+latérale) listant les tâches en attente puis terminées (repliées),
+`components/TaskRow.tsx` pour cocher fait/pas fait et supprimer,
+badge "En retard" si l'échéance est dépassée.
+
+**À appliquer en prod** : migration `0034` (après la 0033).
+
+**Pas testé en conditions réelles** : `tsc --noEmit`, `npm test` et
+`npm run build` passent, mais pas de vrai enregistrement avec de vraies
+tâches mentionnées essayé en navigateur ; pas de nouveau test unitaire
+pour `extractTasksFromText`/`extractAndStoreTasks` (même lacune que
+documentée à l'item 15 pour le reste des appels LLM/Supabase directs).
+
+**Effort réel** : moyen, confirmé (nouvelle table + prompt d'extraction +
+UI liste de tâches, transcription déjà acquise).
+
+### 73. Rappel par email si une tâche de la todolist est en retard : ✅ Fait (2026-11-27)
+
+**Besoin** : si une tâche de l'item 72 dépasse son échéance sans être
+marquée faite, prévenir automatiquement par email plutôt que de compter
+sur quelqu'un qui repense à aller vérifier la liste.
+
+**WhatsApp écarté (discuté le 2026-11-27)** : canal envisagé en plus du
+mail, abandonné volontairement : API Business (Twilio ou Meta Cloud),
+validation de compte, templates de message à faire approuver à l'avance,
+coût par message, jugé disproportionné par rapport au besoin. Email seul
+retenu.
+
+**Implémenté** : `lib/taskReminders.ts` (`sendOverdueTaskReminders`),
+appelé quotidiennement par `app/api/cron/task-reminders/route.ts` (ajouté
+à `vercel.json`, même mécanisme `CRON_SECRET`/`force-dynamic` que la
+purge RGPD de l'item 48). Regroupe les tâches en retard par organisation,
+trouve les owners/admins via `users_organizations`
+(`admin.auth.admin.getUserById` pour l'email, même pattern que
+`app/api/organizations/[id]/members/route.ts`), et envoie **un seul
+email par admin** listant toutes ses tâches en retard (pas un email par
+tâche) via l'outil déjà utilisé pour les notifications (item 33,
+`sendEmail`).
+
+**Limite connue, partagée avec les items 12/13** : sans `RESEND_API_KEY`
+configurée, le cron tourne mais `sendEmail` échoue silencieusement
+(loggé, pas d'exception qui remonte), fonctionnel seulement une fois
+cette variable en place en prod.
+
+**Pas testé en conditions réelles** : `tsc --noEmit` et `npm test`
+passent ; le cron n'a pas été déclenché manuellement contre de vraies
+données, et aucun email n'a été reçu pour vérification.
+
+**Effort réel** : faible-moyen, confirmé (cron + email, pas de nouvelle
+infra).

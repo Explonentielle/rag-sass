@@ -24,6 +24,24 @@ function PaperclipIcon({ className }: { className?: string }) {
     </svg>
   );
 }
+function MicIcon({ className }: { className?: string }) {
+  return (
+    <svg
+      className={className}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <path d="M12 2a3 3 0 00-3 3v6a3 3 0 006 0V5a3 3 0 00-3-3z" />
+      <path d="M19 10v1a7 7 0 01-14 0v-1" />
+      <line x1="12" y1="18" x2="12" y2="22" />
+    </svg>
+  );
+}
 function ThumbIcon({ className, down }: { className?: string; down?: boolean }) {
   return (
     <svg
@@ -406,8 +424,12 @@ export default function ChatWidget({
   const [visitorId, setVisitorId] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
+  const [recordingVoice, setRecordingVoice] = useState(false);
+  const [transcribing, setTranscribing] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const voiceChunksRef = useRef<Blob[]>([]);
 
   useEffect(() => {
     if (isPublic) setVisitorId(getOrCreateVisitorId());
@@ -560,6 +582,63 @@ export default function ChatWidget({
     } finally {
       setUploading(false);
     }
+  }
+
+  // Dictée pour remplir le champ de saisie (docs/roadmap.md item 71),
+  // dashboard uniquement : pas de bouton rendu pour le widget public (voir
+  // plus bas, isPublic). Pas de document créé : juste un aller-retour vers
+  // /api/transcribe, le résultat vient remplir `input` comme si l'utilisateur
+  // l'avait tapé.
+  async function handleMicClick() {
+    if (recordingVoice) {
+      mediaRecorderRef.current?.stop();
+      return;
+    }
+
+    let stream: MediaStream;
+    try {
+      stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    } catch {
+      setUploadError('Accès au micro refusé ou indisponible.');
+      return;
+    }
+
+    const mimeType = MediaRecorder.isTypeSupported('audio/webm') ? 'audio/webm' : undefined;
+    const recorder = new MediaRecorder(stream, mimeType ? { mimeType } : undefined);
+    voiceChunksRef.current = [];
+    recorder.ondataavailable = (e) => {
+      if (e.data.size > 0) voiceChunksRef.current.push(e.data);
+    };
+    recorder.onstop = async () => {
+      stream.getTracks().forEach((track) => track.stop());
+      setRecordingVoice(false);
+      const blob = new Blob(voiceChunksRef.current, { type: recorder.mimeType || mimeType || 'audio/webm' });
+      voiceChunksRef.current = [];
+      if (blob.size === 0) return;
+
+      setTranscribing(true);
+      try {
+        const form = new FormData();
+        form.set('file', blob, 'dictation.webm');
+        const res = await fetch('/api/transcribe', { method: 'POST', body: form });
+        if (!res.ok) {
+          setUploadError(describeFailedResponse(res.status, await res.text().catch(() => '')));
+          return;
+        }
+        const body = await res.json();
+        if (typeof body.text === 'string' && body.text.trim()) {
+          setInput((prev) => (prev.trim() ? `${prev.trim()} ${body.text.trim()}` : body.text.trim()));
+        }
+      } catch {
+        setUploadError('Erreur lors de la transcription.');
+      } finally {
+        setTranscribing(false);
+      }
+    };
+
+    mediaRecorderRef.current = recorder;
+    recorder.start();
+    setRecordingVoice(true);
   }
 
   // Rates (or un-rates, when clicking the same thumb again) one saved answer.
@@ -874,6 +953,22 @@ export default function ChatWidget({
               )}
             </button>
           </>
+        )}
+        {!isPublic && (
+          <button
+            type="button"
+            onClick={handleMicClick}
+            disabled={loading || transcribing}
+            aria-label={recordingVoice ? 'Arrêter la dictée' : 'Dicter un message'}
+            title={recordingVoice ? 'Arrêter la dictée' : 'Dicter un message'}
+            className={`flex-shrink-0 rounded-md border px-3 transition-colors disabled:opacity-50 ${
+              recordingVoice
+                ? 'border-red-300 bg-red-50 text-red-600'
+                : 'border-slate-300 text-slate-500 hover:bg-slate-50 hover:text-slate-700'
+            }`}
+          >
+            {transcribing ? <span className="text-xs">...</span> : <MicIcon className="h-4 w-4" />}
+          </button>
         )}
         <Input
           type="text"

@@ -166,6 +166,7 @@ export async function POST(request: Request) {
         filename: file.name,
         useAiIndexing: chatbot.use_ai_indexing,
         documentFormat: chatbot.use_case === 'paperwork_digitizer' ? chatbot.document_format : null,
+        extractTasks: fileType === 'audio' && chatbot.use_case === 'second_cerveau',
       }).catch((err) => {
         logError('upload.background_processing_uncaught', {
           documentId: document.id,
