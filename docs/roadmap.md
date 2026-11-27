@@ -3524,8 +3524,15 @@ seulement hors widget public ; le texte transcrit vient compléter
 main pour relire/corriger avant d'envoyer. Pas de palier requis (coût
 marginal négligeable face à une transcription de réunion entière).
 
-**Pas testé en conditions réelles** : `tsc --noEmit` et `npm test`
-passent, mais pas de vrai micro essayé dans un navigateur.
+**Tests** : `tsc --noEmit` et `npm test` passent (pas de nouveau test
+unitaire, composant UI + appel réseau direct).
+
+**À tester en conditions réelles** : cliquer le micro dans le chat du
+dashboard, parler, vérifier que le texte transcrit arrive bien dans le
+champ de saisie sans l'envoyer automatiquement ; refuser la permission
+micro du navigateur et vérifier qu'un message d'erreur clair s'affiche
+plutôt qu'un plantage ; vérifier que le bouton micro est bien absent du
+widget public (`isPublic`).
 
 **Effort réel** : faible-moyen, confirmé (surtout UI, la brique de
 transcription était déjà en place).
@@ -3561,11 +3568,19 @@ badge "En retard" si l'échéance est dépassée.
 
 **À appliquer en prod** : migration `0034` (après la 0033).
 
-**Pas testé en conditions réelles** : `tsc --noEmit`, `npm test` et
-`npm run build` passent, mais pas de vrai enregistrement avec de vraies
-tâches mentionnées essayé en navigateur ; pas de nouveau test unitaire
-pour `extractTasksFromText`/`extractAndStoreTasks` (même lacune que
-documentée à l'item 15 pour le reste des appels LLM/Supabase directs).
+**Tests** : `tsc --noEmit`, `npm test` et `npm run build` passent ; pas de
+nouveau test unitaire pour `extractTasksFromText`/`extractAndStoreTasks`
+(même lacune que documentée à l'item 15 pour le reste des appels
+LLM/Supabase directs).
+
+**À tester en conditions réelles** : appliquer la migration `0034` en
+prod ; sur un chatbot `second_cerveau`, uploader un enregistrement audio
+qui mentionne clairement une ou deux actions avec échéance ("il faut
+qu'on envoie le devis vendredi prochain") et vérifier qu'elles
+apparaissent dans `/dashboard/tasks` avec la bonne date résolue ;
+uploader un enregistrement sans aucune action et vérifier qu'aucune
+tâche parasite n'est créée ; cocher une tâche faite et la supprimer
+depuis `TaskRow`.
 
 **Effort réel** : moyen, confirmé (nouvelle table + prompt d'extraction +
 UI liste de tâches, transcription déjà acquise).
@@ -3593,14 +3608,24 @@ email par admin** listant toutes ses tâches en retard (pas un email par
 tâche) via l'outil déjà utilisé pour les notifications (item 33,
 `sendEmail`).
 
-**Limite connue, partagée avec les items 12/13** : sans `RESEND_API_KEY`
-configurée, le cron tourne mais `sendEmail` échoue silencieusement
-(loggé, pas d'exception qui remonte), fonctionnel seulement une fois
-cette variable en place en prod.
+**Limite connue en prod (2026-11-27)** : `RESEND_API_KEY` est bien
+configurée sur Vercel, mais sans domaine d'envoi vérifié sur Resend : les
+emails ne peuvent partir que vers l'adresse du compte Resend
+lui-même (celle de l'utilisateur), pas vers l'email réel d'un autre
+owner/admin d'org. Accepté comme limite temporaire tant qu'il n'y a
+qu'un seul pilote (voir `docs/deployment.md` §5, `RESEND_FROM_EMAIL`),
+à lever le jour où un domaine est vérifié sur Resend.
 
-**Pas testé en conditions réelles** : `tsc --noEmit` et `npm test`
-passent ; le cron n'a pas été déclenché manuellement contre de vraies
-données, et aucun email n'a été reçu pour vérification.
+**Tests** : `tsc --noEmit` et `npm test` passent (pas de nouveau test
+unitaire, fonction best-effort qui parle à Supabase et à Resend).
+
+**À tester en conditions réelles** : créer une tâche avec une échéance
+passée, appeler `/api/cron/task-reminders` (avec le header
+`Authorization: Bearer <CRON_SECRET>` si configuré) et vérifier qu'un
+email arrive bien à l'adresse du compte Resend (limite connue
+ci-dessus), qu'il regroupe plusieurs tâches en retard d'une même
+organisation en un seul email, et qu'une tâche déjà marquée faite ou
+sans échéance dépassée n'y apparaît pas.
 
 **Effort réel** : faible-moyen, confirmé (cron + email, pas de nouvelle
 infra).

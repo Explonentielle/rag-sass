@@ -286,6 +286,15 @@ reçoit la ligne attendue, avant d'envisager un abonnement live.
 | `STRIPE_WEBHOOK_SECRET` | Optionnel (étape 4) — généré à la création du webhook |
 | `STRIPE_PRICE_SOLO` / `_PME` / `_METIER` | Optionnel (étape 4) — ids `price_...` de chaque plan |
 
+**État réel de `RESEND_API_KEY`/`RESEND_FROM_EMAIL` en prod (2026-11-27)** :
+configurées sur Vercel, mais sans domaine vérifié sur Resend. En mode
+sandbox (`onboarding@resend.dev`), Resend ne livre que vers l'adresse
+email du compte Resend lui-même, jamais vers un destinataire arbitraire.
+`lib/email.ts` (outil email agentique, item 33) et `lib/taskReminders.ts`
+(item 73) tournent donc sans erreur, mais n'atteignent concrètement que
+cette seule adresse pour l'instant. Accepté tel quel tant qu'il n'y a
+qu'un seul pilote ; à lever le jour où un domaine est vérifié sur Resend.
+
 3. Déployer. Vercel gère `waitUntil`/`maxDuration` (déjà configurés dans
    le code pour l'ingestion async et le streaming de chat) nativement.
 
